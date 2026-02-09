@@ -1,0 +1,128 @@
+import { db } from "@/db/client";
+import { championships, players, teams } from "@/schema";
+import { eq, asc } from "drizzle-orm";
+import { playerUpsertSchema, teamUpsertSchema } from "@/lib/validation";
+
+export async function listChampionships() {
+  return db.select().from(championships).orderBy(asc(championships.name));
+}
+
+export async function listTeamsWithMeta() {
+  return db
+    .select({
+      id: teams.id,
+      name: teams.name,
+      championshipId: teams.championshipId,
+      stadium: teams.stadium,
+      coach: teams.coach,
+      pitchDimensions: teams.pitchDimensions,
+      pitchRating: teams.pitchRating
+    })
+    .from(teams)
+    .orderBy(asc(teams.name));
+}
+
+export async function createTeam(payload: unknown) {
+  const data = teamUpsertSchema.parse(payload);
+  const [created] = await db
+    .insert(teams)
+    .values({
+      championshipId: data.championshipId,
+      name: data.name,
+      emblem: data.emblem || null,
+      stadium: data.stadium || null,
+      pitchDimensions: data.pitchDimensions || null,
+      pitchRating: data.pitchRating ?? null,
+      coach: data.coach || null,
+      president: data.president || null
+    })
+    .returning();
+  return created;
+}
+
+export async function updateTeam(id: number, payload: unknown) {
+  const data = teamUpsertSchema.parse(payload);
+  const [updated] = await db
+    .update(teams)
+    .set({
+      championshipId: data.championshipId,
+      name: data.name,
+      emblem: data.emblem || null,
+      stadium: data.stadium || null,
+      pitchDimensions: data.pitchDimensions || null,
+      pitchRating: data.pitchRating ?? null,
+      coach: data.coach || null,
+      president: data.president || null
+    })
+    .where(eq(teams.id, id))
+    .returning();
+  return updated;
+}
+
+export async function deleteTeam(id: number) {
+  await db.delete(teams).where(eq(teams.id, id));
+}
+
+export async function listPlayersWithTeams(teamId?: number) {
+  let query = db
+    .select({
+      id: players.id,
+      name: players.name,
+      teamId: players.teamId,
+      primaryPosition: players.primaryPosition,
+      secondaryPosition: players.secondaryPosition,
+      dominantFoot: players.dominantFoot,
+      heightCm: players.heightCm,
+      weightKg: players.weightKg
+    })
+    .from(players);
+
+  if (teamId) {
+    query = query.where(eq(players.teamId, teamId));
+  }
+
+  return await query.orderBy(asc(players.name));
+}
+
+export async function createPlayer(payload: unknown) {
+  const data = playerUpsertSchema.parse(payload);
+  const [created] = await db
+    .insert(players)
+    .values({
+      teamId: data.teamId,
+      name: data.name,
+      primaryPosition: data.primaryPosition,
+      secondaryPosition: data.secondaryPosition || null,
+      tertiaryPosition: data.tertiaryPosition || null,
+      dominantFoot: data.dominantFoot || null,
+      heightCm: data.heightCm ?? null,
+      weightKg: data.weightKg ?? null,
+      description: data.description || null
+    })
+    .returning();
+  return created;
+}
+
+export async function updatePlayer(id: number, payload: unknown) {
+  const data = playerUpsertSchema.parse(payload);
+  const [updated] = await db
+    .update(players)
+    .set({
+      teamId: data.teamId,
+      name: data.name,
+      primaryPosition: data.primaryPosition,
+      secondaryPosition: data.secondaryPosition || null,
+      tertiaryPosition: data.tertiaryPosition || null,
+      dominantFoot: data.dominantFoot || null,
+      heightCm: data.heightCm ?? null,
+      weightKg: data.weightKg ?? null,
+      description: data.description || null
+    })
+    .where(eq(players.id, id))
+    .returning();
+  return updated;
+}
+
+export async function deletePlayer(id: number) {
+  await db.delete(players).where(eq(players.id, id));
+}
