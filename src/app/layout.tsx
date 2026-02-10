@@ -12,12 +12,12 @@ const font = Space_Grotesk({
 
 export const metadata = {
   title: "Football Analysis",
-  description: "Goal analytics for professional staff"
+  description: "Análise de golos para equipas técnicas"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={font.variable}>
+    <html lang="pt-PT" className={font.variable}>
       <body className="bg-background text-foreground">
         <QueryProvider>
           <div className="min-h-screen">
@@ -32,16 +32,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </div>
                 <nav className="flex items-center gap-3 text-sm font-medium">
                   <a href="/manage/teams" className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/5">
-                    Teams
+                    Equipas
                   </a>
                   <a href="/manage/players" className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/5">
-                    Players
+                    Jogadores
                   </a>
                   <a href="/goals" className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/5">
-                    Capture Goal
+                    Registar Golo
                   </a>
                   <a href="/teams" className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/5">
-                    Team Stats
+                    Estatísticas
                   </a>
                 </nav>
               </div>

@@ -2,16 +2,39 @@ import { z } from "zod";
 
 export const roleEnum = z.enum(["assist", "involvement"]);
 
+export const pointSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1)
+});
+
+export const fieldDrawingSchema = z.object({
+  strokes: z
+    .array(
+      z.object({
+        id: z.string(),
+        color: z.string(),
+        width: z.number().min(1),
+        points: z.array(pointSchema).min(2)
+      })
+    )
+    .optional()
+    .default([]),
+  width: z.number().positive(),
+  height: z.number().positive()
+});
+
 export const goalInputSchema = z.object({
-  matchId: z.number().int().positive().optional(),
+  matchId: z.number().int().positive().optional().nullable(),
   teamId: z.number().int().positive(),
   scorerId: z.number().int().positive(),
+  assistId: z.number().int().positive().optional().nullable(),
   minute: z.number().int().min(0).max(130),
   momentId: z.number().int().positive(),
   subMomentId: z.number().int().positive(),
   actionId: z.number().int().positive(),
-  goalZoneId: z.number().int().positive(),
-  notes: z.string().optional(),
+  goalZoneId: z.number().int().positive().optional().nullable(),
+  fieldDrawing: fieldDrawingSchema.optional(),
+  notes: z.string().optional().or(z.literal("")),
   involvements: z
     .array(
       z.object({
@@ -43,6 +66,5 @@ export const playerUpsertSchema = z.object({
   tertiaryPosition: z.string().optional().or(z.literal("")),
   dominantFoot: z.string().optional().or(z.literal("")),
   heightCm: z.number().int().min(120).max(220).optional().nullable(),
-  weightKg: z.number().int().min(40).max(120).optional().nullable(),
-  description: z.string().optional().or(z.literal(""))
+  weightKg: z.number().int().min(40).max(120).optional().nullable()
 });

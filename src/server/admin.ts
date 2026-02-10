@@ -1,7 +1,7 @@
-import { db } from "@/db/client";
-import { championships, players, teams } from "@/schema";
+import { db } from "../db/client";
+import { championships, players, teams } from "../schema/schema";
 import { eq, asc } from "drizzle-orm";
-import { playerUpsertSchema, teamUpsertSchema } from "@/lib/validation";
+import { playerUpsertSchema, teamUpsertSchema } from "../lib/validation";
 
 export async function listChampionships() {
   return db.select().from(championships).orderBy(asc(championships.name));
@@ -64,24 +64,23 @@ export async function deleteTeam(id: number) {
 }
 
 export async function listPlayersWithTeams(teamId?: number) {
-  let query = db
+  const baseQuery = db
     .select({
       id: players.id,
       name: players.name,
       teamId: players.teamId,
       primaryPosition: players.primaryPosition,
       secondaryPosition: players.secondaryPosition,
+      tertiaryPosition: players.tertiaryPosition,
       dominantFoot: players.dominantFoot,
       heightCm: players.heightCm,
       weightKg: players.weightKg
     })
     .from(players);
 
-  if (teamId) {
-    query = query.where(eq(players.teamId, teamId));
-  }
+  const scopedQuery = teamId ? baseQuery.where(eq(players.teamId, teamId)) : baseQuery;
 
-  return await query.orderBy(asc(players.name));
+  return await scopedQuery.orderBy(asc(players.name));
 }
 
 export async function createPlayer(payload: unknown) {
@@ -96,8 +95,7 @@ export async function createPlayer(payload: unknown) {
       tertiaryPosition: data.tertiaryPosition || null,
       dominantFoot: data.dominantFoot || null,
       heightCm: data.heightCm ?? null,
-      weightKg: data.weightKg ?? null,
-      description: data.description || null
+      weightKg: data.weightKg ?? null
     })
     .returning();
   return created;
@@ -115,8 +113,7 @@ export async function updatePlayer(id: number, payload: unknown) {
       tertiaryPosition: data.tertiaryPosition || null,
       dominantFoot: data.dominantFoot || null,
       heightCm: data.heightCm ?? null,
-      weightKg: data.weightKg ?? null,
-      description: data.description || null
+      weightKg: data.weightKg ?? null
     })
     .where(eq(players.id, id))
     .returning();

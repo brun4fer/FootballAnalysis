@@ -10,6 +10,7 @@ export async function GET(req: Request) {
     const data = await getGoalsByTeam(teamId);
     return NextResponse.json(data);
   } catch (error) {
+    console.error(error);
     const message = error instanceof ZodError ? error.flatten() : (error as Error).message;
     const status = error instanceof ZodError ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
@@ -19,9 +20,22 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const json = await req.json();
-    const id = await createGoal(json);
+    // Normalize payload before validation/insert
+    const minute =
+      json?.minute === undefined || json?.minute === null
+        ? json?.minute
+        : Number(String(json.minute).replace(/[^\d.-]/g, ""));
+    const payload = {
+      ...json,
+      minute,
+      // Ensure the drawing is plain JSON (no prototypes) so it can be stored as jsonb
+      fieldDrawing: json?.fieldDrawing ? JSON.parse(JSON.stringify(json.fieldDrawing)) : json?.fieldDrawing
+    };
+
+    const id = await createGoal(payload);
     return NextResponse.json({ id }, { status: 201 });
   } catch (error) {
+    console.error(error);
     const message = error instanceof ZodError ? error.flatten() : (error as Error).message;
     const status = error instanceof ZodError ? 400 : 500;
     return NextResponse.json({ error: message }, { status });

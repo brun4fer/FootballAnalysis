@@ -9,26 +9,26 @@ export default function HomePage() {
       <section className="rounded-2xl border border-border/60 bg-gradient-to-br from-[#0f1729] via-[#0a0f1a] to-[#0f1729] px-8 py-10 shadow-2xl shadow-cyan-500/10">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Professional Analytics</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Análises profissionais</p>
             <h1 className="text-3xl font-semibold leading-tight text-white md:text-4xl">
-              Tactical intelligence for Liga Portugal 2, built on live event data.
+              Inteligência tática para a Liga Portugal 2, construída sobre dados de eventos em tempo real.
             </h1>
             <p className="max-w-2xl text-sm text-muted-foreground">
-              Capture goals with structured context, manage rosters, and surface high-signal insights without precomputed stats.
+              Regista golos com contexto estruturado, gere plantéis e obtém insights de alto valor sem depender de estatísticas pré-computadas.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Badge className="bg-emerald-500/20 text-emerald-200">Dark Ops UI</Badge>
-              <Badge className="bg-cyan-500/20 text-cyan-100">Live Aggregations</Badge>
-              <Badge className="bg-white/10 text-white/80">PostgreSQL · Drizzle</Badge>
+              <Badge className="bg-emerald-500/20 text-emerald-200">UI Dark Ops</Badge>
+              <Badge className="bg-cyan-500/20 text-cyan-100">Agregação em tempo real</Badge>
+              <Badge className="bg-white/10 text-white/80">PostgreSQL / Drizzle</Badge>
             </div>
           </div>
           <div className="flex gap-3">
             <Link href="/goals">
-              <Button size="lg">Capture Goal</Button>
+              <Button size="lg">Registar Golo</Button>
             </Link>
             <Link href="/teams">
               <Button variant="secondary" size="lg">
-                Team Stats
+                Estatísticas
               </Button>
             </Link>
           </div>
@@ -37,29 +37,29 @@ export default function HomePage() {
 
       <div className="grid gap-5 md:grid-cols-2">
         <Card>
-          <CardHeader title="Goal Wizard" description="Stateful flow for consistent event capture" />
+          <CardHeader title="Wizard de Golo" description="Fluxo guiado para registar eventos de forma consistente" />
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>Team → scorer → involvements → tactical context → goalkeeper zone with live validation.</p>
+            <p>Equipa → marcador → participações → contexto tático → zona da baliza com validação em tempo real.</p>
             <Link href="/goals">
               <Button size="sm" className="mt-2">
-                Open Wizard
+                Abrir Wizard
               </Button>
             </Link>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader title="Rosters" description="Manage Liga Portugal 2 teams and players" />
+          <CardHeader title="Plantéis" description="Gerir equipas e jogadores da Liga Portugal 2" />
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>Pre-seeded clubs, quick player entry, and ready-to-use stats pipelines.</p>
+            <p>Clubes pré-carregados, entrada rápida de jogadores e pipelines de estatísticas prontos a usar.</p>
             <div className="flex gap-2">
               <Link href="/manage/teams">
                 <Button variant="secondary" size="sm">
-                  Teams
+                  Equipas
                 </Button>
               </Link>
               <Link href="/manage/players">
                 <Button variant="ghost" size="sm">
-                  Players
+                  Jogadores
                 </Button>
               </Link>
             </div>

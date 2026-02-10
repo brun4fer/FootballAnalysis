@@ -22,7 +22,7 @@ type Championship = { id: number; name: string };
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
-  if (!res.ok) throw new Error((await res.json()).error ?? "Request failed");
+  if (!res.ok) throw new Error((await res.json()).error ?? "Pedido falhou");
   return res.json();
 }
 
@@ -84,20 +84,20 @@ export default function ManageTeamsPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold text-white">Teams</h1>
-        <p className="text-sm text-muted-foreground">Manage Liga Portugal 2 clubs.</p>
+        <h1 className="text-2xl font-semibold text-white">Equipas</h1>
+        <p className="text-sm text-muted-foreground">Gerir clubes da Liga Portugal 2.</p>
       </div>
       <Card>
-        <CardHeader title={editingId ? "Update Team" : "Create Team"} description="All teams are linked to a championship" />
+        <CardHeader title={editingId ? "Atualizar Equipa" : "Criar Equipa"} description="Todas as equipas estão ligadas a um campeonato" />
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Name</label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Team name" />
+            <label className="text-xs text-muted-foreground">Nome</label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nome da equipa" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Championship</label>
+            <label className="text-xs text-muted-foreground">Campeonato</label>
             <Select value={form.championshipId} onChange={(e) => setForm({ ...form, championshipId: e.target.value })}>
-              <option value="">Select</option>
+              <option value="">Selecionar</option>
               {championships.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -106,15 +106,15 @@ export default function ManageTeamsPage() {
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Coach</label>
-            <Input value={form.coach} onChange={(e) => setForm({ ...form, coach: e.target.value })} placeholder="Coach name" />
+            <label className="text-xs text-muted-foreground">Treinador</label>
+            <Input value={form.coach} onChange={(e) => setForm({ ...form, coach: e.target.value })} placeholder="Nome do treinador" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Stadium</label>
-            <Input value={form.stadium} onChange={(e) => setForm({ ...form, stadium: e.target.value })} placeholder="Stadium" />
+            <label className="text-xs text-muted-foreground">Estádio</label>
+            <Input value={form.stadium} onChange={(e) => setForm({ ...form, stadium: e.target.value })} placeholder="Estádio" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Pitch Dimensions</label>
+            <label className="text-xs text-muted-foreground">Dimensões do relvado</label>
             <Input
               value={form.pitchDimensions}
               onChange={(e) => setForm({ ...form, pitchDimensions: e.target.value })}
@@ -122,7 +122,7 @@ export default function ManageTeamsPage() {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Pitch Rating (0-100)</label>
+            <label className="text-xs text-muted-foreground">Qualidade do relvado (0-100)</label>
             <Input
               type="number"
               value={form.pitchRating}
@@ -134,28 +134,28 @@ export default function ManageTeamsPage() {
           <div className="md:col-span-3 flex justify-end gap-2">
             {editingId && (
               <Button variant="ghost" type="button" onClick={() => setEditingId(null)}>
-                Cancel
+                Cancelar
               </Button>
             )}
-            <Button type="button" onClick={() => saveTeam.mutate()} disabled={!form.name || !form.championshipId || saveTeam.isLoading}>
-              {saveTeam.isLoading ? "Saving..." : editingId ? "Update" : "Create"}
+            <Button type="button" onClick={() => saveTeam.mutate()} disabled={!form.name || !form.championshipId || saveTeam.isPending}>
+              {saveTeam.isPending ? "A guardar..." : editingId ? "Atualizar" : "Criar"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader title="Teams" description="Existing clubs" />
+        <CardHeader title="Equipas" description="Clubes existentes" />
         <CardContent className="space-y-3 text-sm">
           {teamsQuery.data?.length ? (
             teamsQuery.data.map((team) => (
               <div key={team.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 hover:border-primary/60">
                 <div className="flex flex-col">
                   <span className="font-medium text-white">{team.name}</span>
-                  <span className="text-xs text-muted-foreground">{championshipMap.get(team.championshipId) ?? `Championship #${team.championshipId}`}</span>
+                  <span className="text-xs text-muted-foreground">{championshipMap.get(team.championshipId) ?? `Campeonato #${team.championshipId}`}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge>{team.coach || "Coach TBD"}</Badge>
+                  <Badge>{team.coach || "Treinador por definir"}</Badge>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -171,16 +171,16 @@ export default function ManageTeamsPage() {
                       });
                     }}
                   >
-                    Edit
+                    Editar
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => deleteTeam.mutate(team.id)}>
-                    Delete
+                    Apagar
                   </Button>
                 </div>
               </div>
             ))
           ) : (
-            <div className="text-muted-foreground">No teams yet.</div>
+            <div className="text-muted-foreground">Ainda não existem equipas.</div>
           )}
         </CardContent>
       </Card>

@@ -1,13 +1,13 @@
 ﻿import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { teamParamSchema } from "@/lib/validation";
-import { involvementLeaderboard } from "@/server/stats";
+import { mostInvolved } from "@/server/stats";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   try {
     const { teamId } = teamParamSchema.parse({ teamId: searchParams.get("teamId") });
-    const data = await involvementLeaderboard(teamId);
+    const data = await mostInvolved(teamId);
     return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof ZodError ? error.flatten() : (error as Error).message;

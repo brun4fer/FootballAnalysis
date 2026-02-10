@@ -1,5 +1,5 @@
 import { db } from "../db/client";
-import { players, teams } from "../schema";
+import { players, teams } from "../schema/schema";
 import { eq, asc } from "drizzle-orm";
 
 export async function listTeams() {

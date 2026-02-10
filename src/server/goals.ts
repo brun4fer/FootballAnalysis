@@ -1,7 +1,41 @@
-﻿import { db } from "@/db/client";
-import { actions, goals, goalInvolvements, moments, players, subMoments, teams } from "@/schema";
 import { eq, desc, inArray } from "drizzle-orm";
-import { goalInputSchema } from "@/lib/validation";
+import { db } from "../db/client";
+import { actions, goals, goalInvolvements, moments, players, subMoments, teams, goalkeeperZones } from "../schema/schema";
+import { goalInputSchema } from "../lib/validation";
+
+type RawGoalPayload = Record<string, unknown>;
+
+async function normalizeGoalPayload(payload: RawGoalPayload) {
+  const minuteValue = payload?.minute;
+  const minute =
+    minuteValue === undefined || minuteValue === null
+      ? minuteValue
+      : Number(String(minuteValue).replace(/[^\d.-]/g, ""));
+
+  let goalZoneId: unknown = payload?.goalZoneId;
+  if (typeof goalZoneId === "string") {
+    const numeric = Number(goalZoneId);
+    if (!Number.isNaN(numeric)) {
+      goalZoneId = numeric;
+    } else {
+      const zone = await db.query.goalkeeperZones.findFirst({
+        where: eq(goalkeeperZones.name, goalZoneId)
+      });
+      if (zone) {
+        goalZoneId = zone.id;
+      } else {
+        throw new Error(`Goal zone '${goalZoneId}' not found`);
+      }
+    }
+  }
+
+  const fieldDrawing =
+    payload?.fieldDrawing && typeof payload.fieldDrawing === "object"
+      ? JSON.parse(JSON.stringify(payload.fieldDrawing))
+      : payload?.fieldDrawing ?? null;
+
+  return { ...payload, minute, goalZoneId, fieldDrawing };
+}
 
 export async function getGoalsByTeam(teamId: number) {
   const rows = await db
@@ -10,9 +44,10 @@ export async function getGoalsByTeam(teamId: number) {
       matchId: goals.matchId,
       teamId: goals.teamId,
       scorerId: goals.scorerId,
+      assistId: goals.assistId,
       minute: goals.minute,
       notes: goals.notes,
-      createdAt: goals.createdAt,
+      fieldDrawing: goals.fieldDrawing,
       moment: moments.name,
       subMoment: subMoments.name,
       action: actions.name,
@@ -23,7 +58,7 @@ export async function getGoalsByTeam(teamId: number) {
     .leftJoin(subMoments, eq(goals.subMomentId, subMoments.id))
     .leftJoin(actions, eq(goals.actionId, actions.id))
     .where(eq(goals.teamId, teamId))
-    .orderBy(desc(goals.createdAt));
+    .orderBy(desc(goals.id));
 
   if (rows.length === 0) return [];
 
@@ -47,9 +82,9 @@ export async function getGoalsByTeam(teamId: number) {
 }
 
 export async function createGoal(payload: unknown) {
-  const parsed = goalInputSchema.parse(payload);
+  const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
+  const parsed = goalInputSchema.parse(normalized);
 
-  // Validate referential integrity manually for clearer errors
   const [team, scorer] = await Promise.all([
     db.query.teams.findFirst({ where: eq(teams.id, parsed.teamId) }),
     db.query.players.findFirst({ where: eq(players.id, parsed.scorerId) })
@@ -68,13 +103,37 @@ export async function createGoal(payload: unknown) {
   const action = await db.query.actions.findFirst({ where: eq(actions.id, parsed.actionId) });
   if (!action) throw new Error("Action not found");
   if (action.subMomentId !== parsed.subMomentId) throw new Error("Action does not belong to sub-moment");
+  const actionContext = (action as any).context as "field" | "field_goal" | undefined;
 
-  // Validate involvement players belong to team
+  if (actionContext === "field" && (!parsed.fieldDrawing || (parsed.fieldDrawing.strokes?.length ?? 0) === 0)) {
+    throw new Error("Esta ação requer desenho no campo (field drawing obrigatório).");
+  }
+  if (actionContext !== "field" && !parsed.goalZoneId) {
+    throw new Error("Esta ação requer selecionar uma zona da baliza.");
+  }
+
+  const assistFromRoles = parsed.involvements?.filter((i) => i.role === "assist") ?? [];
+  if (assistFromRoles.length > 1) {
+    throw new Error("Only one assist is allowed per goal");
+  }
+
+  let assistId = parsed.assistId ?? assistFromRoles[0]?.playerId ?? null;
+  if (assistId) {
+    const assistPlayer = await db.query.players.findFirst({ where: eq(players.id, assistId) });
+    if (!assistPlayer) throw new Error("Assist player not found");
+    if (assistPlayer.teamId !== parsed.teamId) throw new Error("Assist player does not belong to team");
+  }
+
   if (parsed.involvements) {
-    const ids = [...new Set(parsed.involvements.map((i) => i.playerId))];
-    if (ids.length !== parsed.involvements.length) {
-      throw new Error("Duplicate player roles in involvements");
+    const duplicateRole = new Set<string>();
+    for (const inv of parsed.involvements) {
+      const key = `${inv.playerId}-${inv.role}`;
+      if (duplicateRole.has(key)) {
+        throw new Error("Duplicate player role in involvements");
+      }
+      duplicateRole.add(key);
     }
+    const ids = [...new Set(parsed.involvements.map((i) => i.playerId))];
     const involvementPlayers = await db
       .select({ id: players.id, teamId: players.teamId })
       .from(players)
@@ -88,15 +147,17 @@ export async function createGoal(payload: unknown) {
     const [inserted] = await tx
       .insert(goals)
       .values({
-        matchId: parsed.matchId,
+        matchId: parsed.matchId ?? null,
         teamId: parsed.teamId,
         scorerId: parsed.scorerId,
+        assistId,
         minute: parsed.minute,
         momentId: parsed.momentId,
         subMomentId: parsed.subMomentId,
         actionId: parsed.actionId,
-        goalZoneId: parsed.goalZoneId,
-        notes: parsed.notes
+        goalZoneId: actionContext === "field" ? null : parsed.goalZoneId,
+        fieldDrawing: parsed.fieldDrawing ?? null,
+        notes: parsed.notes || null
       })
       .returning({ id: goals.id });
 
@@ -115,4 +176,3 @@ export async function createGoal(payload: unknown) {
 
   return goalId;
 }
-

@@ -4,22 +4,22 @@
 
 :root {
   color-scheme: dark;
-  --background: 210 25% 6%;
-  --foreground: 204 15% 92%;
-  --card: 212 30% 10%;
-  --card-foreground: 204 15% 92%;
-  --primary: 153 85% 55%;
+  --background: 220 26% 6%;
+  --foreground: 198 18% 92%;
+  --card: 222 38% 10%;
+  --card-foreground: 198 18% 92%;
+  --primary: 183 85% 55%;
   --primary-foreground: 210 20% 8%;
-  --secondary: 204 35% 18%;
-  --secondary-foreground: 204 15% 92%;
-  --muted: 210 25% 14%;
-  --muted-foreground: 204 12% 70%;
-  --accent: 190 85% 55%;
+  --secondary: 213 36% 18%;
+  --secondary-foreground: 198 18% 92%;
+  --muted: 220 26% 14%;
+  --muted-foreground: 198 12% 68%;
+  --accent: 165 82% 55%;
   --accent-foreground: 210 20% 8%;
-  --border: 210 28% 18%;
-  --input: 210 28% 18%;
-  --ring: 153 85% 60%;
-  --glow: 153 85% 55%;
+  --border: 220 30% 18%;
+  --input: 220 30% 18%;
+  --ring: 183 85% 62%;
+  --glow: 183 85% 55%;
   --radius: 14px;
 }
 
@@ -30,12 +30,36 @@
 body {
   margin: 0;
   background: radial-gradient(circle at 20% 20%, hsla(190, 80%, 20%, 0.25), transparent 25%),
-    radial-gradient(circle at 80% 10%, hsla(153, 80%, 18%, 0.2), transparent 22%),
-    radial-gradient(circle at 50% 80%, hsla(210, 60%, 20%, 0.3), transparent 30%),
+    radial-gradient(circle at 78% 12%, hsla(165, 80%, 22%, 0.2), transparent 22%),
+    radial-gradient(circle at 48% 80%, hsla(218, 60%, 20%, 0.3), transparent 30%),
     hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: var(--font-body), system-ui, -apple-system, sans-serif;
   min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(90deg, rgba(103, 232, 249, 0.05) 0, rgba(103, 232, 249, 0.05) 1px, transparent 1px, transparent 80px),
+    repeating-linear-gradient(0deg, rgba(16, 185, 129, 0.05) 0, rgba(16, 185, 129, 0.05) 1px, transparent 1px, transparent 80px);
+  opacity: 0.35;
+  z-index: -1;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 30% 30%, rgba(14, 165, 233, 0.16), transparent 40%),
+    radial-gradient(circle at 70% 20%, rgba(16, 185, 129, 0.12), transparent 35%);
+  opacity: 0.6;
+  z-index: -2;
 }
 
 a {
@@ -49,6 +73,20 @@ input:focus-visible,
 textarea:focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
+}
+
+/* High-contrast menu options for native selects/dropdowns */
+select option,
+select optgroup {
+  color: #0f172a; /* near-black for readability */
+  background-color: #f8fafc;
+}
+
+select option:checked,
+select option:hover,
+select option:focus {
+  color: #0f172a;
+  background-color: #e2e8f0;
 }
 
 .glass {
