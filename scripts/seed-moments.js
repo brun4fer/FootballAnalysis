@@ -5,104 +5,69 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const seeds = [
   {
-    name: "Organizacao Ofensiva",
+    name: "Organização Ofensiva",
     sub: [
+      { name: "Saída do GR", actions: ["Em organização", "Curto para longo", "Bola longa"] },
       {
-        name: "Saida do GR",
-        actions: [
-          { name: "Curto para longo", context: "field" },
-          { name: "Ligacao por dentro", context: "field" },
-          { name: "Ligacao por fora", context: "field" }
-        ]
+        name: "Construção",
+        actions: ["Ligação por dentro", "Ligação na largura", "Bola longa no corredor central", "Bola longa na largura"]
       },
+      { name: "Criação", actions: ["Ligação no corredor central", "Ligação na largura", "Bola longa", "Profundidade"] },
       {
-        name: "Construcao",
-        actions: [
-          { name: "Atrair pressao / 3o homem", context: "field" },
-          { name: "Mudanca corredor", context: "field" },
-          { name: "Passe vertical", context: "field" }
-        ]
-      },
-      {
-        name: "Criacao",
-        actions: [
-          { name: "Ligacao por dentro", context: "field" },
-          { name: "Ligacao por fora", context: "field" },
-          { name: "Terceiro homem", context: "field" }
-        ]
-      },
-      {
-        name: "Finalizacao",
-        actions: [
-          { name: "Cruzamento", context: "field_goal" },
-          { name: "Remate exterior", context: "field_goal" },
-          { name: "Segunda bola", context: "field_goal" }
-        ]
+        name: "Finalização",
+        actions: ["Cruzamento", "Remate de fora da área", "Profundidade", "Segunda bola", "Marcador", "Assistência", "Unidades de ligação"]
       }
     ]
   },
   {
-    name: "Transicao Ofensiva",
-    sub: [
-      {
-        name: "Recuperacao meio campo defensivo",
-        actions: [
-          { name: "Primeiro passe", context: "field" },
-          { name: "Jogadores referencia", context: "field" },
-          { name: "Espacos que atacam", context: "field" }
-        ]
-      },
-      {
-        name: "Recuperacao meio campo ofensivo",
-        actions: [
-          { name: "Primeiro passe", context: "field" },
-          { name: "Ataque rapido", context: "field_goal" },
-          { name: "Finalizacao imediata", context: "field_goal" }
-        ]
-      }
-    ]
+    name: "Transição Ofensiva",
+    sub: ["Recuperação meio campo defensivo", "Recuperação meio campo ofensivo"].map((subName) => ({
+      name: subName,
+      actions: ["Primeiro passe", "Jogadores referência", "Espaços que atacam", "Transição para organização", "Marcador", "Assistência", "Unidades de ligação"]
+    }))
   },
   {
-    name: "Bola Parada Ofensiva",
+    name: "Bola Parada Ofensiva (BPO)",
     sub: [
-      {
-        name: "Penalty",
-        actions: [{ name: "Penalty direto", context: "field_goal" }]
-      },
+      { name: "Penalty", actions: ["Falta sobre", "Momento anterior"] },
       {
         name: "Livre",
-        actions: [
-          { name: "Livre aberto", context: "field_goal" },
-          { name: "Livre fechado", context: "field_goal" },
-          { name: "Livre combinado", context: "field_goal" }
-        ]
+        actions: ["Aberto", "Fechado", "Combinado", "Marcador da falta", "Assistência", "Marcador", "Unidades de ligação"]
       },
       {
         name: "Canto",
-        actions: [
-          { name: "Canto aberto", context: "field_goal" },
-          { name: "Canto fechado", context: "field_goal" },
-          { name: "Canto combinado", context: "field_goal" }
-        ]
+        actions: ["Aberto", "Fechado", "Combinado", "Marcador do canto", "Assistência", "Marcador", "Unidades de ligação"]
       },
+      { name: "Livre Direto", actions: ["Falta sobre", "Momento anterior", "Marcador da falta"] },
       {
-        name: "Livre Direto",
-        actions: [
-          { name: "Remate direto", context: "field_goal" },
-          { name: "Rebote/segunda bola", context: "field_goal" }
-        ]
-      },
-      {
-        name: "Lancamento Lateral",
-        actions: [
-          { name: "Lancamento curto", context: "field" },
-          { name: "Lancamento longo", context: "field_goal" },
-          { name: "Combinado lancamento", context: "field_goal" }
-        ]
+        name: "Lançamento Lateral",
+        actions: ["Lançamento para a área", "Passagem para organização", "Marcador do lançamento", "Assistência", "Marcador", "Unidades de ligação"]
       }
     ]
   }
 ];
+
+const renameMap = {
+  // moments
+  "Organizacao Ofensiva": "Organização Ofensiva",
+  "Transicao Ofensiva": "Transição Ofensiva",
+  "Bola Parada Ofensiva": "Bola Parada Ofensiva (BPO)",
+  // sub-moments
+  "Saida do GR": "Saída do GR",
+  "Construcao": "Construção",
+  "Criacao": "Criação",
+  "Finalizacao": "Finalização",
+  "Recuperacao meio campo defensivo": "Recuperação meio campo defensivo",
+  "Recuperacao meio campo ofensivo": "Recuperação meio campo ofensivo",
+  "Lancamento Lateral": "Lançamento Lateral",
+  // actions
+  "Remate exterior": "Remate de fora da área",
+  "Rebote/segunda bola": "Rebote / segunda bola",
+  "Ligacao por dentro": "Ligação por dentro",
+  "Ligacao na largura": "Ligação na largura",
+  "Ligacao no corredor central": "Ligação no corredor central",
+  "Ligacao por fora": "Ligação na largura"
+};
 
 async function upsertMoment(name) {
   const { rows } = await pool.query(
@@ -128,13 +93,26 @@ async function upsertAction(subId, name, context) {
   return rows[0].id;
 }
 
+async function normalizeExistingNames() {
+  for (const [from, to] of Object.entries(renameMap)) {
+    await pool.query("UPDATE moments SET name = $2 WHERE name = $1", [from, to]);
+    await pool.query("UPDATE sub_moments SET name = $2 WHERE name = $1", [from, to]);
+    await pool.query("UPDATE actions SET name = $2 WHERE name = $1", [from, to]);
+  }
+}
+
 async function main() {
+  await normalizeExistingNames();
+  const contextFor = (name) => (name.toLowerCase().includes("marcador") ? "field_goal" : "field");
+
   for (const m of seeds) {
     const momentId = await upsertMoment(m.name);
     for (const s of m.sub) {
       const subId = await upsertSub(momentId, s.name);
       for (const a of s.actions) {
-        await upsertAction(subId, a.name, a.context);
+        const actionName = typeof a === "string" ? a : a.name;
+        const ctx = typeof a === "string" ? contextFor(a) : a.context ?? contextFor(a.name);
+        await upsertAction(subId, actionName, ctx);
       }
     }
   }

@@ -6,7 +6,7 @@ import { actions } from "@/schema/schema";
 const schema = z.object({
   subMomentId: z.number().int().positive(),
   name: z.string().min(2),
-  context: z.enum(["field", "field_goal"]).default("field_goal")
+  context: z.enum(["field", "field_goal"]).default("field")
 });
 
 export async function POST(req: Request) {

@@ -7,12 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useAppContext } from "@/components/ui/app-context";
 
 type LookupResponse = {
   moments: Array<{ id: number; name: string }>;
   subMoments: Array<{ id: number; name: string; momentId: number }>;
   actions: Array<{ id: number; name: string; subMomentId: number; context: "field" | "field_goal" }>;
   zones: Array<{ id: number; name: string }>;
+  seasons: Array<{ id: number; name: string }>;
+  championships: Array<{ id: number; name: string; seasonId: number; logo: string | null }>;
+  teams: Array<{ id: number; name: string; championshipId: number }>;
 };
 
 type Team = { id: number; name: string };
@@ -24,6 +28,8 @@ type Stroke = { id: string; color: string; width: number; points: Array<{ x: num
 const palette = ["#67e8f9", "#22d3ee", "#a78bfa", "#f97316", "#22c55e"];
 
 const steps = [
+  { id: "season", label: "Época" },
+  { id: "championship", label: "Campeonato" },
   { id: "team", label: "Equipa" },
   { id: "scorer", label: "Marcador & Assistência" },
   { id: "context", label: "Contexto" },
@@ -258,15 +264,18 @@ function CreateItemModal({
   title,
   placeholder,
   onClose,
-  onSave
+  onSave,
+  includeContext = false
 }: {
   open: boolean;
   title: string;
   placeholder: string;
   onClose: () => void;
-  onSave: (name: string) => Promise<void>;
+  includeContext?: boolean;
+  onSave: (name: string, context?: "field" | "field_goal") => Promise<void>;
 }) {
   const [value, setValue] = useState("");
+  const [context, setContext] = useState<"field" | "field_goal">("field");
   const [saving, setSaving] = useState(false);
   if (!open) return null;
 
@@ -274,8 +283,17 @@ function CreateItemModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-md rounded-2xl border border-border/70 bg-[#0c1527] p-5 shadow-2xl shadow-cyan-500/15">
         <div className="text-lg font-semibold text-white">{title}</div>
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-3">
           <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} />
+          {includeContext && (
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Contexto da ação</label>
+              <Select value={context} onChange={(e) => setContext((e.target.value as "field" | "field_goal") ?? "field")}>
+                <option value="field">Campo (sem baliza obrigatória)</option>
+                <option value="field_goal">Campo + Baliza</option>
+              </Select>
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose} type="button">
               Cancelar
@@ -285,9 +303,10 @@ function CreateItemModal({
               onClick={async () => {
                 if (!value.trim()) return;
                 setSaving(true);
-                await onSave(value.trim());
+                await onSave(value.trim(), context);
                 setSaving(false);
                 setValue("");
+                setContext("field");
                 onClose();
               }}
               disabled={saving}
@@ -303,7 +322,10 @@ function CreateItemModal({
 
 export function GoalWizard() {
   const qc = useQueryClient();
-  const [step, setStep] = useState<StepId>("team");
+  const { updatePartial } = useAppContext();
+  const [step, setStep] = useState<StepId>("season");
+  const [seasonId, setSeasonId] = useState<number | undefined>();
+  const [championshipId, setChampionshipId] = useState<number | undefined>();
   const [teamId, setTeamId] = useState<number | undefined>();
   const [matchId, setMatchId] = useState<number | undefined>();
   const [scorerId, setScorerId] = useState<number | undefined>();
@@ -314,6 +336,7 @@ export function GoalWizard() {
   const [actionId, setActionId] = useState<number | undefined>();
   const [zoneId, setZoneId] = useState<number | undefined | null>(null);
   const [notes, setNotes] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [involvements, setInvolvements] = useState<Involvement[]>([]);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -322,8 +345,8 @@ export function GoalWizard() {
     open: false
   });
 
-  const teamsQuery = useQuery({ queryKey: ["teams"], queryFn: () => fetchJson<Team[]>("/api/teams") });
   const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<LookupResponse>("/api/lookups") });
+  const teamsQuery = useQuery({ queryKey: ["teams"], queryFn: () => fetchJson<Team[]>("/api/teams") });
   const playersQuery = useQuery({
     queryKey: ["players", teamId],
     enabled: Boolean(teamId),
@@ -334,13 +357,13 @@ export function GoalWizard() {
       if (!teamId || !scorerId || !momentId || !subMomentId || !actionId) {
         throw new Error("Campos obrigatórios em falta");
       }
+      if (!seasonId || !championshipId) throw new Error("Selecione época e campeonato.");
 
       const actionMeta = lookupsQuery.data?.actions.find((a) => a.id === actionId);
-      const requiresField = actionMeta?.context === "field";
-      const requiresGoal = actionMeta?.context !== "field";
+      const requiresGoal = actionMeta ? actionMeta.name.toLowerCase().includes("marcador") : false;
 
       if (requiresGoal && !zoneId) throw new Error("Esta ação requer zona da baliza.");
-      if (requiresField && strokes.length === 0) throw new Error("Desenho de campo obrigatório para esta ação.");
+      if (!strokes.length) throw new Error("Desenho de campo obrigatório para esta ação.");
 
       const payload = {
         matchId,
@@ -352,6 +375,7 @@ export function GoalWizard() {
         subMomentId,
         actionId,
         goalZoneId: requiresGoal ? zoneId : null,
+        videoUrl: videoUrl || undefined,
         fieldDrawing: strokes.length ? { strokes, width: 1, height: 1 } : undefined,
         notes: notes || undefined,
         involvements
@@ -376,11 +400,22 @@ export function GoalWizard() {
       setActionId(undefined);
       setZoneId(null);
       setNotes("");
+      setVideoUrl("");
       setInvolvements([]);
       setStrokes([]);
     },
     onError: (err: any) => setMessage(err.message ?? "Erro ao gravar o golo")
   });
+
+  const filteredChampionships = useMemo(() => {
+    if (!lookupsQuery.data) return [];
+    return lookupsQuery.data.championships.filter((c) => (seasonId ? c.seasonId === seasonId : true));
+  }, [lookupsQuery.data, seasonId]);
+
+  const filteredTeams = useMemo(() => {
+    if (!lookupsQuery.data) return [];
+    return lookupsQuery.data.teams.filter((t) => (championshipId ? t.championshipId === championshipId : true));
+  }, [lookupsQuery.data, championshipId]);
 
   const filteredSubMoments = useMemo(() => {
     if (!momentId || !lookupsQuery.data) return [];
@@ -393,8 +428,8 @@ export function GoalWizard() {
   }, [lookupsQuery.data, subMomentId]);
 
   const selectedAction = filteredActions.find((a) => a.id === actionId);
-  const requiresField = selectedAction?.context === "field";
-  const requiresGoal = selectedAction?.context !== "field";
+  const requiresGoal = selectedAction ? selectedAction.name.toLowerCase().includes("marcador") : false;
+  const requiresField = Boolean(selectedAction); // todas as ações pedem registo de campo
 
   const currentPlayers = playersQuery.data ?? [];
   const addInvolvement = (playerId: number) => {
@@ -409,6 +444,10 @@ export function GoalWizard() {
 
   const canNext = (current: StepId) => {
     switch (current) {
+      case "season":
+        return Boolean(seasonId);
+      case "championship":
+        return Boolean(championshipId);
       case "team":
         return Boolean(teamId);
       case "scorer":
@@ -429,9 +468,9 @@ export function GoalWizard() {
   const currentIndex = steps.findIndex((s) => s.id === step);
   const movePrev = () => setStep(steps[Math.max(0, currentIndex - 1)].id);
   const moveNext = () => setStep(steps[Math.min(steps.length - 1, currentIndex + 1)].id);
-  const readyToSave = Boolean(teamId && scorerId && momentId && subMomentId && actionId && canNext("zone") && canNext("field"));
+  const readyToSave = Boolean(seasonId && championshipId && teamId && scorerId && momentId && subMomentId && actionId && canNext("zone") && canNext("field"));
 
-  async function handleCreate(kind: "moment" | "submoment" | "action", name: string) {
+  async function handleCreate(kind: "moment" | "submoment" | "action", name: string, context?: "field" | "field_goal") {
     if (kind === "moment") {
       await fetchJson("/api/lookups/moments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
     } else if (kind === "submoment") {
@@ -446,7 +485,7 @@ export function GoalWizard() {
       await fetchJson("/api/lookups/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subMomentId, name, context: "field_goal" })
+        body: JSON.stringify({ subMomentId, name, context: context ?? "field" })
       });
     }
     await qc.invalidateQueries({ queryKey: ["lookups"] });
@@ -458,6 +497,76 @@ export function GoalWizard() {
         <CardContent className="space-y-6">
           <StepIndicator current={step} />
 
+          {step === "season" && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Época</label>
+                <Select
+                  value={seasonId?.toString() ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSeasonId(val ? Number(val) : undefined);
+                    if (val) {
+                      const s = lookupsQuery.data?.seasons.find((x) => x.id === Number(val));
+                      updatePartial({ seasonId: Number(val), seasonName: s?.name });
+                    } else {
+                      updatePartial({ seasonId: undefined, seasonName: undefined });
+                    }
+                    setChampionshipId(undefined);
+                    setTeamId(undefined);
+                    setScorerId(undefined);
+                    setAssistId(undefined);
+                  }}
+                >
+                  <option value="">Selecionar época</option>
+                  {lookupsQuery.data?.seasons.map((s) => (
+                    <option key={s.id} value={s.id} className="text-black">
+                      {s.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Precisa criar uma época? <a href="/manage/config" className="text-cyan-300 underline">Abrir Configurações</a>
+              </div>
+            </div>
+          )}
+
+          {step === "championship" && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Campeonato</label>
+                <Select
+                  value={championshipId?.toString() ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setChampionshipId(val ? Number(val) : undefined);
+                    if (val) {
+                      const c = filteredChampionships.find((x) => x.id === Number(val));
+                      updatePartial({ championshipId: Number(val), championshipName: c?.name });
+                    } else {
+                      updatePartial({ championshipId: undefined, championshipName: undefined });
+                    }
+                    setTeamId(undefined);
+                    setScorerId(undefined);
+                    setAssistId(undefined);
+                  }}
+                  disabled={!seasonId}
+                >
+                  <option value="">Selecionar campeonato</option>
+                  {filteredChampionships.map((c) => (
+                    <option key={c.id} value={c.id} className="text-black">
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Precisa criar um campeonato? <a href="/manage/config" className="text-cyan-300 underline">Abrir Configurações</a>
+              </div>
+            </div>
+          )}
+
           {step === "team" && (
             <div className="grid gap-4 md:grid-cols-3">
               <div className="md:col-span-2 space-y-2">
@@ -466,9 +575,10 @@ export function GoalWizard() {
                   value={teamId?.toString() ?? ""}
                   onChange={(e) => setTeamId(Number(e.target.value) || undefined)}
                   aria-label="team-select"
+                  disabled={!championshipId}
                 >
                   <option value="">Selecionar equipa</option>
-                  {teamsQuery.data?.map((team) => (
+                  {filteredTeams.map((team) => (
                     <option key={team.id} value={team.id} className="text-black">
                       {team.name}
                     </option>
@@ -635,16 +745,23 @@ export function GoalWizard() {
                   <option value="__create__" disabled={!subMomentId}>
                     + Criar novo...
                   </option>
-                  {filteredActions.map((a) => (
-                    <option key={a.id} value={a.id} className="text-black">
-                      {a.name} ({a.context === "field" ? "Campo" : "Campo/Baliza"})
-                    </option>
-                  ))}
+                  {filteredActions.map((a) => {
+                    const needsGoal = a.name.toLowerCase().includes("marcador");
+                    return (
+                      <option key={a.id} value={a.id} className="text-black">
+                        {a.name} ({needsGoal ? "Campo + Baliza" : "Campo"})
+                      </option>
+                    );
+                  })}
                 </Select>
               </div>
               <div className="md:col-span-2 space-y-2">
                 <label className="text-sm font-medium">Notas (opcional)</label>
                 <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Contexto tático ou observações" />
+              </div>
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-sm font-medium">Vídeo do golo (URL)</label>
+                <Input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://...mp4" />
               </div>
             </div>
           )}
@@ -654,7 +771,7 @@ export function GoalWizard() {
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Zona da Baliza</label>
                 {requiresGoal ? (
-                  <span className="text-xs text-muted-foreground">Necessário porque a ação é de Campo/Baliza</span>
+                  <span className="text-xs text-muted-foreground">Necessário porque a ação envolve Marcador</span>
                 ) : (
                   <span className="text-xs text-emerald-300">Esta ação é apenas de Campo. Selecionar baliza é opcional.</span>
                 )}
@@ -684,6 +801,10 @@ export function GoalWizard() {
           {step === "review" && (
             <div className="space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-card/70 p-4">
+                <span className="text-muted-foreground">Época</span>
+                <span>{lookupsQuery.data?.seasons.find((s) => s.id === seasonId)?.name ?? "-"}</span>
+                <span className="text-muted-foreground">Campeonato</span>
+                <span>{lookupsQuery.data?.championships.find((c) => c.id === championshipId)?.name ?? "-"}</span>
                 <span className="text-muted-foreground">Equipa</span>
                 <span>{teamsQuery.data?.find((t) => t.id === teamId)?.name ?? "-"}</span>
                 <span className="text-muted-foreground">Marcador</span>
@@ -699,9 +820,11 @@ export function GoalWizard() {
                 <span className="text-muted-foreground">Ação</span>
                 <span>{lookupsQuery.data?.actions.find((a) => a.id === actionId)?.name ?? "-"}</span>
                 <span className="text-muted-foreground">Contexto</span>
-                <span>{requiresField ? "Campo" : "Campo/Baliza"}</span>
+                <span>{requiresGoal ? "Campo + Baliza" : "Campo"}</span>
                 <span className="text-muted-foreground">Zona</span>
                 <span>{zoneId ? lookupsQuery.data?.zones.find((z) => z.id === zoneId)?.name ?? "-" : "N/A"}</span>
+                <span className="text-muted-foreground">Vídeo</span>
+                <span>{videoUrl ? "Anexado" : "—"}</span>
               </div>
               {involvements.length > 0 && (
                 <div className="flex flex-wrap gap-2">
@@ -767,7 +890,8 @@ export function GoalWizard() {
         title="Criar Ação"
         placeholder="Nome da ação"
         onClose={() => setModal({ ...modal, open: false })}
-        onSave={(name) => handleCreate("action", name)}
+        includeContext
+        onSave={(name, context) => handleCreate("action", name, context)}
       />
     </>
   );

@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SimpleBar, SimplePie } from "@/components/ui/charts";
+import { FileText, PlayCircle } from "lucide-react";
+import { useAppContext } from "@/components/ui/app-context";
 
-type Team = { id: number; name: string };
+type Team = { id: number; name: string; championshipId?: number | null; radiographyPdfUrl?: string | null; videoReportUrl?: string | null; emblem?: string | null };
 
 const zoneShapes = [
   { key: "Upper Left", points: "5,5 33,5 33,50 5,50" },
@@ -95,7 +97,21 @@ function GoalNetHeatmap({ data }: { data: Array<{ name: string; goals: number }>
 }
 
 export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
+  const { selection } = useAppContext();
   const [teamId, setTeamId] = useState<number | undefined>(initialTeams[0]?.id);
+
+  const scopedTeams = useMemo(
+    () => (selection.championshipId ? initialTeams.filter((t) => t.championshipId === selection.championshipId) : initialTeams),
+    [initialTeams, selection.championshipId]
+  );
+
+  useEffect(() => {
+    if (scopedTeams.length > 0 && (!teamId || !scopedTeams.some((t) => t.id === teamId))) {
+      setTeamId(scopedTeams[0].id);
+    }
+  }, [scopedTeams, teamId]);
+
+  const selectedTeam = useMemo(() => scopedTeams.find((t) => t.id === teamId), [scopedTeams, teamId]);
 
   if (initialTeams.length === 0) {
     return <div className="text-sm text-muted-foreground">Ainda não existem equipas na base de dados. Adiciona uma equipa para veres estatísticas.</div>;
@@ -170,7 +186,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
         </div>
         <div className="flex gap-3 items-center">
           <Select value={teamId?.toString()} onChange={(e) => setTeamId(Number(e.target.value) || undefined)} className="w-52">
-            {initialTeams.map((team) => (
+            {scopedTeams.map((team) => (
               <option key={team.id} value={team.id}>
                 {team.name}
               </option>
@@ -181,6 +197,26 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
           </Button>
         </div>
       </div>
+
+      {selectedTeam && (selectedTeam.radiographyPdfUrl || selectedTeam.videoReportUrl) && (
+        <div className="flex flex-wrap gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3">
+          {selectedTeam.emblem && <img src={selectedTeam.emblem} alt="Emblema" className="h-8 w-8 rounded-full border border-border/50 bg-white/10" />}
+          {selectedTeam.radiographyPdfUrl && (
+            <Button asChild variant="ghost" size="sm" className="gap-2">
+              <a href={selectedTeam.radiographyPdfUrl} target="_blank" rel="noreferrer">
+                <FileText className="h-4 w-4" /> Radiografia Ofensiva (PDF)
+              </a>
+            </Button>
+          )}
+          {selectedTeam.videoReportUrl && (
+            <Button asChild variant="ghost" size="sm" className="gap-2">
+              <a href={selectedTeam.videoReportUrl} target="_blank" rel="noreferrer">
+                <PlayCircle className="h-4 w-4" /> Vídeo de Análise
+              </a>
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatTile title="Total de Golos" value={totalGoals} hint={`${goalEvents.length} registos de golo`} />

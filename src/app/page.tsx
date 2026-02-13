@@ -11,7 +11,7 @@ export default function HomePage() {
           <div className="space-y-3">
             <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Análises profissionais</p>
             <h1 className="text-3xl font-semibold leading-tight text-white md:text-4xl">
-              Inteligência tática para a Liga Portugal 2, construída sobre dados de eventos em tempo real.
+              Inteligência tática, construída sobre dados de eventos em tempo real.
             </h1>
             <p className="max-w-2xl text-sm text-muted-foreground">
               Regista golos com contexto estruturado, gere plantéis e obtém insights de alto valor sem depender de estatísticas pré-computadas.

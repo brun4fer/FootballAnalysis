@@ -44,6 +44,8 @@ export const teams = pgTable(
       .references(() => championships.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     emblem: text("emblem"),
+    radiographyPdfUrl: text("radiography_pdf_url"),
+    videoReportUrl: text("video_report_url"),
     stadium: text("stadium"),
     pitchDimensions: text("pitch_dimensions"),
     pitchRating: smallint("pitch_rating"),
@@ -64,6 +66,7 @@ export const players = pgTable(
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    photoUrl: text("photo_url"),
     primaryPosition: text("primary_position").notNull(),
     secondaryPosition: text("secondary_position"),
     tertiaryPosition: text("tertiary_position"),
@@ -150,6 +153,7 @@ export const goals = pgTable(
     actionId: bigint("action_id", { mode: "number" })
       .notNull()
       .references(() => actions.id),
+    videoUrl: text("video_url"),
     goalZoneId: smallint("goal_zone_id").references(() => goalkeeperZones.id),
     fieldDrawing: jsonb("field_drawing").$type<FieldDrawing | null>(),
     notes: text("notes")

@@ -12,6 +12,9 @@ type Team = {
   id: number;
   name: string;
   championshipId: number;
+  emblem?: string | null;
+  radiographyPdfUrl?: string | null;
+  videoReportUrl?: string | null;
   stadium?: string | null;
   coach?: string | null;
   pitchDimensions?: string | null;
@@ -31,6 +34,9 @@ export default function ManageTeamsPage() {
   const [form, setForm] = useState({
     name: "",
     championshipId: "",
+    emblem: "",
+    radiographyPdfUrl: "",
+    videoReportUrl: "",
     stadium: "",
     coach: "",
     pitchDimensions: "",
@@ -49,6 +55,9 @@ export default function ManageTeamsPage() {
       const body = {
         name: form.name,
         championshipId: Number(form.championshipId),
+        emblem: form.emblem,
+        radiographyPdfUrl: form.radiographyPdfUrl,
+        videoReportUrl: form.videoReportUrl,
         stadium: form.stadium,
         pitchDimensions: form.pitchDimensions,
         pitchRating: form.pitchRating ? Number(form.pitchRating) : undefined,
@@ -71,7 +80,17 @@ export default function ManageTeamsPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["manage-teams"] });
-      setForm({ name: "", championshipId: form.championshipId, stadium: "", coach: "", pitchDimensions: "", pitchRating: "" });
+      setForm({
+        name: "",
+        championshipId: form.championshipId,
+        emblem: "",
+        radiographyPdfUrl: "",
+        videoReportUrl: "",
+        stadium: "",
+        coach: "",
+        pitchDimensions: "",
+        pitchRating: ""
+      });
       setEditingId(null);
     }
   });
@@ -85,7 +104,7 @@ export default function ManageTeamsPage() {
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-white">Equipas</h1>
-        <p className="text-sm text-muted-foreground">Gerir clubes da Liga Portugal 2.</p>
+        <p className="text-sm text-muted-foreground">Gerir equipas e plantéis.</p>
       </div>
       <Card>
         <CardHeader title={editingId ? "Atualizar Equipa" : "Criar Equipa"} description="Todas as equipas estão ligadas a um campeonato" />
@@ -99,7 +118,7 @@ export default function ManageTeamsPage() {
             <Select value={form.championshipId} onChange={(e) => setForm({ ...form, championshipId: e.target.value })}>
               <option value="">Selecionar</option>
               {championships.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option key={c.id} value={c.id} className="text-black">
                   {c.name}
                 </option>
               ))}
@@ -108,6 +127,22 @@ export default function ManageTeamsPage() {
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Treinador</label>
             <Input value={form.coach} onChange={(e) => setForm({ ...form, coach: e.target.value })} placeholder="Nome do treinador" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Emblema (URL)</label>
+            <Input value={form.emblem} onChange={(e) => setForm({ ...form, emblem: e.target.value })} placeholder="https://..." />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Radiografia Ofensiva (PDF)</label>
+            <Input
+              value={form.radiographyPdfUrl}
+              onChange={(e) => setForm({ ...form, radiographyPdfUrl: e.target.value })}
+              placeholder="https://...pdf"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Relatório Vídeo (MP4)</label>
+            <Input value={form.videoReportUrl} onChange={(e) => setForm({ ...form, videoReportUrl: e.target.value })} placeholder="https://...mp4" />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Estádio</label>
@@ -156,6 +191,16 @@ export default function ManageTeamsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge>{team.coach || "Treinador por definir"}</Badge>
+                  {team.radiographyPdfUrl && (
+                    <a href={team.radiographyPdfUrl} target="_blank" rel="noreferrer" className="text-xs text-cyan-300 underline">
+                      PDF
+                    </a>
+                  )}
+                  {team.videoReportUrl && (
+                    <a href={team.videoReportUrl} target="_blank" rel="noreferrer" className="text-xs text-emerald-300 underline">
+                      Vídeo
+                    </a>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -164,6 +209,9 @@ export default function ManageTeamsPage() {
                       setForm({
                         name: team.name,
                         championshipId: String(team.championshipId),
+                        emblem: team.emblem || "",
+                        radiographyPdfUrl: team.radiographyPdfUrl || "",
+                        videoReportUrl: team.videoReportUrl || "",
                         stadium: team.stadium || "",
                         coach: team.coach || "",
                         pitchDimensions: team.pitchDimensions || "",

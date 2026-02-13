@@ -103,12 +103,13 @@ export async function createGoal(payload: unknown) {
   const action = await db.query.actions.findFirst({ where: eq(actions.id, parsed.actionId) });
   if (!action) throw new Error("Action not found");
   if (action.subMomentId !== parsed.subMomentId) throw new Error("Action does not belong to sub-moment");
-  const actionContext = (action as any).context as "field" | "field_goal" | undefined;
+  const needsGoal = action.name.toLowerCase().includes("marcador");
+  const needsField = true; // todas as ações exigem registo no campo
 
-  if (actionContext === "field" && (!parsed.fieldDrawing || (parsed.fieldDrawing.strokes?.length ?? 0) === 0)) {
+  if (needsField && (!parsed.fieldDrawing || (parsed.fieldDrawing.strokes?.length ?? 0) === 0)) {
     throw new Error("Esta ação requer desenho no campo (field drawing obrigatório).");
   }
-  if (actionContext !== "field" && !parsed.goalZoneId) {
+  if (needsGoal && !parsed.goalZoneId) {
     throw new Error("Esta ação requer selecionar uma zona da baliza.");
   }
 
@@ -155,7 +156,8 @@ export async function createGoal(payload: unknown) {
         momentId: parsed.momentId,
         subMomentId: parsed.subMomentId,
         actionId: parsed.actionId,
-        goalZoneId: actionContext === "field" ? null : parsed.goalZoneId,
+        goalZoneId: needsGoal ? parsed.goalZoneId : null,
+        videoUrl: parsed.videoUrl || null,
         fieldDrawing: parsed.fieldDrawing ?? null,
         notes: parsed.notes || null
       })

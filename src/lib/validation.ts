@@ -33,6 +33,7 @@ export const goalInputSchema = z.object({
   subMomentId: z.number().int().positive(),
   actionId: z.number().int().positive(),
   goalZoneId: z.number().int().positive().optional().nullable(),
+  videoUrl: z.string().url().optional().or(z.literal("")).nullable(),
   fieldDrawing: fieldDrawingSchema.optional(),
   notes: z.string().optional().or(z.literal("")),
   involvements: z
@@ -51,6 +52,8 @@ export const teamUpsertSchema = z.object({
   name: z.string().min(2),
   championshipId: z.number().int().positive(),
   emblem: z.string().url().optional().or(z.literal("")),
+  radiographyPdfUrl: z.string().url().optional().or(z.literal("")),
+  videoReportUrl: z.string().url().optional().or(z.literal("")),
   stadium: z.string().optional().or(z.literal("")),
   pitchDimensions: z.string().optional().or(z.literal("")),
   pitchRating: z.number().int().min(0).max(100).optional().nullable(),
@@ -61,10 +64,23 @@ export const teamUpsertSchema = z.object({
 export const playerUpsertSchema = z.object({
   teamId: z.number().int().positive(),
   name: z.string().min(2),
+  photoUrl: z.string().url().optional().or(z.literal("")),
   primaryPosition: z.string().min(2),
   secondaryPosition: z.string().optional().or(z.literal("")),
   tertiaryPosition: z.string().optional().or(z.literal("")),
   dominantFoot: z.string().optional().or(z.literal("")),
   heightCm: z.number().int().min(120).max(220).optional().nullable(),
   weightKg: z.number().int().min(40).max(120).optional().nullable()
+});
+
+export const seasonUpsertSchema = z.object({
+  name: z.string().min(3),
+  description: z.string().optional().or(z.literal(""))
+});
+
+export const championshipUpsertSchema = z.object({
+  name: z.string().min(2),
+  country: z.string().min(2),
+  seasonId: z.number().int().positive(),
+  logo: z.string().url().optional().or(z.literal(""))
 });
