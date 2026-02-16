@@ -48,7 +48,7 @@ export default function HomePage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader title="Plantéis" description="Gerir equipas e jogadores da Liga Portugal 2" />
+          <CardHeader title="Plantéis" description="Gerir equipas e jogadores" />
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p>Clubes pré-carregados, entrada rápida de jogadores e pipelines de estatísticas prontos a usar.</p>
             <div className="flex gap-2">

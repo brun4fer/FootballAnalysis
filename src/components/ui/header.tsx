@@ -15,8 +15,7 @@ export function Header() {
         <div className="flex items-center gap-2">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-400/70 to-emerald-500/70 shadow-lg shadow-emerald-500/30" />
           <div>
-            <div className="text-lg font-semibold tracking-tight">Football Analysis{subtitle ? " - " + subtitle : ""}</div>
-            <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{subtitle || " "}</div>
+            <div className="text-lg font-semibold tracking-tight">Football Analysis</div>
           </div>
         </div>
         <nav className="flex items-center gap-3 text-sm font-medium">

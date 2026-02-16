@@ -1,12 +1,12 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
 
 type Team = {
   id: number;
@@ -21,7 +21,8 @@ type Team = {
   pitchRating?: number | null;
 };
 
-type Championship = { id: number; name: string };
+type Championship = { id: number; name: string; seasonId: number };
+type Season = { id: number; name: string };
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
@@ -31,6 +32,9 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 
 export default function ManageTeamsPage() {
   const qc = useQueryClient();
+  const [filterSeasonId, setFilterSeasonId] = useState("");
+  const [filterChampionshipId, setFilterChampionshipId] = useState("");
+  const [formSeasonId, setFormSeasonId] = useState("");
   const [form, setForm] = useState({
     name: "",
     championshipId: "",
@@ -44,11 +48,25 @@ export default function ManageTeamsPage() {
   });
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  const teamsQuery = useQuery({ queryKey: ["manage-teams"], queryFn: () => fetchJson<Team[]>(`/api/manage/teams`) });
-  const champsQuery = useQuery({ queryKey: ["champs"], queryFn: () => fetchJson<{ championships: Championship[] } & Record<string, any>>(`/api/lookups`) });
+  const lookupsQuery = useQuery({
+    queryKey: ["teams-lookups"],
+    queryFn: () => fetchJson<{ championships: Championship[]; seasons: Season[] }>(`/api/lookups`)
+  });
 
-  const championships = champsQuery.data?.championships ?? [];
-  const championshipMap = new Map(championships.map((c) => [c.id, c.name]));
+  const teamsQuery = useQuery({
+    queryKey: ["manage-teams", filterChampionshipId],
+    enabled: Boolean(filterChampionshipId),
+    queryFn: () => fetchJson<Team[]>(`/api/teams?championshipId=${filterChampionshipId}`)
+  });
+
+  const championships = lookupsQuery.data?.championships ?? [];
+  const seasons = lookupsQuery.data?.seasons ?? [];
+
+  const championshipMap = useMemo(() => new Map(championships.map((c) => [c.id, c])), [championships]);
+  const seasonMap = useMemo(() => new Map(seasons.map((s) => [s.id, s.name])), [seasons]);
+
+  const filteredChampsForFilters = championships.filter((c) => (!filterSeasonId ? true : c.seasonId === Number(filterSeasonId)));
+  const filteredChampsForForm = championships.filter((c) => (!formSeasonId ? true : c.seasonId === Number(formSeasonId)));
 
   const saveTeam = useMutation({
     mutationFn: async () => {
@@ -79,7 +97,7 @@ export default function ManageTeamsPage() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["manage-teams"] });
+      qc.invalidateQueries({ queryKey: ["manage-teams"], exact: false });
       setForm({
         name: "",
         championshipId: form.championshipId,
@@ -91,13 +109,14 @@ export default function ManageTeamsPage() {
         pitchDimensions: "",
         pitchRating: ""
       });
+      setFormSeasonId(formSeasonId);
       setEditingId(null);
     }
   });
 
   const deleteTeam = useMutation({
     mutationFn: (id: number) => fetchJson(`/api/manage/teams/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["manage-teams"] })
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["manage-teams"], exact: false })
   });
 
   return (
@@ -106,23 +125,42 @@ export default function ManageTeamsPage() {
         <h1 className="text-2xl font-semibold text-white">Equipas</h1>
         <p className="text-sm text-muted-foreground">Gerir equipas e plantéis.</p>
       </div>
+
       <Card>
         <CardHeader title={editingId ? "Atualizar Equipa" : "Criar Equipa"} description="Todas as equipas estão ligadas a um campeonato" />
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Nome</label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nome da equipa" />
+            <label className="text-xs text-muted-foreground">Época</label>
+            <Select
+              value={formSeasonId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFormSeasonId(val);
+                setForm({ ...form, championshipId: "" });
+              }}
+            >
+              <option value="">Selecionar Época</option>
+              {seasons.map((s) => (
+                <option key={s.id} value={s.id} className="text-black">
+                  {s.name}
+                </option>
+              ))}
+            </Select>
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Campeonato</label>
-            <Select value={form.championshipId} onChange={(e) => setForm({ ...form, championshipId: e.target.value })}>
+            <Select value={form.championshipId} onChange={(e) => setForm({ ...form, championshipId: e.target.value })} disabled={!formSeasonId}>
               <option value="">Selecionar</option>
-              {championships.map((c) => (
+              {filteredChampsForForm.map((c) => (
                 <option key={c.id} value={c.id} className="text-black">
                   {c.name}
                 </option>
               ))}
             </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Nome</label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nome da equipa" />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Treinador</label>
@@ -134,11 +172,7 @@ export default function ManageTeamsPage() {
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Radiografia Ofensiva (PDF)</label>
-            <Input
-              value={form.radiographyPdfUrl}
-              onChange={(e) => setForm({ ...form, radiographyPdfUrl: e.target.value })}
-              placeholder="https://...pdf"
-            />
+            <Input value={form.radiographyPdfUrl} onChange={(e) => setForm({ ...form, radiographyPdfUrl: e.target.value })} placeholder="https://...pdf" />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Relatório Vídeo (MP4)</label>
@@ -150,21 +184,11 @@ export default function ManageTeamsPage() {
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Dimensões do relvado</label>
-            <Input
-              value={form.pitchDimensions}
-              onChange={(e) => setForm({ ...form, pitchDimensions: e.target.value })}
-              placeholder="105 x 68 m"
-            />
+            <Input value={form.pitchDimensions} onChange={(e) => setForm({ ...form, pitchDimensions: e.target.value })} placeholder="105 x 68 m" />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Qualidade do relvado (0-100)</label>
-            <Input
-              type="number"
-              value={form.pitchRating}
-              onChange={(e) => setForm({ ...form, pitchRating: e.target.value })}
-              min={0}
-              max={100}
-            />
+            <Input type="number" value={form.pitchRating} onChange={(e) => setForm({ ...form, pitchRating: e.target.value })} min={0} max={100} />
           </div>
           <div className="md:col-span-3 flex justify-end gap-2">
             {editingId && (
@@ -181,55 +205,107 @@ export default function ManageTeamsPage() {
 
       <Card>
         <CardHeader title="Equipas" description="Clubes existentes" />
-        <CardContent className="space-y-3 text-sm">
-          {teamsQuery.data?.length ? (
-            teamsQuery.data.map((team) => (
-              <div key={team.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 hover:border-primary/60">
-                <div className="flex flex-col">
-                  <span className="font-medium text-white">{team.name}</span>
-                  <span className="text-xs text-muted-foreground">{championshipMap.get(team.championshipId) ?? `Campeonato #${team.championshipId}`}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge>{team.coach || "Treinador por definir"}</Badge>
-                  {team.radiographyPdfUrl && (
-                    <a href={team.radiographyPdfUrl} target="_blank" rel="noreferrer" className="text-xs text-cyan-300 underline">
-                      PDF
-                    </a>
-                  )}
-                  {team.videoReportUrl && (
-                    <a href={team.videoReportUrl} target="_blank" rel="noreferrer" className="text-xs text-emerald-300 underline">
-                      Vídeo
-                    </a>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditingId(team.id);
-                      setForm({
-                        name: team.name,
-                        championshipId: String(team.championshipId),
-                        emblem: team.emblem || "",
-                        radiographyPdfUrl: team.radiographyPdfUrl || "",
-                        videoReportUrl: team.videoReportUrl || "",
-                        stadium: team.stadium || "",
-                        coach: team.coach || "",
-                        pitchDimensions: team.pitchDimensions || "",
-                        pitchRating: team.pitchRating != null ? String(team.pitchRating) : ""
-                      });
-                    }}
-                  >
-                    Editar
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => deleteTeam.mutate(team.id)}>
-                    Apagar
-                  </Button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-muted-foreground">Ainda não existem equipas.</div>
+        <CardContent className="space-y-4 text-sm">
+          <div className="flex flex-wrap gap-3 rounded-xl border border-border/70 bg-card/60 p-3">
+            <div className="flex-1 min-w-[180px] space-y-1">
+              <label className="text-xs text-muted-foreground">Filtrar por Época</label>
+              <Select
+                value={filterSeasonId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFilterSeasonId(val);
+                  setFilterChampionshipId("");
+                }}
+              >
+                <option value="">Selecionar Época</option>
+                {seasons.map((s) => (
+                  <option key={s.id} value={s.id} className="text-black">
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="flex-1 min-w-[180px] space-y-1">
+              <label className="text-xs text-muted-foreground">Filtrar por campeonato</label>
+              <Select
+                value={filterChampionshipId}
+                onChange={(e) => setFilterChampionshipId(e.target.value)}
+                disabled={!filterSeasonId}
+              >
+                <option value="">Selecionar campeonato</option>
+                {filteredChampsForFilters.map((c) => (
+                  <option key={c.id} value={c.id} className="text-black">
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          {!filterChampionshipId && (
+            <div className="rounded-lg border border-dashed border-border/60 bg-card/50 p-4 text-muted-foreground">
+              Selecionar um campeonato para ver as equipas.
+            </div>
           )}
+
+          {filterChampionshipId && teamsQuery.data?.length ? (
+            <div className="grid gap-3">
+              {teamsQuery.data.map((team) => {
+                const champ = championshipMap.get(team.championshipId);
+                return (
+                  <div key={team.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 hover:border-primary/60">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-white">{team.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {champ?.name ?? `Campeonato #${team.championshipId}`}
+                        {champ?.seasonId && seasonMap.get(champ.seasonId) ? ` · ${seasonMap.get(champ.seasonId)}` : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge>{team.coach || "Treinador por definir"}</Badge>
+                      {team.radiographyPdfUrl && (
+                        <a href={team.radiographyPdfUrl} target="_blank" rel="noreferrer" className="text-xs text-cyan-300 underline">
+                          PDF
+                        </a>
+                      )}
+                      {team.videoReportUrl && (
+                        <a href={team.videoReportUrl} target="_blank" rel="noreferrer" className="text-xs text-emerald-300 underline">
+                          VÃ­deo
+                        </a>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(team.id);
+                          const champSeason = championshipMap.get(team.championshipId)?.seasonId;
+                          setFormSeasonId(champSeason ? String(champSeason) : "");
+                          setForm({
+                            name: team.name,
+                            championshipId: String(team.championshipId),
+                            emblem: team.emblem || "",
+                            radiographyPdfUrl: team.radiographyPdfUrl || "",
+                            videoReportUrl: team.videoReportUrl || "",
+                            stadium: team.stadium || "",
+                            coach: team.coach || "",
+                            pitchDimensions: team.pitchDimensions || "",
+                            pitchRating: team.pitchRating != null ? String(team.pitchRating) : ""
+                          });
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => deleteTeam.mutate(team.id)}>
+                        Apagar
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : filterChampionshipId ? (
+            <div className="text-muted-foreground">Sem equipas para este campeonato.</div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

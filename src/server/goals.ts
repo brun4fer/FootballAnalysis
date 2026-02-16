@@ -1,6 +1,6 @@
 import { eq, desc, inArray } from "drizzle-orm";
 import { db } from "../db/client";
-import { actions, goals, goalInvolvements, moments, players, subMoments, teams, goalkeeperZones } from "../schema/schema";
+import { actions, goals, goalInvolvements, moments, players, subMoments, teams } from "../schema/schema";
 import { goalInputSchema } from "../lib/validation";
 
 type RawGoalPayload = Record<string, unknown>;
@@ -12,29 +12,16 @@ async function normalizeGoalPayload(payload: RawGoalPayload) {
       ? minuteValue
       : Number(String(minuteValue).replace(/[^\d.-]/g, ""));
 
-  let goalZoneId: unknown = payload?.goalZoneId;
-  if (typeof goalZoneId === "string") {
-    const numeric = Number(goalZoneId);
-    if (!Number.isNaN(numeric)) {
-      goalZoneId = numeric;
-    } else {
-      const zone = await db.query.goalkeeperZones.findFirst({
-        where: eq(goalkeeperZones.name, goalZoneId)
-      });
-      if (zone) {
-        goalZoneId = zone.id;
-      } else {
-        throw new Error(`Goal zone '${goalZoneId}' not found`);
-      }
-    }
-  }
-
+  const goalCoordinates =
+    payload?.goalCoordinates && typeof payload.goalCoordinates === "object"
+      ? JSON.parse(JSON.stringify(payload.goalCoordinates))
+      : payload?.goalCoordinates ?? null;
   const fieldDrawing =
     payload?.fieldDrawing && typeof payload.fieldDrawing === "object"
       ? JSON.parse(JSON.stringify(payload.fieldDrawing))
       : payload?.fieldDrawing ?? null;
 
-  return { ...payload, minute, goalZoneId, fieldDrawing };
+  return { ...payload, minute, goalCoordinates, goalZoneId: null, fieldDrawing };
 }
 
 export async function getGoalsByTeam(teamId: number) {
@@ -48,15 +35,18 @@ export async function getGoalsByTeam(teamId: number) {
       minute: goals.minute,
       notes: goals.notes,
       fieldDrawing: goals.fieldDrawing,
+      goalCoordinates: goals.goalCoordinates,
       moment: moments.name,
       subMoment: subMoments.name,
       action: actions.name,
-      goalZoneId: goals.goalZoneId
+      goalZoneId: goals.goalZoneId,
+      scorerName: players.name
     })
     .from(goals)
     .leftJoin(moments, eq(goals.momentId, moments.id))
     .leftJoin(subMoments, eq(goals.subMomentId, subMoments.id))
     .leftJoin(actions, eq(goals.actionId, actions.id))
+    .leftJoin(players, eq(goals.scorerId, players.id))
     .where(eq(goals.teamId, teamId))
     .orderBy(desc(goals.id));
 
@@ -79,6 +69,42 @@ export async function getGoalsByTeam(teamId: number) {
   });
 
   return rows.map((g) => ({ ...g, involvements: grouped.get(g.id) ?? [] }));
+}
+
+export async function getGoalById(goalId: number) {
+  const row = await db
+    .select({
+      id: goals.id,
+      matchId: goals.matchId,
+      teamId: goals.teamId,
+      scorerId: goals.scorerId,
+      assistId: goals.assistId,
+      minute: goals.minute,
+      momentId: goals.momentId,
+      subMomentId: goals.subMomentId,
+      actionId: goals.actionId,
+      videoUrl: goals.videoUrl,
+      fieldDrawing: goals.fieldDrawing,
+      goalCoordinates: goals.goalCoordinates,
+      notes: goals.notes,
+      scorerName: players.name
+    })
+    .from(goals)
+    .leftJoin(players, eq(goals.scorerId, players.id))
+    .where(eq(goals.id, goalId))
+    .limit(1);
+  if (!row[0]) return null;
+
+  const involvements = await db
+    .select({
+      goalId: goalInvolvements.goalId,
+      playerId: goalInvolvements.playerId,
+      role: goalInvolvements.role
+    })
+    .from(goalInvolvements)
+    .where(eq(goalInvolvements.goalId, goalId));
+
+  return { ...row[0], involvements };
 }
 
 export async function createGoal(payload: unknown) {
@@ -106,11 +132,11 @@ export async function createGoal(payload: unknown) {
   const needsGoal = action.name.toLowerCase().includes("marcador");
   const needsField = true; // todas as ações exigem registo no campo
 
-  if (needsField && (!parsed.fieldDrawing || (parsed.fieldDrawing.strokes?.length ?? 0) === 0)) {
-    throw new Error("Esta ação requer desenho no campo (field drawing obrigatório).");
+  if (needsField && !parsed.fieldDrawing) {
+    throw new Error("Esta ação requer marcar o ponto no campo (field drawing obrigatório).");
   }
-  if (needsGoal && !parsed.goalZoneId) {
-    throw new Error("Esta ação requer selecionar uma zona da baliza.");
+  if (needsGoal && !parsed.goalCoordinates) {
+    throw new Error("Esta ação requer selecionar um ponto na baliza.");
   }
 
   const assistFromRoles = parsed.involvements?.filter((i) => i.role === "assist") ?? [];
@@ -156,7 +182,8 @@ export async function createGoal(payload: unknown) {
         momentId: parsed.momentId,
         subMomentId: parsed.subMomentId,
         actionId: parsed.actionId,
-        goalZoneId: needsGoal ? parsed.goalZoneId : null,
+        goalZoneId: null,
+        goalCoordinates: parsed.goalCoordinates ?? null,
         videoUrl: parsed.videoUrl || null,
         fieldDrawing: parsed.fieldDrawing ?? null,
         notes: parsed.notes || null
@@ -177,4 +204,35 @@ export async function createGoal(payload: unknown) {
   });
 
   return goalId;
+}
+
+export async function updateGoal(id: number, payload: unknown) {
+  const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
+  const parsed = goalInputSchema.parse(normalized);
+
+  const existing = await db.query.goals.findFirst({ where: eq(goals.id, id) });
+  if (!existing) throw new Error("Goal not found");
+  if (existing.teamId !== parsed.teamId) throw new Error("Cannot move goal to another team");
+
+  const [updated] = await db
+    .update(goals)
+    .set({
+      matchId: parsed.matchId ?? null,
+      teamId: parsed.teamId,
+      scorerId: parsed.scorerId,
+      assistId: parsed.assistId ?? null,
+      minute: parsed.minute,
+      momentId: parsed.momentId,
+      subMomentId: parsed.subMomentId,
+      actionId: parsed.actionId,
+      goalZoneId: null,
+      goalCoordinates: parsed.goalCoordinates ?? null,
+      videoUrl: parsed.videoUrl || null,
+      fieldDrawing: parsed.fieldDrawing ?? null,
+      notes: parsed.notes || null
+    })
+    .where(eq(goals.id, id))
+    .returning({ id: goals.id });
+
+  return updated.id;
 }

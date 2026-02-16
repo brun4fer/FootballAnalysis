@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,6 @@ type LookupResponse = {
   moments: Array<{ id: number; name: string }>;
   subMoments: Array<{ id: number; name: string; momentId: number }>;
   actions: Array<{ id: number; name: string; subMomentId: number; context: "field" | "field_goal" }>;
-  zones: Array<{ id: number; name: string }>;
   seasons: Array<{ id: number; name: string }>;
   championships: Array<{ id: number; name: string; seasonId: number; logo: string | null }>;
   teams: Array<{ id: number; name: string; championshipId: number }>;
@@ -23,9 +22,7 @@ type Team = { id: number; name: string };
 type Player = { id: number; name: string };
 
 type Involvement = { playerId: number; role: "assist" | "involvement" };
-type Stroke = { id: string; color: string; width: number; points: Array<{ x: number; y: number }> };
-
-const palette = ["#67e8f9", "#22d3ee", "#a78bfa", "#f97316", "#22c55e"];
+type Point = { x: number; y: number };
 
 const steps = [
   { id: "season", label: "Época" },
@@ -39,15 +36,6 @@ const steps = [
 ] as const;
 
 type StepId = (typeof steps)[number]["id"];
-
-const goalZoneShapes = [
-  { key: "Upper Left", points: "5,5 33,5 33,50 5,50" },
-  { key: "Upper Center", points: "33,5 66,5 66,50 33,50" },
-  { key: "Upper Right", points: "66,5 95,5 95,50 66,50" },
-  { key: "Lower Left", points: "5,50 33,50 33,95 5,95" },
-  { key: "Lower Center", points: "33,50 66,50 66,95 33,95" },
-  { key: "Lower Right", points: "66,50 95,50 95,95 66,95" }
-];
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
@@ -83,84 +71,10 @@ function StepIndicator({ current }: { current: StepId }) {
     </div>
   );
 }
-function GoalNetSelector({
-  zones,
-  value,
-  onChange
-}: {
-  zones: LookupResponse["zones"];
-  value?: number | null;
-  onChange: (id: number) => void;
-}) {
-  const resolveZoneId = (label: string) => zones.find((z) => z.name.toLowerCase() === label.toLowerCase())?.id;
-
-  return (
-    <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
-      <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-[#0b1220] shadow-[0_0_50px_rgba(103,232,249,0.1)]">
-        <svg viewBox="0 0 100 100" className="h-full w-full" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <linearGradient id="netGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#22c55e" stopOpacity="0.35" />
-            </linearGradient>
-          </defs>
-          <rect x="2" y="2" width="96" height="96" fill="url(#netGradient)" stroke="#164e63" strokeWidth="1.5" rx="4" />
-          {goalZoneShapes.map((shape) => {
-            const id = resolveZoneId(shape.key);
-            const selected = value === id;
-            return (
-              <polygon
-                key={shape.key}
-                points={shape.points}
-                onClick={() => id && onChange(id)}
-                className="cursor-pointer transition-all"
-                fill={selected ? "rgba(103,232,249,0.35)" : "rgba(15,23,42,0.6)"}
-                stroke={selected ? "#67e8f9" : "rgba(226,232,240,0.2)"}
-                strokeWidth={selected ? 2.2 : 1.2}
-              />
-            );
-          })}
-          <path d="M2 50h96M33 2v96M66 2v96" stroke="rgba(226,232,240,0.16)" strokeWidth="0.8" />
-        </svg>
-      </div>
-      <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">Clique na zona da baliza. Os ids seguem a tabela goalkeeper_zones.</p>
-        <div className="grid grid-cols-2 gap-2">
-          {goalZoneShapes.map((shape) => {
-            const id = resolveZoneId(shape.key);
-            const selected = value === id;
-            return (
-              <button
-                key={shape.key}
-                type="button"
-                disabled={!id}
-                onClick={() => id && onChange(id)}
-                className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
-                  selected ? "border-cyan-400/80 bg-cyan-400/10 text-white shadow-[0_0_12px_rgba(103,232,249,0.35)]" : "border-border/70 bg-card text-muted-foreground"
-                }`}
-              >
-                {shape.key}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PitchDrawer({
-  strokes,
-  onChange
-}: {
-  strokes: Stroke[];
-  onChange: (next: Stroke[]) => void;
-}) {
+function GoalNetPinpoint({ value, onChange }: { value: Point | null; onChange: (pt: Point) => void }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [active, setActive] = useState<Stroke | null>(null);
-  const [color, setColor] = useState(palette[0]);
 
-  const normalizePoint = (clientX: number, clientY: number) => {
+  const normalize = (clientX: number, clientY: number) => {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return null;
     const clamp = (v: number) => Math.min(1, Math.max(0, v));
@@ -170,69 +84,80 @@ function PitchDrawer({
     };
   };
 
-  const start = (e: React.PointerEvent<SVGSVGElement>) => {
-    const pt = normalizePoint(e.clientX, e.clientY);
-    if (!pt) return;
-    const stroke: Stroke = {
-      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-      color,
-      width: 2.2,
-      points: [pt]
-    };
-    setActive(stroke);
-    e.currentTarget.setPointerCapture(e.pointerId);
+  const handleClick = (e: React.PointerEvent<SVGSVGElement>) => {
+    const pt = normalize(e.clientX, e.clientY);
+    if (pt) onChange(pt);
   };
 
-  const move = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!active) return;
-    const pt = normalizePoint(e.clientX, e.clientY);
-    if (!pt) return;
-    setActive({ ...active, points: [...active.points, pt] });
-  };
-
-  const end = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (active && active.points.length > 1) {
-      onChange([...strokes, active]);
-    }
-    setActive(null);
-    e.currentTarget.releasePointerCapture(e.pointerId);
-  };
-
-  const undo = () => onChange(strokes.slice(0, -1));
-  const clear = () => onChange([]);
-
-  const allStrokes = active ? [...strokes, active] : strokes;
+  const ball = value ? (
+    <g transform={`translate(${value.x * 120}, ${value.y * 80})`}>
+      <circle r="4.5" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
+      <circle r="2.4" fill="#0f172a" />
+      <circle r="1.1" fill="#f97316" />
+    </g>
+  ) : null;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs">
-          <span className="text-muted-foreground">Traço</span>
-          {palette.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setColor(c)}
-              className={`h-6 w-6 rounded-full border ${color === c ? "border-white shadow-[0_0_0_2px_rgba(103,232,249,0.4)]" : "border-border/50"}`}
-              style={{ background: c }}
-            />
-          ))}
-        </div>
-        <Button variant="secondary" size="sm" onClick={undo} disabled={strokes.length === 0}>
-          Desfazer
-        </Button>
-        <Button variant="ghost" size="sm" onClick={clear} disabled={strokes.length === 0}>
-          Limpar
-        </Button>
+    <div className="space-y-2">
+      <div className="rounded-2xl border border-border/80 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 shadow-[0_0_40px_rgba(0,0,0,0.4)]">
+        <svg
+          ref={svgRef}
+          viewBox="0 0 120 80"
+          className="h-[260px] w-full cursor-crosshair touch-none"
+          onPointerDown={handleClick}
+        >
+          <rect x="4" y="6" width="112" height="68" rx="6" fill="#0b1220" stroke="#1f2937" strokeWidth="1.4" />
+          <rect x="8" y="10" width="104" height="60" rx="5" fill="url(#netPattern)" stroke="#0ea5e9" strokeWidth="0.6" strokeDasharray="4 3" />
+          <path d="M8 22h104M8 36h104M8 50h104M8 64h104" stroke="rgba(226,232,240,0.18)" strokeWidth="0.6" />
+          <path d="M26 10v60M46 10v60M66 10v60M86 10v60" stroke="rgba(226,232,240,0.18)" strokeWidth="0.6" />
+          <rect x="4" y="6" width="112" height="68" rx="6" fill="url(#goalGlow)" />
+          {ball}
+          <defs>
+            <linearGradient id="goalGlow" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(14,165,233,0.06)" />
+              <stop offset="100%" stopColor="rgba(16,185,129,0.08)" />
+            </linearGradient>
+            <pattern id="netPattern" width="6" height="6" patternUnits="userSpaceOnUse">
+              <path d="M0 0h6M0 0v6" stroke="rgba(148,163,184,0.2)" strokeWidth="0.6" />
+            </pattern>
+          </defs>
+        </svg>
       </div>
+      <p className="text-xs text-muted-foreground">Clique para colocar a bola em qualquer ponto da baliza.</p>
+    </div>
+  );
+}
+
+function PitchPinpoint({ value, onChange }: { value: Point | null; onChange: (pt: Point) => void }) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const normalize = (clientX: number, clientY: number) => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const clamp = (v: number) => Math.min(1, Math.max(0, v));
+    return { x: clamp((clientX - rect.left) / rect.width), y: clamp((clientY - rect.top) / rect.height) };
+  };
+
+  const handleClick = (e: React.PointerEvent<SVGSVGElement>) => {
+    const pt = normalize(e.clientX, e.clientY);
+    if (pt) onChange(pt);
+  };
+
+  const ball = value ? (
+    <g transform={`translate(${value.x * 105}, ${value.y * 68})`}>
+      <circle r="3.8" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
+      <circle r="2.2" fill="#0f172a" />
+      <circle r="1" fill="#22c55e" />
+    </g>
+  ) : null;
+
+  return (
+    <div className="space-y-2">
       <div className="rounded-2xl border border-border/70 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-3 shadow-[0_10px_60px_rgba(0,0,0,0.4)]">
         <svg
           ref={svgRef}
           viewBox="0 0 105 68"
-          className="h-[340px] w-full touch-none"
-          onPointerDown={start}
-          onPointerMove={move}
-          onPointerUp={end}
+          className="h-[340px] w-full cursor-crosshair touch-none"
+          onPointerDown={handleClick}
         >
           <rect x="1" y="1" width="103" height="66" rx="8" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
           <rect x="1" y="1" width="103" height="66" rx="8" stroke="rgba(103,232,249,0.35)" strokeWidth="0.8" strokeDasharray="4 4" fill="none" />
@@ -240,21 +165,11 @@ function PitchDrawer({
           <circle cx="52.5" cy="34" r="9.15" stroke="rgba(148,163,184,0.35)" fill="none" />
           <rect x="1" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
           <rect x="90" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
-          {allStrokes.map((stroke) => (
-            <polyline
-              key={stroke.id}
-              fill="none"
-              stroke={stroke.color}
-              strokeWidth={stroke.width}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              points={stroke.points.map((p) => `${p.x * 105},${p.y * 68}`).join(" ")}
-            />
-          ))}
+          {ball}
         </svg>
       </div>
       <p className="text-xs text-muted-foreground">
-        Coordenadas são normalizadas (0-1) e guardadas como JSONB em <code className="font-mono text-emerald-300">field_drawing</code>.
+        Apenas um ponto é guardado em <code className="font-mono text-emerald-300">field_drawing</code> com coordenadas normalizadas (0-1).
       </p>
     </div>
   );
@@ -320,7 +235,24 @@ function CreateItemModal({
   );
 }
 
-export function GoalWizard() {
+type ExistingGoal = {
+  id: number;
+  matchId: number | null;
+  teamId: number;
+  scorerId: number;
+  assistId: number | null;
+  minute: number;
+  momentId: number;
+  subMomentId: number;
+  actionId: number;
+  goalCoordinates: Point | null;
+  fieldDrawing: Point | null;
+  notes: string | null;
+  videoUrl: string | null;
+  involvements?: Involvement[];
+};
+
+export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingGoal | null; onSaved?: () => void }) {
   const qc = useQueryClient();
   const { updatePartial } = useAppContext();
   const [step, setStep] = useState<StepId>("season");
@@ -334,11 +266,11 @@ export function GoalWizard() {
   const [momentId, setMomentId] = useState<number | undefined>();
   const [subMomentId, setSubMomentId] = useState<number | undefined>();
   const [actionId, setActionId] = useState<number | undefined>();
-  const [zoneId, setZoneId] = useState<number | undefined | null>(null);
+  const [goalPoint, setGoalPoint] = useState<Point | null>(null);
   const [notes, setNotes] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [involvements, setInvolvements] = useState<Involvement[]>([]);
-  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [fieldPoint, setFieldPoint] = useState<Point | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [modal, setModal] = useState<{ kind: "moment" | "submoment" | "action"; open: boolean }>({
     kind: "moment",
@@ -362,8 +294,8 @@ export function GoalWizard() {
       const actionMeta = lookupsQuery.data?.actions.find((a) => a.id === actionId);
       const requiresGoal = actionMeta ? actionMeta.name.toLowerCase().includes("marcador") : false;
 
-      if (requiresGoal && !zoneId) throw new Error("Esta ação requer zona da baliza.");
-      if (!strokes.length) throw new Error("Desenho de campo obrigatório para esta ação.");
+      if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
+      if (!fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
 
       const payload = {
         matchId,
@@ -374,9 +306,9 @@ export function GoalWizard() {
         momentId,
         subMomentId,
         actionId,
-        goalZoneId: requiresGoal ? zoneId : null,
+        goalCoordinates: goalPoint ?? undefined,
         videoUrl: videoUrl || undefined,
-        fieldDrawing: strokes.length ? { strokes, width: 1, height: 1 } : undefined,
+        fieldDrawing: fieldPoint ?? undefined,
         notes: notes || undefined,
         involvements
       };
@@ -398,13 +330,45 @@ export function GoalWizard() {
       setMomentId(undefined);
       setSubMomentId(undefined);
       setActionId(undefined);
-      setZoneId(null);
+      setGoalPoint(null);
       setNotes("");
       setVideoUrl("");
       setInvolvements([]);
-      setStrokes([]);
+      setFieldPoint(null);
     },
     onError: (err: any) => setMessage(err.message ?? "Erro ao gravar o golo")
+  });
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      if (!existingGoal) return;
+      const payload = {
+        matchId,
+        teamId,
+        scorerId,
+        assistId: assistId ?? null,
+        minute,
+        momentId,
+        subMomentId,
+        actionId,
+        goalCoordinates: goalPoint ?? undefined,
+        videoUrl: videoUrl || undefined,
+        fieldDrawing: fieldPoint ?? undefined,
+        notes: notes || undefined,
+        involvements
+      };
+      const res = await fetch(`/api/goals/${existingGoal.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to update goal");
+      return res.json();
+    },
+    onSuccess: () => {
+      setMessage("Golo atualizado.");
+      onSaved?.();
+    },
+    onError: (err: any) => setMessage(err.message ?? "Erro ao atualizar o golo")
   });
 
   const filteredChampionships = useMemo(() => {
@@ -442,6 +406,37 @@ export function GoalWizard() {
     setInvolvements(involvements.filter((i) => !(i.playerId === playerId && i.role === role)));
   };
 
+  // Prefill when editing (once lookups are ready we can also derive season/campeonato)
+  useEffect(() => {
+    if (!existingGoal) return;
+    setTeamId(existingGoal.teamId);
+    setMatchId(existingGoal.matchId ?? undefined);
+    setScorerId(existingGoal.scorerId);
+    setAssistId(existingGoal.assistId ?? undefined);
+    setMinute(existingGoal.minute);
+    setMomentId(existingGoal.momentId);
+    setSubMomentId(existingGoal.subMomentId);
+    setActionId(existingGoal.actionId);
+    setGoalPoint(existingGoal.goalCoordinates ?? null);
+    setFieldPoint(existingGoal.fieldDrawing ?? null);
+    setNotes(existingGoal.notes ?? "");
+    setVideoUrl(existingGoal.videoUrl ?? "");
+    setInvolvements(existingGoal.involvements ?? []);
+    setStep("season");
+  }, [existingGoal]);
+
+  // Derive season/championship from team after lookups loaded
+  useEffect(() => {
+    if (!existingGoal || !lookupsQuery.data) return;
+    const team = lookupsQuery.data.teams.find((t) => t.id === existingGoal.teamId);
+    if (team) {
+      const champ = lookupsQuery.data.championships.find((c) => c.id === team.championshipId);
+      setChampionshipId(champ ? champ.id : undefined);
+      const season = champ ? lookupsQuery.data.seasons.find((s) => s.id === champ.seasonId) : undefined;
+      setSeasonId(season ? season.id : undefined);
+    }
+  }, [existingGoal, lookupsQuery.data]);
+
   const canNext = (current: StepId) => {
     switch (current) {
       case "season":
@@ -455,9 +450,9 @@ export function GoalWizard() {
       case "context":
         return Boolean(momentId && subMomentId && actionId && minute >= 0);
       case "zone":
-        return requiresGoal ? Boolean(zoneId) : true;
+        return requiresGoal ? Boolean(goalPoint) : true;
       case "field":
-        return requiresField ? strokes.length > 0 : true;
+        return requiresField ? Boolean(fieldPoint) : true;
       case "review":
         return true;
       default:
@@ -737,7 +732,8 @@ export function GoalWizard() {
                       return;
                     }
                     setActionId(val ? Number(val) : undefined);
-                    setZoneId(null);
+                    setGoalPoint(null);
+                    setFieldPoint(null);
                   }}
                   disabled={!subMomentId}
                 >
@@ -766,35 +762,29 @@ export function GoalWizard() {
             </div>
           )}
 
-          {step === "zone" && lookupsQuery.data && (
+          {step === "zone" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Zona da Baliza</label>
+                <label className="text-sm font-medium">Ponto na Baliza</label>
                 {requiresGoal ? (
-                  <span className="text-xs text-muted-foreground">Necessário porque a ação envolve Marcador</span>
+                  <span className="text-xs text-muted-foreground">Obrigatório para ações com “Marcador”.</span>
                 ) : (
-                  <span className="text-xs text-emerald-300">Esta ação é apenas de Campo. Selecionar baliza é opcional.</span>
+                  <span className="text-xs text-emerald-300">Opcional para esta ação (só Campo).</span>
                 )}
               </div>
-              {requiresGoal ? (
-                <GoalNetSelector zones={lookupsQuery.data.zones} value={zoneId} onChange={setZoneId} />
-              ) : (
-                <div className="rounded-xl border border-border/70 bg-card/70 p-4 text-sm text-muted-foreground">
-                  A ação selecionada não requer zona da baliza. Pode continuar.
-                </div>
-              )}
+              <GoalNetPinpoint value={goalPoint} onChange={setGoalPoint} />
             </div>
           )}
 
           {step === "field" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">Desenho no Campo</div>
+                <div className="text-sm font-medium">Ponto no Campo</div>
                 <span className="text-xs text-muted-foreground">
                   {requiresField ? "Obrigatório para esta ação." : "Opcional para referência tática."}
                 </span>
               </div>
-              <PitchDrawer strokes={strokes} onChange={setStrokes} />
+              <PitchPinpoint value={fieldPoint} onChange={setFieldPoint} />
             </div>
           )}
 
@@ -821,8 +811,10 @@ export function GoalWizard() {
                 <span>{lookupsQuery.data?.actions.find((a) => a.id === actionId)?.name ?? "-"}</span>
                 <span className="text-muted-foreground">Contexto</span>
                 <span>{requiresGoal ? "Campo + Baliza" : "Campo"}</span>
-                <span className="text-muted-foreground">Zona</span>
-                <span>{zoneId ? lookupsQuery.data?.zones.find((z) => z.id === zoneId)?.name ?? "-" : "N/A"}</span>
+                <span className="text-muted-foreground">Baliza</span>
+                <span>{goalPoint ? `(${goalPoint.x.toFixed(2)}, ${goalPoint.y.toFixed(2)})` : "N/A"}</span>
+                <span className="text-muted-foreground">Campo</span>
+                <span>{fieldPoint ? `(${fieldPoint.x.toFixed(2)}, ${fieldPoint.y.toFixed(2)})` : "N/A"}</span>
                 <span className="text-muted-foreground">Vídeo</span>
                 <span>{videoUrl ? "Anexado" : "—"}</span>
               </div>
@@ -836,13 +828,50 @@ export function GoalWizard() {
                   ))}
                 </div>
               )}
-              {strokes.length > 0 ? (
-                <div className="rounded-xl border border-border/60 bg-card/60 p-3 text-xs text-muted-foreground">
-                  {strokes.length} traco(s) serao guardados em JSONB com {strokes.reduce((sum, s) => sum + s.points.length, 0)} pontos normalizados.
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Campo</div>
+                  <div className="rounded-lg border border-border/50 bg-slate-950/60 p-2">
+                    <svg viewBox="0 0 105 68" className="w-full">
+                      <rect x="1" y="1" width="103" height="66" rx="8" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
+                      <line x1="52.5" y1="1" x2="52.5" y2="67" stroke="rgba(148,163,184,0.35)" strokeDasharray="3 3" />
+                      <circle cx="52.5" cy="34" r="9.15" stroke="rgba(148,163,184,0.35)" fill="none" />
+                      <rect x="1" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
+                      <rect x="90" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
+                      {fieldPoint && (
+                        <g transform={`translate(${fieldPoint.x * 105}, ${fieldPoint.y * 68})`}>
+                          <circle r="3.4" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
+                          <circle r="1.8" fill="#0f172a" />
+                          <circle r="0.9" fill="#22c55e" />
+                        </g>
+                      )}
+                    </svg>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-xs text-muted-foreground">Sem desenho no campo.</div>
-              )}
+                <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Baliza</div>
+                  <div className="rounded-lg border border-border/50 bg-slate-950/60 p-2">
+                    <svg viewBox="0 0 120 80" className="w-full">
+                      <rect x="4" y="6" width="112" height="68" rx="6" fill="#0b1220" stroke="#1f2937" strokeWidth="1.4" />
+                      <rect x="8" y="10" width="104" height="60" rx="5" fill="url(#reviewNet)" stroke="#0ea5e9" strokeWidth="0.6" strokeDasharray="4 3" />
+                      <path d="M8 22h104M8 36h104M8 50h104M8 64h104" stroke="rgba(226,232,240,0.18)" strokeWidth="0.6" />
+                      <path d="M26 10v60M46 10v60M66 10v60M86 10v60" stroke="rgba(226,232,240,0.18)" strokeWidth="0.6" />
+                      {goalPoint && (
+                        <g transform={`translate(${goalPoint.x * 120}, ${goalPoint.y * 80})`}>
+                          <circle r="4.2" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
+                          <circle r="2.2" fill="#0f172a" />
+                          <circle r="1.1" fill="#f97316" />
+                        </g>
+                      )}
+                      <defs>
+                        <pattern id="reviewNet" width="6" height="6" patternUnits="userSpaceOnUse">
+                          <path d="M0 0h6M0 0v6" stroke="rgba(148,163,184,0.2)" strokeWidth="0.6" />
+                        </pattern>
+                      </defs>
+                    </svg>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -860,8 +889,16 @@ export function GoalWizard() {
                 </Button>
               )}
               {step === "review" && (
-                <Button type="button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !readyToSave}>
-                  {createMutation.isPending ? "A gravar..." : "Gravar Golo"}
+                <Button
+                  type="button"
+                  onClick={() => (existingGoal ? updateMutation.mutate() : createMutation.mutate())}
+                  disabled={createMutation.isPending || updateMutation.isPending || !readyToSave}
+                >
+                  {createMutation.isPending || updateMutation.isPending
+                    ? "A gravar..."
+                    : existingGoal
+                      ? "Atualizar Golo"
+                      : "Gravar Golo"}
                 </Button>
               )}
             </div>

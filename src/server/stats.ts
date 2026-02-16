@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { goalInvolvements, goals, goalkeeperZones, moments, actions, subMoments, players } from "../schema/schema";
+import { goalInvolvements, goals, moments, actions, subMoments, players } from "../schema/schema";
 
 export async function topScorers(teamId: number) {
   const result = await db.execute<{ id: number; name: string; goals: number; assists: number }>(sql`
@@ -64,12 +64,26 @@ export async function mostInvolved(teamId: number) {
 
 export async function zoneDistribution(teamId: number) {
   const result = await db.execute<{ name: string; goals: number }>(sql`
-    SELECT gz.name, COUNT(*)::int AS goals
+    SELECT
+      CASE
+        WHEN (g.goal_coordinates ->> 'y')::float <= 0.5 THEN
+          CASE
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Upper Left'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Upper Center'
+            ELSE 'Upper Right'
+          END
+        ELSE
+          CASE
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Lower Left'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Lower Center'
+            ELSE 'Lower Right'
+          END
+      END AS name,
+      COUNT(*)::int AS goals
     FROM ${goals} g
-    JOIN ${goalkeeperZones} gz ON gz.id = g.goal_zone_id
-    WHERE g.team_id = ${teamId} AND g.goal_zone_id IS NOT NULL
-    GROUP BY gz.name
-    ORDER BY goals DESC, gz.name;
+    WHERE g.team_id = ${teamId} AND g.goal_coordinates IS NOT NULL
+    GROUP BY name
+    ORDER BY goals DESC, name;
   `);
   return result.rows;
 }
@@ -100,13 +114,27 @@ export async function actionsBreakdown(teamId: number) {
 
 export async function penaltiesByZone(teamId: number) {
   const result = await db.execute<{ zone: string; goals: number }>(sql`
-    SELECT gz.name AS zone, COUNT(*)::int AS goals
+    SELECT
+      CASE
+        WHEN (g.goal_coordinates ->> 'y')::float <= 0.5 THEN
+          CASE
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Upper Left'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Upper Center'
+            ELSE 'Upper Right'
+          END
+        ELSE
+          CASE
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Lower Left'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Lower Center'
+            ELSE 'Lower Right'
+          END
+      END AS zone,
+      COUNT(*)::int AS goals
     FROM ${goals} g
-    JOIN ${goalkeeperZones} gz ON gz.id = g.goal_zone_id
     JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
-    WHERE g.team_id = ${teamId} AND sm.name = 'Penalty' AND g.goal_zone_id IS NOT NULL
-    GROUP BY gz.name
-    ORDER BY goals DESC, gz.name;
+    WHERE g.team_id = ${teamId} AND sm.name = 'Penalty' AND g.goal_coordinates IS NOT NULL
+    GROUP BY zone
+    ORDER BY goals DESC, zone;
   `);
   return result.rows;
 }

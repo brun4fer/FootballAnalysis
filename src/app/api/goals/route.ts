@@ -29,7 +29,8 @@ export async function POST(req: Request) {
       ...json,
       minute,
       // Ensure the drawing is plain JSON (no prototypes) so it can be stored as jsonb
-      fieldDrawing: json?.fieldDrawing ? JSON.parse(JSON.stringify(json.fieldDrawing)) : json?.fieldDrawing
+      fieldDrawing: json?.fieldDrawing ? JSON.parse(JSON.stringify(json.fieldDrawing)) : json?.fieldDrawing,
+      goalCoordinates: json?.goalCoordinates ? JSON.parse(JSON.stringify(json.goalCoordinates)) : json?.goalCoordinates
     };
 
     const id = await createGoal(payload);

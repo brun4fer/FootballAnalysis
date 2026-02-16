@@ -1,16 +1,7 @@
 import { pgTable, bigserial, bigint, serial, smallint, text, date, jsonb, index, uniqueIndex, check } from "drizzle-orm/pg-core";
 import { desc, sql } from "drizzle-orm";
 
-export type FieldDrawing = {
-  strokes: Array<{
-    id: string;
-    color: string;
-    width: number;
-    points: Array<{ x: number; y: number }>;
-  }>;
-  width: number;
-  height: number;
-};
+export type CoordinatePoint = { x: number; y: number };
 
 export const seasons = pgTable(
   "seasons",
@@ -155,7 +146,8 @@ export const goals = pgTable(
       .references(() => actions.id),
     videoUrl: text("video_url"),
     goalZoneId: smallint("goal_zone_id").references(() => goalkeeperZones.id),
-    fieldDrawing: jsonb("field_drawing").$type<FieldDrawing | null>(),
+    goalCoordinates: jsonb("goal_coordinates").$type<CoordinatePoint | null>(),
+    fieldDrawing: jsonb("field_drawing").$type<CoordinatePoint | null>(),
     notes: text("notes")
   },
   (table) => ({

@@ -7,21 +7,7 @@ export const pointSchema = z.object({
   y: z.number().min(0).max(1)
 });
 
-export const fieldDrawingSchema = z.object({
-  strokes: z
-    .array(
-      z.object({
-        id: z.string(),
-        color: z.string(),
-        width: z.number().min(1),
-        points: z.array(pointSchema).min(2)
-      })
-    )
-    .optional()
-    .default([]),
-  width: z.number().positive(),
-  height: z.number().positive()
-});
+export const fieldDrawingSchema = pointSchema;
 
 export const goalInputSchema = z.object({
   matchId: z.number().int().positive().optional().nullable(),
@@ -32,7 +18,7 @@ export const goalInputSchema = z.object({
   momentId: z.number().int().positive(),
   subMomentId: z.number().int().positive(),
   actionId: z.number().int().positive(),
-  goalZoneId: z.number().int().positive().optional().nullable(),
+  goalCoordinates: pointSchema.optional(),
   videoUrl: z.string().url().optional().or(z.literal("")).nullable(),
   fieldDrawing: fieldDrawingSchema.optional(),
   notes: z.string().optional().or(z.literal("")),

@@ -2,18 +2,22 @@ import { db } from "../db/client";
 import { players, teams } from "../schema/schema";
 import { eq, asc } from "drizzle-orm";
 
-export async function listTeams() {
-  return db
+export async function listTeams(championshipId?: number) {
+  const base = db
     .select({
       id: teams.id,
       name: teams.name,
       championshipId: teams.championshipId,
       emblem: teams.emblem,
       radiographyPdfUrl: teams.radiographyPdfUrl,
-      videoReportUrl: teams.videoReportUrl
+      videoReportUrl: teams.videoReportUrl,
+      coach: teams.coach
     })
-    .from(teams)
-    .orderBy(asc(teams.name));
+    .from(teams);
+
+  const scoped = championshipId ? base.where(eq(teams.championshipId, championshipId)) : base;
+
+  return scoped.orderBy(asc(teams.name));
 }
 
 export async function listPlayers(teamId: number) {
