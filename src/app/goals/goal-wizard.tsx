@@ -29,7 +29,7 @@ const steps = [
   { id: "championship", label: "Campeonato" },
   { id: "team", label: "Equipa" },
   { id: "scorer", label: "Marcador & Assistência" },
-  { id: "context", label: "Contexto" },
+  { id: "context", label: "Momentos" },
   { id: "zone", label: "Baliza" },
   { id: "field", label: "Campo" },
   { id: "review", label: "Revisão" }
