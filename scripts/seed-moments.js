@@ -15,7 +15,7 @@ const seeds = [
       { name: "Criação", actions: ["Ligação no corredor central", "Ligação na largura", "Bola longa", "Profundidade"] },
       {
         name: "Finalização",
-        actions: ["Cruzamento", "Remate de fora da área", "Profundidade", "Segunda bola", "Marcador", "Assistência", "Unidades de ligação"]
+        actions: ["Cruzamento", "Remate de fora da área", "Profundidade", "Segunda bola"]
       }
     ]
   },
@@ -23,7 +23,7 @@ const seeds = [
     name: "Transição Ofensiva",
     sub: ["Recuperação meio campo defensivo", "Recuperação meio campo ofensivo"].map((subName) => ({
       name: subName,
-      actions: ["Primeiro passe", "Jogadores referência", "Espaços que atacam", "Transição para organização", "Marcador", "Assistência", "Unidades de ligação"]
+      actions: ["Primeiro passe", "Jogadores referência", "Espaços que atacam", "Transição para organização"]
     }))
   },
   {
@@ -32,16 +32,16 @@ const seeds = [
       { name: "Penalty", actions: ["Falta sobre", "Momento anterior"] },
       {
         name: "Livre",
-        actions: ["Aberto", "Fechado", "Combinado", "Marcador da falta", "Assistência", "Marcador", "Unidades de ligação"]
+        actions: ["Aberto", "Fechado", "Combinado", "Marcador da falta"]
       },
       {
         name: "Canto",
-        actions: ["Aberto", "Fechado", "Combinado", "Marcador do canto", "Assistência", "Marcador", "Unidades de ligação"]
+        actions: ["Aberto", "Fechado", "Combinado", "Marcador do canto"]
       },
       { name: "Livre Direto", actions: ["Falta sobre", "Momento anterior", "Marcador da falta"] },
       {
         name: "Lançamento Lateral",
-        actions: ["Lançamento para a área", "Passagem para organização", "Marcador do lançamento", "Assistência", "Marcador", "Unidades de ligação"]
+        actions: ["Lançamento para a área", "Passagem para organização", "Marcador do lançamento"]
       }
     ]
   }

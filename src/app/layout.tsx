@@ -3,6 +3,7 @@ import { ReactNode } from "react";
 import { QueryProvider } from "@/components/ui/query-provider";
 import { AppProvider } from "@/components/ui/app-context";
 import { Header } from "@/components/ui/header";
+import { Sidebar } from "@/components/ui/sidebar";
 import { Space_Grotesk } from "next/font/google";
 
 const font = Space_Grotesk({
@@ -25,7 +26,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <AppProvider>
             <div className="min-h-screen">
               <Header />
-              <main className="p-6 max-w-6xl mx-auto">{children}</main>
+              <div className="mx-auto flex max-w-6xl gap-6 px-6 py-6">
+                <Sidebar />
+                <main className="flex-1">{children}</main>
+              </div>
             </div>
           </AppProvider>
         </QueryProvider>

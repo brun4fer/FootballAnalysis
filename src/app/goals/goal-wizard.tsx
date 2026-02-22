@@ -237,7 +237,7 @@ function CreateItemModal({
 
 type ExistingGoal = {
   id: number;
-  matchId: number | null;
+  opponentTeamId: number | null;
   teamId: number;
   scorerId: number;
   assistId: number | null;
@@ -245,6 +245,10 @@ type ExistingGoal = {
   momentId: number;
   subMomentId: number;
   actionId: number;
+  cornerTakerId?: number | null;
+  freekickTakerId?: number | null;
+  penaltyTakerId?: number | null;
+  crossAuthorId?: number | null;
   goalCoordinates: Point | null;
   fieldDrawing: Point | null;
   notes: string | null;
@@ -259,13 +263,17 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
   const [seasonId, setSeasonId] = useState<number | undefined>();
   const [championshipId, setChampionshipId] = useState<number | undefined>();
   const [teamId, setTeamId] = useState<number | undefined>();
-  const [matchId, setMatchId] = useState<number | undefined>();
+  const [opponentTeamId, setOpponentTeamId] = useState<number | undefined>();
   const [scorerId, setScorerId] = useState<number | undefined>();
   const [assistId, setAssistId] = useState<number | undefined>();
   const [minute, setMinute] = useState(0);
   const [momentId, setMomentId] = useState<number | undefined>();
   const [subMomentId, setSubMomentId] = useState<number | undefined>();
   const [actionId, setActionId] = useState<number | undefined>();
+  const [cornerTakerId, setCornerTakerId] = useState<number | undefined>();
+  const [freekickTakerId, setFreekickTakerId] = useState<number | undefined>();
+  const [penaltyTakerId, setPenaltyTakerId] = useState<number | undefined>();
+  const [crossAuthorId, setCrossAuthorId] = useState<number | undefined>();
   const [goalPoint, setGoalPoint] = useState<Point | null>(null);
   const [notes, setNotes] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
@@ -286,7 +294,7 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
   });
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!teamId || !scorerId || !momentId || !subMomentId || !actionId) {
+      if (!teamId || !opponentTeamId || !scorerId || !momentId || !subMomentId || !actionId) {
         throw new Error("Campos obrigatórios em falta");
       }
       if (!seasonId || !championshipId) throw new Error("Selecione época e campeonato.");
@@ -298,7 +306,7 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
       if (!fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
 
       const payload = {
-        matchId,
+        opponentTeamId,
         teamId,
         scorerId,
         assistId: assistId ?? null,
@@ -306,6 +314,10 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
         momentId,
         subMomentId,
         actionId,
+        cornerTakerId,
+        freekickTakerId,
+        penaltyTakerId,
+        crossAuthorId,
         goalCoordinates: goalPoint ?? undefined,
         videoUrl: videoUrl || undefined,
         fieldDrawing: fieldPoint ?? undefined,
@@ -335,6 +347,10 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
       setVideoUrl("");
       setInvolvements([]);
       setFieldPoint(null);
+      setCornerTakerId(undefined);
+      setFreekickTakerId(undefined);
+      setPenaltyTakerId(undefined);
+      setCrossAuthorId(undefined);
     },
     onError: (err: any) => setMessage(err.message ?? "Erro ao gravar o golo")
   });
@@ -342,7 +358,7 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
     mutationFn: async () => {
       if (!existingGoal) return;
       const payload = {
-        matchId,
+        opponentTeamId,
         teamId,
         scorerId,
         assistId: assistId ?? null,
@@ -350,6 +366,10 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
         momentId,
         subMomentId,
         actionId,
+        cornerTakerId,
+        freekickTakerId,
+        penaltyTakerId,
+        crossAuthorId,
         goalCoordinates: goalPoint ?? undefined,
         videoUrl: videoUrl || undefined,
         fieldDrawing: fieldPoint ?? undefined,
@@ -381,6 +401,12 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
     return lookupsQuery.data.teams.filter((t) => (championshipId ? t.championshipId === championshipId : true));
   }, [lookupsQuery.data, championshipId]);
 
+  const opponentOptions = useMemo(() => {
+    if (!lookupsQuery.data) return [];
+    const sameChampionshipTeams = lookupsQuery.data.teams.filter((t) => (championshipId ? t.championshipId === championshipId : true));
+    return sameChampionshipTeams.filter((t) => t.id !== teamId);
+  }, [lookupsQuery.data, championshipId, teamId]);
+
   const filteredSubMoments = useMemo(() => {
     if (!momentId || !lookupsQuery.data) return [];
     return lookupsQuery.data.subMoments.filter((s) => s.momentId === momentId);
@@ -394,6 +420,13 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
   const selectedAction = filteredActions.find((a) => a.id === actionId);
   const requiresGoal = selectedAction ? selectedAction.name.toLowerCase().includes("marcador") : false;
   const requiresField = Boolean(selectedAction); // todas as ações pedem registo de campo
+
+  const selectedSubMoment = subMomentId ? lookupsQuery.data?.subMoments.find((s) => s.id === subMomentId) : undefined;
+  const subName = selectedSubMoment?.name.toLowerCase() ?? "";
+  const isCorner = subName.includes("canto");
+  const isFreeKick = subName.includes("livre");
+  const isPenalty = subName.includes("penal") || subName.includes("penalty");
+  const isCross = selectedAction ? selectedAction.name.toLowerCase().includes("cruzamento") : false;
 
   const currentPlayers = playersQuery.data ?? [];
   const addInvolvement = (playerId: number) => {
@@ -410,7 +443,7 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
   useEffect(() => {
     if (!existingGoal) return;
     setTeamId(existingGoal.teamId);
-    setMatchId(existingGoal.matchId ?? undefined);
+    setOpponentTeamId(existingGoal.opponentTeamId ?? undefined);
     setScorerId(existingGoal.scorerId);
     setAssistId(existingGoal.assistId ?? undefined);
     setMinute(existingGoal.minute);
@@ -422,6 +455,10 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
     setNotes(existingGoal.notes ?? "");
     setVideoUrl(existingGoal.videoUrl ?? "");
     setInvolvements(existingGoal.involvements ?? []);
+    setCornerTakerId(existingGoal.cornerTakerId ?? undefined);
+    setFreekickTakerId(existingGoal.freekickTakerId ?? undefined);
+    setPenaltyTakerId(existingGoal.penaltyTakerId ?? undefined);
+    setCrossAuthorId(existingGoal.crossAuthorId ?? undefined);
     setStep("season");
   }, [existingGoal]);
 
@@ -444,7 +481,7 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
       case "championship":
         return Boolean(championshipId);
       case "team":
-        return Boolean(teamId);
+        return Boolean(teamId && opponentTeamId && opponentTeamId !== teamId);
       case "scorer":
         return Boolean(scorerId);
       case "context":
@@ -463,7 +500,22 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
   const currentIndex = steps.findIndex((s) => s.id === step);
   const movePrev = () => setStep(steps[Math.max(0, currentIndex - 1)].id);
   const moveNext = () => setStep(steps[Math.min(steps.length - 1, currentIndex + 1)].id);
-  const readyToSave = Boolean(seasonId && championshipId && teamId && scorerId && momentId && subMomentId && actionId && canNext("zone") && canNext("field"));
+  const readyToSave = Boolean(
+    seasonId &&
+    championshipId &&
+    teamId &&
+    opponentTeamId &&
+    scorerId &&
+    momentId &&
+    subMomentId &&
+    actionId &&
+    (!isCorner || cornerTakerId) &&
+    (!isFreeKick || freekickTakerId) &&
+    (!isPenalty || penaltyTakerId) &&
+    (!isCross || crossAuthorId) &&
+    canNext("zone") &&
+    canNext("field")
+  );
 
   async function handleCreate(kind: "moment" | "submoment" | "action", name: string, context?: "field" | "field_goal") {
     if (kind === "moment") {
@@ -509,6 +561,7 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
                     }
                     setChampionshipId(undefined);
                     setTeamId(undefined);
+                    setOpponentTeamId(undefined);
                     setScorerId(undefined);
                     setAssistId(undefined);
                   }}
@@ -543,6 +596,7 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
                       updatePartial({ championshipId: undefined, championshipName: undefined });
                     }
                     setTeamId(undefined);
+                    setOpponentTeamId(undefined);
                     setScorerId(undefined);
                     setAssistId(undefined);
                   }}
@@ -568,7 +622,11 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
                 <label className="text-sm font-medium">Equipa</label>
                 <Select
                   value={teamId?.toString() ?? ""}
-                  onChange={(e) => setTeamId(Number(e.target.value) || undefined)}
+                  onChange={(e) => {
+                    const val = Number(e.target.value) || undefined;
+                    setTeamId(val);
+                    if (val && opponentTeamId === val) setOpponentTeamId(undefined);
+                  }}
                   aria-label="team-select"
                   disabled={!championshipId}
                 >
@@ -581,8 +639,23 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">ID do Jogo (opcional)</label>
-                <Input type="number" min={1} value={matchId ?? ""} onChange={(e) => setMatchId(e.target.value ? Number(e.target.value) : undefined)} />
+                <label className="text-sm font-medium">Equipa Adversária</label>
+                <Select
+                  value={opponentTeamId?.toString() ?? ""}
+                  onChange={(e) => setOpponentTeamId(e.target.value ? Number(e.target.value) : undefined)}
+                  aria-label="opponent-select"
+                  disabled={!championshipId}
+                >
+                  <option value="">Selecionar adversário</option>
+                  {opponentOptions.map((team) => (
+                    <option key={team.id} value={team.id} className="text-black">
+                      {team.name}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Lista filtrada para o mesmo campeonato/época (Premier League 25/26) e sem a equipa selecionada.
+                </p>
               </div>
             </div>
           )}
@@ -684,6 +757,10 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
                     setMomentId(val ? Number(val) : undefined);
                     setSubMomentId(undefined);
                     setActionId(undefined);
+                    setCornerTakerId(undefined);
+                    setFreekickTakerId(undefined);
+                    setPenaltyTakerId(undefined);
+                    setCrossAuthorId(undefined);
                   }}
                 >
                   <option value="">Selecionar momento</option>
@@ -707,6 +784,10 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
                     }
                     setSubMomentId(val ? Number(val) : undefined);
                     setActionId(undefined);
+                    setCornerTakerId(undefined);
+                    setFreekickTakerId(undefined);
+                    setPenaltyTakerId(undefined);
+                    setCrossAuthorId(undefined);
                   }}
                   disabled={!momentId}
                 >
@@ -734,6 +815,7 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
                     setActionId(val ? Number(val) : undefined);
                     setGoalPoint(null);
                     setFieldPoint(null);
+                    setCrossAuthorId(undefined);
                   }}
                   disabled={!subMomentId}
                 >
@@ -751,6 +833,74 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
                   })}
                 </Select>
               </div>
+              {isCorner && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Marcador do Canto</label>
+                  <Select
+                    value={cornerTakerId?.toString() ?? ""}
+                    onChange={(e) => setCornerTakerId(e.target.value ? Number(e.target.value) : undefined)}
+                    disabled={!teamId || playersQuery.isLoading}
+                  >
+                    <option value="">Selecionar jogador</option>
+                    {currentPlayers.map((p) => (
+                      <option key={p.id} value={p.id} className="text-black">
+                        {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
+              {isFreeKick && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Marcador da Falta</label>
+                  <Select
+                    value={freekickTakerId?.toString() ?? ""}
+                    onChange={(e) => setFreekickTakerId(e.target.value ? Number(e.target.value) : undefined)}
+                    disabled={!teamId || playersQuery.isLoading}
+                  >
+                    <option value="">Selecionar jogador</option>
+                    {currentPlayers.map((p) => (
+                      <option key={p.id} value={p.id} className="text-black">
+                        {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
+              {isPenalty && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Marcador do Penálti</label>
+                  <Select
+                    value={penaltyTakerId?.toString() ?? ""}
+                    onChange={(e) => setPenaltyTakerId(e.target.value ? Number(e.target.value) : undefined)}
+                    disabled={!teamId || playersQuery.isLoading}
+                  >
+                    <option value="">Selecionar jogador</option>
+                    {currentPlayers.map((p) => (
+                      <option key={p.id} value={p.id} className="text-black">
+                        {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
+              {isCross && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Autor do Cruzamento</label>
+                  <Select
+                    value={crossAuthorId?.toString() ?? ""}
+                    onChange={(e) => setCrossAuthorId(e.target.value ? Number(e.target.value) : undefined)}
+                    disabled={!teamId || playersQuery.isLoading}
+                  >
+                    <option value="">Selecionar jogador</option>
+                    {currentPlayers.map((p) => (
+                      <option key={p.id} value={p.id} className="text-black">
+                        {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
               <div className="md:col-span-2 space-y-2">
                 <label className="text-sm font-medium">Notas (opcional)</label>
                 <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Contexto tático ou observações" />
@@ -797,6 +947,8 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
                 <span>{lookupsQuery.data?.championships.find((c) => c.id === championshipId)?.name ?? "-"}</span>
                 <span className="text-muted-foreground">Equipa</span>
                 <span>{teamsQuery.data?.find((t) => t.id === teamId)?.name ?? "-"}</span>
+                <span className="text-muted-foreground">Adversário</span>
+                <span>{lookupsQuery.data?.teams.find((t) => t.id === opponentTeamId)?.name ?? "-"}</span>
                 <span className="text-muted-foreground">Marcador</span>
                 <span>{currentPlayers.find((p) => p.id === scorerId)?.name ?? "-"}</span>
                 <span className="text-muted-foreground">Assistência</span>
@@ -811,6 +963,30 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
                 <span>{lookupsQuery.data?.actions.find((a) => a.id === actionId)?.name ?? "-"}</span>
                 <span className="text-muted-foreground">Contexto</span>
                 <span>{requiresGoal ? "Campo + Baliza" : "Campo"}</span>
+                {isCorner && (
+                  <>
+                    <span className="text-muted-foreground">Marcador do canto</span>
+                    <span>{currentPlayers.find((p) => p.id === cornerTakerId)?.name ?? "-"}</span>
+                  </>
+                )}
+                {isFreeKick && (
+                  <>
+                    <span className="text-muted-foreground">Marcador da falta</span>
+                    <span>{currentPlayers.find((p) => p.id === freekickTakerId)?.name ?? "-"}</span>
+                  </>
+                )}
+                {isPenalty && (
+                  <>
+                    <span className="text-muted-foreground">Marcador do penálti</span>
+                    <span>{currentPlayers.find((p) => p.id === penaltyTakerId)?.name ?? "-"}</span>
+                  </>
+                )}
+                {isCross && (
+                  <>
+                    <span className="text-muted-foreground">Autor do cruzamento</span>
+                    <span>{currentPlayers.find((p) => p.id === crossAuthorId)?.name ?? "-"}</span>
+                  </>
+                )}
                 <span className="text-muted-foreground">Baliza</span>
                 <span>{goalPoint ? `(${goalPoint.x.toFixed(2)}, ${goalPoint.y.toFixed(2)})` : "N/A"}</span>
                 <span className="text-muted-foreground">Campo</span>

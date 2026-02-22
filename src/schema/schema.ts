@@ -126,7 +126,7 @@ export const goals = pgTable(
   "goals",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    matchId: bigint("match_id", { mode: "number" }).references(() => matches.id),
+    opponentTeamId: bigint("opponent_team_id", { mode: "number" }).references(() => teams.id),
     teamId: bigint("team_id", { mode: "number" })
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
@@ -146,6 +146,10 @@ export const goals = pgTable(
       .references(() => actions.id),
     videoUrl: text("video_url"),
     goalZoneId: smallint("goal_zone_id").references(() => goalkeeperZones.id),
+    cornerTakerId: bigint("corner_taker_id", { mode: "number" }).references(() => players.id),
+    freekickTakerId: bigint("freekick_taker_id", { mode: "number" }).references(() => players.id),
+    penaltyTakerId: bigint("penalty_taker_id", { mode: "number" }).references(() => players.id),
+    crossAuthorId: bigint("cross_author_id", { mode: "number" }).references(() => players.id),
     goalCoordinates: jsonb("goal_coordinates").$type<CoordinatePoint | null>(),
     fieldDrawing: jsonb("field_drawing").$type<CoordinatePoint | null>(),
     notes: text("notes")
@@ -153,11 +157,16 @@ export const goals = pgTable(
   (table) => ({
     minuteCheck: check("goals_minute_check", sql`${table.minute} BETWEEN 0 AND 130`),
     idxTeamMinute: index("idx_goals_team_minute").on(table.teamId),
+    idxOpponent: index("idx_goals_opponent").on(table.opponentTeamId),
     idxScorer: index("idx_goals_scorer").on(table.scorerId),
     idxAssist: index("idx_goals_assist").on(table.assistId),
     idxMoment: index("idx_goals_moment").on(table.momentId),
     idxAction: index("idx_goals_action").on(table.actionId),
-    idxZone: index("idx_goals_zone").on(table.goalZoneId)
+    idxZone: index("idx_goals_zone").on(table.goalZoneId),
+    idxCornerTaker: index("idx_goals_corner_taker").on(table.cornerTakerId),
+    idxFreekickTaker: index("idx_goals_freekick_taker").on(table.freekickTakerId),
+    idxPenaltyTaker: index("idx_goals_penalty_taker").on(table.penaltyTakerId),
+    idxCrossAuthor: index("idx_goals_cross_author").on(table.crossAuthorId)
   })
 );
 

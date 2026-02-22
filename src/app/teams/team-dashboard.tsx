@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SimpleBar, SimplePie } from "@/components/ui/charts";
-import { FileText, PlayCircle, X } from "lucide-react";
+import { FileText, PlayCircle, X, Eye } from "lucide-react";
 import { useAppContext } from "@/components/ui/app-context";
 import { GoalWizard } from "../goals/goal-wizard";
 
@@ -19,6 +20,8 @@ type GoalEvent = {
   minute: number;
   scorerId: number;
   scorerName?: string | null;
+  opponentTeamId?: number | null;
+  opponentName?: string | null;
   goalCoordinates?: { x: number; y: number } | null;
   fieldDrawing?: { x: number; y: number } | null;
   action?: string;
@@ -344,6 +347,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                     <div className="flex items-center gap-3">
                       <span className="text-muted-foreground">{g.minute}'</span>
                       <span className="font-medium">{g.scorerName ?? `#${g.scorerId}`}</span>
+                      <Badge className="bg-slate-700/60 text-slate-50">vs {g.opponentName ?? "Adversário indefinido"}</Badge>
                       {g.goalCoordinates && (
                         <Badge className="bg-cyan-500/10 text-cyan-100">
                           ({g.goalCoordinates.x.toFixed(2)}, {g.goalCoordinates.y.toFixed(2)})
@@ -351,6 +355,11 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={`/stats/goal/${g.id}`} className="flex items-center gap-1">
+                          <Eye className="h-4 w-4" /> Ver
+                        </Link>
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => loadGoalForEdit(g.id)}>
                         Editar
                       </Button>
@@ -383,7 +392,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                       <GoalWizard
                         existingGoal={{
                           id: editingGoal.id,
-                          matchId: editingGoal.matchId,
+                          opponentTeamId: editingGoal.opponentTeamId,
                           teamId: editingGoal.teamId,
                           scorerId: editingGoal.scorerId,
                           assistId: editingGoal.assistId,
@@ -395,7 +404,11 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                           fieldDrawing: editingGoal.fieldDrawing,
                           notes: editingGoal.notes,
                           videoUrl: editingGoal.videoUrl,
-                          involvements: editingGoal.involvements
+                          involvements: editingGoal.involvements,
+                          cornerTakerId: editingGoal.cornerTakerId,
+                          freekickTakerId: editingGoal.freekickTakerId,
+                          penaltyTakerId: editingGoal.penaltyTakerId,
+                          crossAuthorId: editingGoal.crossAuthorId
                         }}
                         onSaved={() => {
                           refreshAll();

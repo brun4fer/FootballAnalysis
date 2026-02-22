@@ -1,13 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useAppContext } from "./app-context";
 
 export function Header() {
   const { selection } = useAppContext();
   const subtitle =
-    selection.championshipName && selection.seasonName
-      ? `${selection.championshipName} (${selection.seasonName})`
-      : "";
+    selection.championshipName && selection.seasonName ? `${selection.championshipName} (${selection.seasonName})` : "";
 
   return (
     <header className="sticky top-0 z-20 border-b border-border/60 bg-[#0a0f1a]/80 backdrop-blur-xl">
@@ -16,12 +14,14 @@ export function Header() {
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-400/70 to-emerald-500/70 shadow-lg shadow-emerald-500/30" />
           <div>
             <div className="text-lg font-semibold tracking-tight">Football Analysis</div>
+            {subtitle && <div className="text-xs text-muted-foreground">{subtitle}</div>}
           </div>
         </div>
         <nav className="flex items-center gap-3 text-sm font-medium">
           <a href="/manage/config" className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/5">
             Configurações
-          </a><a href="/manage/teams" className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/5">
+          </a>
+          <a href="/manage/teams" className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/5">
             Equipas
           </a>
           <a href="/manage/players" className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/5">
@@ -32,6 +32,9 @@ export function Header() {
           </a>
           <a href="/teams" className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/5">
             Estatísticas
+          </a>
+          <a href="/rankings" className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-white/5">
+            🏆 Rankings
           </a>
         </nav>
       </div>

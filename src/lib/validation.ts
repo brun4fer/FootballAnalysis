@@ -10,7 +10,7 @@ export const pointSchema = z.object({
 export const fieldDrawingSchema = pointSchema;
 
 export const goalInputSchema = z.object({
-  matchId: z.number().int().positive().optional().nullable(),
+  opponentTeamId: z.number().int().positive(),
   teamId: z.number().int().positive(),
   scorerId: z.number().int().positive(),
   assistId: z.number().int().positive().optional().nullable(),
@@ -18,6 +18,10 @@ export const goalInputSchema = z.object({
   momentId: z.number().int().positive(),
   subMomentId: z.number().int().positive(),
   actionId: z.number().int().positive(),
+  cornerTakerId: z.number().int().positive().optional().nullable(),
+  freekickTakerId: z.number().int().positive().optional().nullable(),
+  penaltyTakerId: z.number().int().positive().optional().nullable(),
+  crossAuthorId: z.number().int().positive().optional().nullable(),
   goalCoordinates: pointSchema.optional(),
   videoUrl: z.string().url().optional().or(z.literal("")).nullable(),
   fieldDrawing: fieldDrawingSchema.optional(),
