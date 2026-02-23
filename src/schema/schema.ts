@@ -34,7 +34,7 @@ export const teams = pgTable(
     championshipId: bigint("championship_id", { mode: "number" })
       .references(() => championships.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    emblem: text("emblem"),
+    emblemPath: text("emblem_path"),
     radiographyPdfUrl: text("radiography_pdf_url"),
     videoReportUrl: text("video_report_url"),
     stadium: text("stadium"),
@@ -57,7 +57,7 @@ export const players = pgTable(
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    photoUrl: text("photo_url"),
+    photoPath: text("photo_path"),
     primaryPosition: text("primary_position").notNull(),
     secondaryPosition: text("secondary_position"),
     tertiaryPosition: text("tertiary_position"),
@@ -144,7 +144,7 @@ export const goals = pgTable(
     actionId: bigint("action_id", { mode: "number" })
       .notNull()
       .references(() => actions.id),
-    videoUrl: text("video_url"),
+    videoPath: text("video_path"),
     goalZoneId: smallint("goal_zone_id").references(() => goalkeeperZones.id),
     cornerTakerId: bigint("corner_taker_id", { mode: "number" }).references(() => players.id),
     freekickTakerId: bigint("freekick_taker_id", { mode: "number" }).references(() => players.id),

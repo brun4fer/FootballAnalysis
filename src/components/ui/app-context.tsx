@@ -21,15 +21,8 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 const STORAGE_KEY = "fa.selection";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [selection, setSelectionState] = useState<Selection>(() => {
-    if (typeof window === "undefined") return {};
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as Selection) : {};
-    } catch {
-      return {};
-    }
-  });
+  // Start empty on both server and client to keep SSR/CSR markup aligned; then hydrate from localStorage.
+  const [selection, setSelectionState] = useState<Selection>({});
 
   const setSelection = (sel: Selection) => {
     setSelectionState(sel);
@@ -38,6 +31,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updatePartial = (partial: Partial<Selection>) => {
     setSelectionState((prev) => ({ ...prev, ...partial }));
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        setSelectionState(JSON.parse(raw) as Selection);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

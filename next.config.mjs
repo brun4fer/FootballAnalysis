@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // No experimental flags required; keeps config valid on Next.js 14
+  // Agora todas as imagens/vídeos são servidos localmente em /public, não é necessário remotePatterns.
 };
 
 export default nextConfig;

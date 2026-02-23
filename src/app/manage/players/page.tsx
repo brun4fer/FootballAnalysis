@@ -8,12 +8,13 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useState, useMemo } from "react";
 import { useAppContext } from "@/components/ui/app-context";
+import { FileUpload } from "@/components/ui/file-upload";
 
 type Player = {
   id: number;
   name: string;
   teamId: number;
-  photoUrl?: string | null;
+  photoPath?: string | null;
   primaryPosition: string;
   secondaryPosition?: string | null;
   tertiaryPosition?: string | null;
@@ -41,7 +42,7 @@ export default function ManagePlayersPage() {
   const [form, setForm] = useState({
     teamId: "",
     name: "",
-    photoUrl: "",
+    photoPath: "",
     primaryPosition: "",
     secondaryPosition: "",
     tertiaryPosition: "",
@@ -72,7 +73,7 @@ export default function ManagePlayersPage() {
       const body = {
         teamId: Number(form.teamId),
         name: form.name,
-        photoUrl: form.photoUrl,
+        photoPath: form.photoPath,
         primaryPosition: form.primaryPosition,
         secondaryPosition: form.secondaryPosition,
         tertiaryPosition: form.tertiaryPosition,
@@ -100,7 +101,7 @@ export default function ManagePlayersPage() {
       setForm({
         teamId: form.teamId,
         name: "",
-        photoUrl: "",
+        photoPath: "",
         primaryPosition: "",
         secondaryPosition: "",
         tertiaryPosition: "",
@@ -206,8 +207,14 @@ export default function ManagePlayersPage() {
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nome do jogador" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Foto (URL)</label>
-            <Input value={form.photoUrl} onChange={(e) => setForm({ ...form, photoUrl: e.target.value })} placeholder="https://..." />
+            <label className="text-xs text-muted-foreground">Foto</label>
+            <FileUpload
+              label={form.photoPath ? "Atualizar foto" : "Carregar foto"}
+              accept="image/*"
+              value={form.photoPath}
+              onChange={(path) => setForm({ ...form, photoPath: path })}
+              helperText="Use JPG/PNG; guardado em /uploads."
+            />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Posição principal</label>
@@ -322,7 +329,7 @@ export default function ManagePlayersPage() {
                       setForm({
                         teamId: String(player.teamId),
                         name: player.name,
-                        photoUrl: player.photoUrl || "",
+                        photoPath: player.photoPath || "",
                         primaryPosition: player.primaryPosition,
                         secondaryPosition: player.secondaryPosition || "",
                         tertiaryPosition: player.tertiaryPosition || "",

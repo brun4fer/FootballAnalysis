@@ -8,7 +8,7 @@ export async function listTeams(championshipId?: number) {
       id: teams.id,
       name: teams.name,
       championshipId: teams.championshipId,
-      emblem: teams.emblem,
+      emblemPath: teams.emblemPath,
       radiographyPdfUrl: teams.radiographyPdfUrl,
       videoReportUrl: teams.videoReportUrl,
       coach: teams.coach
@@ -26,7 +26,7 @@ export async function listPlayers(teamId: number) {
       id: players.id,
       name: players.name,
       teamId: players.teamId,
-      photoUrl: players.photoUrl,
+      photoPath: players.photoPath,
       primaryPosition: players.primaryPosition,
       secondaryPosition: players.secondaryPosition,
       tertiaryPosition: players.tertiaryPosition,

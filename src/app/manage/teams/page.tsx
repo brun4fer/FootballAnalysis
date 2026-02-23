@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { FileUpload } from "@/components/ui/file-upload";
 
 type Team = {
   id: number;
   name: string;
   championshipId: number;
-  emblem?: string | null;
+  emblemPath?: string | null;
   radiographyPdfUrl?: string | null;
   videoReportUrl?: string | null;
   stadium?: string | null;
@@ -38,7 +39,7 @@ export default function ManageTeamsPage() {
   const [form, setForm] = useState({
     name: "",
     championshipId: "",
-    emblem: "",
+    emblemPath: "",
     radiographyPdfUrl: "",
     videoReportUrl: "",
     stadium: "",
@@ -73,7 +74,7 @@ export default function ManageTeamsPage() {
       const body = {
         name: form.name,
         championshipId: Number(form.championshipId),
-        emblem: form.emblem,
+        emblemPath: form.emblemPath,
         radiographyPdfUrl: form.radiographyPdfUrl,
         videoReportUrl: form.videoReportUrl,
         stadium: form.stadium,
@@ -101,7 +102,7 @@ export default function ManageTeamsPage() {
       setForm({
         name: "",
         championshipId: form.championshipId,
-        emblem: "",
+        emblemPath: "",
         radiographyPdfUrl: "",
         videoReportUrl: "",
         stadium: "",
@@ -167,16 +168,34 @@ export default function ManageTeamsPage() {
             <Input value={form.coach} onChange={(e) => setForm({ ...form, coach: e.target.value })} placeholder="Nome do treinador" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Emblema (URL)</label>
-            <Input value={form.emblem} onChange={(e) => setForm({ ...form, emblem: e.target.value })} placeholder="https://..." />
+            <label className="text-xs text-muted-foreground">Emblema (upload)</label>
+            <FileUpload
+              label={form.emblemPath ? "Atualizar emblema" : "Carregar emblema"}
+              accept="image/*"
+              value={form.emblemPath}
+              onChange={(path) => setForm({ ...form, emblemPath: path })}
+              helperText="Suporta PNG/JPG. Guarda no servidor local."
+            />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Radiografia Ofensiva (PDF)</label>
-            <Input value={form.radiographyPdfUrl} onChange={(e) => setForm({ ...form, radiographyPdfUrl: e.target.value })} placeholder="https://...pdf" />
+            <FileUpload
+              label={form.radiographyPdfUrl ? "Atualizar PDF" : "Carregar PDF"}
+              accept="application/pdf"
+              value={form.radiographyPdfUrl}
+              onChange={(path) => setForm({ ...form, radiographyPdfUrl: path })}
+              helperText="Ficheiro ficará em /uploads/."
+            />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Relatório Vídeo (MP4)</label>
-            <Input value={form.videoReportUrl} onChange={(e) => setForm({ ...form, videoReportUrl: e.target.value })} placeholder="https://...mp4" />
+            <FileUpload
+              label={form.videoReportUrl ? "Atualizar vídeo" : "Carregar vídeo"}
+              accept="video/mp4,video/*"
+              value={form.videoReportUrl}
+              onChange={(path) => setForm({ ...form, videoReportUrl: path })}
+              helperText="Suporta MP4; guardado localmente."
+            />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Estádio</label>
@@ -270,7 +289,7 @@ export default function ManageTeamsPage() {
                       )}
                       {team.videoReportUrl && (
                         <a href={team.videoReportUrl} target="_blank" rel="noreferrer" className="text-xs text-emerald-300 underline">
-                          VÃ­deo
+                          Ví­deo
                         </a>
                       )}
                       <Button
@@ -283,7 +302,7 @@ export default function ManageTeamsPage() {
                           setForm({
                             name: team.name,
                             championshipId: String(team.championshipId),
-                            emblem: team.emblem || "",
+                            emblemPath: team.emblemPath || "",
                             radiographyPdfUrl: team.radiographyPdfUrl || "",
                             videoReportUrl: team.videoReportUrl || "",
                             stadium: team.stadium || "",

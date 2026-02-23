@@ -65,18 +65,18 @@ export default async function GoalDetail({ params }: { params: { id: string } })
         </Link>
         <div>
           <h1 className="text-2xl font-semibold">Golo #{id}</h1>
-          <p className="text-sm text-muted-foreground">Visualização detalhada com vídeo e pinpoints.</p>
+          <p className="text-sm text-muted-foreground">VisualizaÃ§Ã£o detalhada com vÃ­deo e pinpoints.</p>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Vídeo" description={goal.videoUrl ? "Replay do lance" : "Sem vídeo disponível"} />
+          <CardHeader title="VÃ­deo" description={goal.videoPath ? "Replay do lance" : "Sem vÃ­deo disponÃ­vel"} />
           <CardContent>
-            {goal.videoUrl ? (
-              <video controls className="w-full rounded-xl border border-border/60" src={goal.videoUrl} />
+            {goal.videoPath ? (
+              <video controls className="w-full rounded-xl border border-border/60" src={goal.videoPath} />
             ) : (
-              <div className="text-sm text-muted-foreground">Sem URL de vídeo.</div>
+              <div className="text-sm text-muted-foreground">Sem vÃ­deo disponÃ­vel.</div>
             )}
           </CardContent>
         </Card>
@@ -86,19 +86,19 @@ export default async function GoalDetail({ params }: { params: { id: string } })
             <div className="grid grid-cols-2 gap-2">
               <span className="text-muted-foreground">Equipa</span>
               <span>{goal.teamName ?? goal.teamId}</span>
-              <span className="text-muted-foreground">Adversário</span>
+              <span className="text-muted-foreground">AdversÃ¡rio</span>
               <span>{goal.opponentName ?? goal.opponentTeamId ?? "-"}</span>
               <span className="text-muted-foreground">Marcador</span>
               <span>{goal.scorerName ?? goal.scorerId}</span>
-              <span className="text-muted-foreground">Assistência</span>
-              <span>{goal.assistName ?? goal.assistId ?? "—"}</span>
+              <span className="text-muted-foreground">AssistÃªncia</span>
+              <span>{goal.assistName ?? goal.assistId ?? "â€”"}</span>
               <span className="text-muted-foreground">Minuto</span>
               <span>{goal.minute}'</span>
               <span className="text-muted-foreground">Momento</span>
               <span>{goal.momentName ?? goal.momentId}</span>
               <span className="text-muted-foreground">Sub-momento</span>
               <span>{goal.subMomentName ?? goal.subMomentId}</span>
-              <span className="text-muted-foreground">Ação</span>
+              <span className="text-muted-foreground">AÃ§Ã£o</span>
               <span>{goal.actionName ?? goal.actionId}</span>
               {goal.cornerTakerId && (
                 <>
@@ -114,7 +114,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
               )}
               {goal.penaltyTakerId && (
                 <>
-                  <span className="text-muted-foreground">Marcador do penálti</span>
+                  <span className="text-muted-foreground">Marcador do penÃ¡lti</span>
                   <span>{goal.penaltyTakerName ?? goal.penaltyTakerId}</span>
                 </>
               )}
@@ -153,4 +153,4 @@ export default async function GoalDetail({ params }: { params: { id: string } })
       </div>
     </div>
   );
-}
+}

@@ -17,7 +17,7 @@ export async function listTeamsWithMeta() {
       id: teams.id,
       name: teams.name,
       championshipId: teams.championshipId,
-      emblem: teams.emblem,
+      emblemPath: teams.emblemPath,
       radiographyPdfUrl: teams.radiographyPdfUrl,
       videoReportUrl: teams.videoReportUrl,
       stadium: teams.stadium,
@@ -36,7 +36,7 @@ export async function createTeam(payload: unknown) {
     .values({
       championshipId: data.championshipId,
       name: data.name,
-      emblem: data.emblem || null,
+      emblemPath: data.emblemPath || null,
       radiographyPdfUrl: data.radiographyPdfUrl || null,
       videoReportUrl: data.videoReportUrl || null,
       stadium: data.stadium || null,
@@ -56,7 +56,7 @@ export async function updateTeam(id: number, payload: unknown) {
     .set({
       championshipId: data.championshipId,
       name: data.name,
-      emblem: data.emblem || null,
+      emblemPath: data.emblemPath || null,
       radiographyPdfUrl: data.radiographyPdfUrl || null,
       videoReportUrl: data.videoReportUrl || null,
       stadium: data.stadium || null,
@@ -119,7 +119,7 @@ export async function listPlayersWithTeams(teamId?: number) {
       id: players.id,
       name: players.name,
       teamId: players.teamId,
-      photoUrl: players.photoUrl,
+      photoPath: players.photoPath,
       primaryPosition: players.primaryPosition,
       secondaryPosition: players.secondaryPosition,
       tertiaryPosition: players.tertiaryPosition,
@@ -141,7 +141,7 @@ export async function createPlayer(payload: unknown) {
     .values({
       teamId: data.teamId,
       name: data.name,
-      photoUrl: data.photoUrl || null,
+      photoPath: data.photoPath || null,
       primaryPosition: data.primaryPosition,
       secondaryPosition: data.secondaryPosition || null,
       tertiaryPosition: data.tertiaryPosition || null,
@@ -160,7 +160,7 @@ export async function updatePlayer(id: number, payload: unknown) {
     .set({
       teamId: data.teamId,
       name: data.name,
-      photoUrl: data.photoUrl || null,
+      photoPath: data.photoPath || null,
       primaryPosition: data.primaryPosition,
       secondaryPosition: data.secondaryPosition || null,
       tertiaryPosition: data.tertiaryPosition || null,

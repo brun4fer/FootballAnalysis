@@ -12,7 +12,7 @@ import { FileText, PlayCircle, X, Eye } from "lucide-react";
 import { useAppContext } from "@/components/ui/app-context";
 import { GoalWizard } from "../goals/goal-wizard";
 
-type Team = { id: number; name: string; championshipId?: number | null; radiographyPdfUrl?: string | null; videoReportUrl?: string | null; emblem?: string | null };
+type Team = { id: number; name: string; championshipId?: number | null; radiographyPdfUrl?: string | null; videoReportUrl?: string | null; emblemPath?: string | null };
 type Season = { id: number; name: string };
 type Championship = { id: number; name: string; seasonId: number };
 type GoalEvent = {
@@ -274,7 +274,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
         <>
           {selectedTeam && (selectedTeam.radiographyPdfUrl || selectedTeam.videoReportUrl) && (
             <div className="flex flex-wrap gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3">
-              {selectedTeam.emblem && <img src={selectedTeam.emblem} alt="Emblema" className="h-8 w-8 rounded-full border border-border/50 bg-white/10" />}
+              {selectedTeam.emblemPath && <img src={selectedTeam.emblemPath} alt="Emblema" className="h-8 w-8 rounded-full border border-border/50 bg-white/10" />}
               {selectedTeam.radiographyPdfUrl && (
                 <Button asChild variant="ghost" size="sm" className="gap-2">
                   <a href={selectedTeam.radiographyPdfUrl} target="_blank" rel="noreferrer">
@@ -403,7 +403,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                           goalCoordinates: editingGoal.goalCoordinates,
                           fieldDrawing: editingGoal.fieldDrawing,
                           notes: editingGoal.notes,
-                          videoUrl: editingGoal.videoUrl,
+                          videoPath: editingGoal.videoPath,
                           involvements: editingGoal.involvements,
                           cornerTakerId: editingGoal.cornerTakerId,
                           freekickTakerId: editingGoal.freekickTakerId,

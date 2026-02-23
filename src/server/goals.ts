@@ -101,7 +101,7 @@ export async function getGoalById(goalId: number) {
       momentName: moments.name,
       subMomentName: subMoments.name,
       actionName: actions.name,
-      videoUrl: goals.videoUrl,
+      videoPath: goals.videoPath,
       fieldDrawing: goals.fieldDrawing,
       goalCoordinates: goals.goalCoordinates,
       notes: goals.notes,
@@ -140,7 +140,7 @@ export async function getGoalById(goalId: number) {
       playerId: goalInvolvements.playerId,
       role: goalInvolvements.role,
       playerName: invPlayer.name,
-      photoUrl: invPlayer.photoUrl
+      photoPath: invPlayer.photoPath
     })
     .from(goalInvolvements)
     .leftJoin(invPlayer, eq(invPlayer.id, goalInvolvements.playerId))
@@ -252,7 +252,7 @@ export async function createGoal(payload: unknown) {
         actionId: parsed.actionId,
         goalZoneId: null,
         goalCoordinates: parsed.goalCoordinates ?? null,
-        videoUrl: parsed.videoUrl || null,
+        videoPath: parsed.videoPath || null,
         fieldDrawing: parsed.fieldDrawing ?? null,
         notes: parsed.notes || null,
         cornerTakerId,
@@ -336,7 +336,7 @@ export async function updateGoal(id: number, payload: unknown) {
       actionId: parsed.actionId,
       goalZoneId: null,
       goalCoordinates: parsed.goalCoordinates ?? null,
-      videoUrl: parsed.videoUrl || null,
+      videoPath: parsed.videoPath || null,
       fieldDrawing: parsed.fieldDrawing ?? null,
       notes: parsed.notes || null,
       cornerTakerId,

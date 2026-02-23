@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
@@ -8,10 +9,10 @@ import { useAppContext } from "@/components/ui/app-context";
 import { cn } from "@/lib/utils";
 import { GitCompare, Trophy } from "lucide-react";
 
-type TeamRanking = { teamId: number; team: string; goals: number; label?: string };
-type PlayerGoals = { playerId: number; name: string; team: string; goals: number };
-type PlayerAssists = { playerId: number; name: string; team: string; assists: number };
-type PlayerInvolvement = { playerId: number; name: string; team: string; involvement: number };
+type TeamRanking = { teamId: number; team: string; goals: number; label?: string; emblemPath?: string | null };
+type PlayerGoals = { playerId: number; name: string; team: string; goals: number; photoPath?: string | null };
+type PlayerAssists = { playerId: number; name: string; team: string; assists: number; photoPath?: string | null };
+type PlayerInvolvement = { playerId: number; name: string; team: string; involvement: number; photoPath?: string | null };
 
 type RankingsResponse = {
   totalGoals: TeamRanking[];
@@ -87,11 +88,79 @@ function RankingCard({
               >
                 <div className="flex items-center gap-3">
                   <span className="w-7 text-center text-xs text-muted-foreground">{idx + 1}º</span>
+                  <div className="relative h-9 w-9 overflow-hidden rounded-full bg-slate-800">
+                    <Image
+                      src={
+                        (row.emblemPath ||
+                          row.photoPath ||
+                          "/images/default.png") as string
+                      }
+                      alt={row.team ?? row.name}
+                      fill
+                      sizes="36px"
+                      className="object-cover"
+                      priority={idx < 3}
+                    />
+                  </div>
                   <div className="flex flex-col">
                     <span className="text-sm font-medium text-white">{row.team ?? row.name}</span>
                     {row.name && row.team && row.name !== row.team && (
                       <span className="text-xs text-muted-foreground">{row.team}</span>
                     )}
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-1 text-sm font-semibold text-emerald-200">
+                  <span>{row[valueKey] ?? 0}</span>
+                  <span className="text-[11px] font-normal text-muted-foreground">{valueLabel}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TopPlayersCard({
+  title,
+  rows,
+  valueKey,
+  valueLabel
+}: {
+  title: string;
+  rows: Array<Record<string, any>>;
+  valueKey: string;
+  valueLabel: string;
+}) {
+  return (
+    <Card className="h-full bg-[#0b1220]/70">
+      <CardHeader title={title} />
+      <CardContent className="space-y-3">
+        {rows.length === 0 ? (
+          <div className="text-sm text-muted-foreground">Sem dados disponíveis.</div>
+        ) : (
+          <div className="space-y-2">
+            {rows.slice(0, 3).map((row, idx) => (
+              <div
+                key={`${row.name}-${idx}`}
+                className="flex items-center justify-between rounded-lg border border-border/50 bg-white/5 px-3 py-2"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-6 text-center text-xs text-muted-foreground">{idx + 1}º</span>
+                  <div className="relative h-9 w-9 overflow-hidden rounded-full bg-slate-800">
+                    <Image
+                      src={(row.photoPath || "/images/default.png") as string}
+                      alt={row.name}
+                      fill
+                      sizes="36px"
+                      className="object-cover"
+                      priority={idx === 0}
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-white">{row.name}</span>
+                    {row.team && <span className="text-xs text-muted-foreground">{row.team}</span>}
                   </div>
                 </div>
                 <div className="flex items-baseline gap-1 text-sm font-semibold text-emerald-200">
@@ -161,10 +230,22 @@ export default function RankingsPage() {
   const [seasonB, setSeasonB] = useState<string>("");
   const [champA, setChampA] = useState<string>(selection.championshipId ? String(selection.championshipId) : "");
   const [champB, setChampB] = useState<string>("");
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => setIsMounted(true), []);
+  useEffect(() => {
+    if (selection.seasonId && String(selection.seasonId) !== seasonId) {
+      setSeasonId(String(selection.seasonId));
+    }
+    if (selection.championshipId && String(selection.championshipId) !== championshipId) {
+      setChampionshipId(String(selection.championshipId));
+    }
+  }, [selection.seasonId, selection.championshipId]);
 
   const lookupsQuery = useQuery({
     queryKey: ["lookups-rankings"],
-    queryFn: () => fetcher<LookupResponse>("/api/lookups")
+    queryFn: () => fetcher<LookupResponse>("/api/lookups"),
+    enabled: isMounted
   });
 
   const seasons = lookupsQuery.data?.seasons ?? [];
@@ -182,7 +263,7 @@ export default function RankingsPage() {
 
   const rankingsQuery = useQuery({
     queryKey: ["rankings", seasonId, championshipId],
-    enabled: Boolean(championshipId),
+    enabled: isMounted && Boolean(championshipId),
     queryFn: () => {
       const params = new URLSearchParams();
       if (seasonId) params.set("seasonId", seasonId);
@@ -196,7 +277,7 @@ export default function RankingsPage() {
 
   const compareQuery = useQuery({
     queryKey: ["compare-rankings", champA, champB, seasonA, seasonB],
-    enabled: Boolean(comparisonReady),
+    enabled: isMounted && Boolean(comparisonReady),
     queryFn: () => {
       const params = new URLSearchParams();
       if (champA) params.set("champA", champA);
@@ -369,9 +450,9 @@ export default function RankingsPage() {
                 <RankingCard title="7. Livres Diretos" rows={rankingsQuery.data.freeKicksDirect} valueKey="goals" valueLabel="golos" />
                 <RankingCard title="8. Penáltis" rows={rankingsQuery.data.penalties} valueKey="goals" valueLabel="golos" />
                 <RankingCard title="9. Lançamentos Laterais" rows={rankingsQuery.data.throwIns} valueKey="goals" valueLabel="golos" />
-                <RankingCard title="10. Top Marcadores" rows={rankingsQuery.data.topScorers} valueKey="goals" valueLabel="golos" />
-                <RankingCard title="11. Assistências" rows={rankingsQuery.data.topAssists} valueKey="assists" valueLabel="assist." />
-                <RankingCard title="12. Participação em Golos (G+A)" rows={rankingsQuery.data.goalInvolvement} valueKey="involvement" valueLabel="ações" />
+                <TopPlayersCard title="10. Top Marcadores" rows={rankingsQuery.data.topScorers} valueKey="goals" valueLabel="golos" />
+                <TopPlayersCard title="11. Assistências" rows={rankingsQuery.data.topAssists} valueKey="assists" valueLabel="assist." />
+                <TopPlayersCard title="12. Participação em Golos (G+A)" rows={rankingsQuery.data.goalInvolvement} valueKey="involvement" valueLabel="ações" />
               </div>
             </div>
           )}
@@ -520,8 +601,30 @@ export default function RankingsPage() {
     </div>
   );
 
+  if (!isMounted) {
+    return (
+      <div className="space-y-6" suppressHydrationWarning>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">Rankings e Comparações</h1>
+            <p className="text-sm text-muted-foreground">
+              Analisa rankings por liga ou coloca dois campeonatos/épocas lado a lado sem alterar a base de dados.
+            </p>
+          </div>
+          <div className="flex rounded-full border border-border/60 bg-white/5 p-1 text-sm">
+            <div className="flex items-center gap-2 rounded-full px-4 py-2 text-muted-foreground">Ligas</div>
+            <div className="flex items-center gap-2 rounded-full px-4 py-2 text-muted-foreground">Comparar</div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border/60 bg-card/60 p-4 text-sm text-muted-foreground">
+          A preparar rankings...
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" suppressHydrationWarning>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">Rankings e Comparações</h1>

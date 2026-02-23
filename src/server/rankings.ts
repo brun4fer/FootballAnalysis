@@ -36,15 +36,15 @@ function extendWhere(base: Clause[], extra?: Clause) {
 
 async function groupGoalsByTeam(label: string, filters: Clause[], extra: Clause) {
   const where = extendWhere(filters, extra);
-  return db.execute<{ teamId: number; team: string; label: string; goals: number }>(sql`
-    SELECT t.id AS team_id, t.name AS team, ${sql`${label}`} AS label, COUNT(*)::int AS goals
+  return db.execute<{ teamId: number; team: string; label: string; goals: number; emblemPath: string | null }>(sql`
+    SELECT t.id AS "teamId", t.name AS team, t.emblem_path AS "emblemPath", ${sql`${label}`} AS label, COUNT(*)::int AS goals
     FROM ${goals} g
     JOIN ${teams} t ON t.id = g.team_id
     JOIN ${championships} c ON c.id = t.championship_id
     JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
     JOIN ${moments} m ON m.id = g.moment_id
     ${where}
-    GROUP BY t.id, t.name, label
+    GROUP BY t.id, t.name, t.emblem_path, label
     ORDER BY goals DESC, team
   `);
 }
@@ -52,46 +52,46 @@ async function groupGoalsByTeam(label: string, filters: Clause[], extra: Clause)
 export async function rankingsOverview(seasonId?: number, championshipId?: number) {
   const filters = buildFilters(seasonId, championshipId);
 
-  const totalGoals = db.execute<{ teamId: number; team: string; goals: number }>(sql`
-    SELECT t.id AS team_id, t.name AS team, COUNT(*)::int AS goals
+  const totalGoals = db.execute<{ teamId: number; team: string; goals: number; emblemPath: string | null }>(sql`
+    SELECT t.id AS "teamId", t.name AS team, t.emblem_path AS "emblemPath", COUNT(*)::int AS goals
     FROM ${goals} g
     JOIN ${teams} t ON t.id = g.team_id
     JOIN ${championships} c ON c.id = t.championship_id
     ${extendWhere(filters)}
-    GROUP BY t.id, t.name
+    GROUP BY t.id, t.name, t.emblem_path
     ORDER BY goals DESC, team
   `);
 
-  const organization = db.execute<{ teamId: number; team: string; goals: number }>(sql`
-    SELECT t.id AS team_id, t.name AS team, COUNT(*)::int AS goals
+  const organization = db.execute<{ teamId: number; team: string; goals: number; emblemPath: string | null }>(sql`
+    SELECT t.id AS "teamId", t.name AS team, t.emblem_path AS "emblemPath", COUNT(*)::int AS goals
     FROM ${goals} g
     JOIN ${teams} t ON t.id = g.team_id
     JOIN ${championships} c ON c.id = t.championship_id
     JOIN ${moments} m ON m.id = g.moment_id
     ${extendWhere(filters, sql`${lowerM} LIKE '%organiza%'`)}
-    GROUP BY t.id, t.name
+    GROUP BY t.id, t.name, t.emblem_path
     ORDER BY goals DESC, team
   `);
 
-  const transition = db.execute<{ teamId: number; team: string; goals: number }>(sql`
-    SELECT t.id AS team_id, t.name AS team, COUNT(*)::int AS goals
+  const transition = db.execute<{ teamId: number; team: string; goals: number; emblemPath: string | null }>(sql`
+    SELECT t.id AS "teamId", t.name AS team, t.emblem_path AS "emblemPath", COUNT(*)::int AS goals
     FROM ${goals} g
     JOIN ${teams} t ON t.id = g.team_id
     JOIN ${championships} c ON c.id = t.championship_id
     JOIN ${moments} m ON m.id = g.moment_id
     ${extendWhere(filters, sql`${lowerM} LIKE '%transi%'`)}
-    GROUP BY t.id, t.name
+    GROUP BY t.id, t.name, t.emblem_path
     ORDER BY goals DESC, team
   `);
 
-  const setPiecesTotal = db.execute<{ teamId: number; team: string; goals: number }>(sql`
-    SELECT t.id AS team_id, t.name AS team, COUNT(*)::int AS goals
+  const setPiecesTotal = db.execute<{ teamId: number; team: string; goals: number; emblemPath: string | null }>(sql`
+    SELECT t.id AS "teamId", t.name AS team, t.emblem_path AS "emblemPath", COUNT(*)::int AS goals
     FROM ${goals} g
     JOIN ${teams} t ON t.id = g.team_id
     JOIN ${championships} c ON c.id = t.championship_id
     JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
     ${extendWhere(filters, sql`${setPieceCase} != 'Outros'`)}
-    GROUP BY t.id, t.name
+    GROUP BY t.id, t.name, t.emblem_path
     ORDER BY goals DESC, team
   `);
 
@@ -105,47 +105,62 @@ export async function rankingsOverview(seasonId?: number, championshipId?: numbe
   const penalties = groupGoalsByTeam("Penálti", filters, sql`${lowerSm} LIKE '%penal%' OR ${lowerSm} LIKE '%penalty%'`);
   const throwIns = groupGoalsByTeam("Lançamento Lateral", filters, sql`${lowerSm} LIKE '%lançamento%'`);
 
-  const topScorers = db.execute<{ playerId: number; name: string; team: string; goals: number }>(sql`
-    SELECT p.id as player_id, p.name, t.name as team, COUNT(*)::int AS goals
-    FROM ${goals} g
-    JOIN ${players} p ON p.id = g.scorer_id
-    JOIN ${teams} t ON t.id = p.team_id
-    JOIN ${championships} c ON c.id = t.championship_id
-    ${extendWhere(filters)}
-    GROUP BY p.id, p.name, t.name
-    HAVING COUNT(*) > 0
-    ORDER BY goals DESC, p.name
+  const topScorers = db.execute<{ playerId: number; name: string; team: string; goals: number; photoPath: string | null }>(sql`
+    SELECT player_id AS "playerId", name, team, "photoPath", goals
+    FROM (
+      SELECT p.id as player_id,
+             p.name,
+             t.name as team,
+           COALESCE(p.photo_path, '') AS "photoPath",
+             COUNT(*)::int AS goals
+      FROM ${goals} g
+      JOIN ${players} p ON p.id = g.scorer_id
+      JOIN ${teams} t ON t.id = p.team_id
+      JOIN ${championships} c ON c.id = t.championship_id
+      ${extendWhere(filters)}
+      GROUP BY p.id, p.name, t.name, p.photo_path
+    ) sub
+    WHERE goals > 0
+    ORDER BY goals DESC, name
     LIMIT 20
   `);
 
-  const topAssists = db.execute<{ playerId: number; name: string; team: string; assists: number }>(sql`
-    SELECT p.id as player_id, p.name, t.name as team, COUNT(*)::int AS assists
+  const topAssists = db.execute<{ playerId: number; name: string; team: string; assists: number; photoPath: string | null }>(sql`
+    SELECT p.id as "playerId", p.name, t.name as team, COALESCE(p.photo_path, '') AS "photoPath", COUNT(*)::int AS assists
     FROM ${goals} g
     JOIN ${players} p ON p.id = g.assist_id
     JOIN ${teams} t ON t.id = p.team_id
     JOIN ${championships} c ON c.id = t.championship_id
     ${extendWhere(filters, sql`g.assist_id IS NOT NULL`)}
-    GROUP BY p.id, p.name, t.name
+    GROUP BY p.id, p.name, t.name, p.photo_path
     ORDER BY assists DESC, p.name
     LIMIT 20
   `);
 
-  const goalInvolvement = db.execute<{ playerId: number; name: string; team: string; involvement: number }>(sql`
+  const goalInvolvement = db.execute<{
+    playerId: number;
+    name: string;
+    team: string;
+    involvement: number;
+    photoPath: string | null;
+  }>(sql`
     WITH scorer AS (
-      SELECT scorer_id AS player_id, COUNT(*)::int AS goals
+      SELECT g.scorer_id AS player_id, COUNT(*)::int AS goals
       FROM ${goals} g
       JOIN ${teams} t ON t.id = g.team_id
       JOIN ${championships} c ON c.id = t.championship_id
       ${extendWhere(filters)}
-      GROUP BY scorer_id
-    ), assist AS (
-      SELECT assist_id AS player_id, COUNT(*)::int AS assists
+      GROUP BY g.scorer_id
+    ),
+    assist AS (
+      SELECT g.assist_id AS player_id, COUNT(*)::int AS assists
       FROM ${goals} g
       JOIN ${teams} t ON t.id = g.team_id
       JOIN ${championships} c ON c.id = t.championship_id
-      ${extendWhere(filters, sql`assist_id IS NOT NULL`)}
-      GROUP BY assist_id
-    ), involvement AS (
+      ${extendWhere(filters, sql`g.assist_id IS NOT NULL`)}
+      GROUP BY g.assist_id
+    ),
+    involvement AS (
       SELECT gi.player_id, COUNT(*)::int AS involvements
       FROM ${goalInvolvements} gi
       JOIN ${goals} g ON g.id = gi.goal_id
@@ -156,10 +171,11 @@ export async function rankingsOverview(seasonId?: number, championshipId?: numbe
     )
     SELECT *
     FROM (
-      SELECT p.id as player_id,
+      SELECT p.id AS "playerId",
              p.name,
-             t.name as team,
-             COALESCE(s.goals,0) + COALESCE(a.assists,0) + COALESCE(inv.involvements,0) AS involvement
+             t.name AS team,
+             COALESCE(p.photo_path, '') AS "photoPath",
+             COALESCE(s.goals, 0) + COALESCE(a.assists, 0) + COALESCE(inv.involvements, 0) AS involvement
       FROM ${players} p
       JOIN ${teams} t ON t.id = p.team_id
       JOIN ${championships} c ON c.id = t.championship_id
