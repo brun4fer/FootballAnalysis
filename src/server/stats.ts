@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { goalInvolvements, goals, moments, actions, subMoments, players } from "../schema/schema";
+import { goalInvolvements, goals, moments, actions, subMoments, players, goalActions } from "../schema/schema";
 
 export async function topScorers(teamId: number) {
   const result = await db.execute<{ id: number; name: string; goals: number; assists: number }>(sql`
@@ -103,8 +103,9 @@ export async function momentsBreakdown(teamId: number) {
 export async function actionsBreakdown(teamId: number) {
   const result = await db.execute<{ action: string; goals: number }>(sql`
     SELECT a.name AS action, COUNT(*)::int AS goals
-    FROM ${goals} g
-    JOIN ${actions} a ON a.id = g.action_id
+    FROM ${goalActions} ga
+    JOIN ${goals} g ON g.id = ga.goal_id
+    JOIN ${actions} a ON a.id = ga.action_id
     WHERE g.team_id = ${teamId}
     GROUP BY a.name
     ORDER BY goals DESC, a.name;

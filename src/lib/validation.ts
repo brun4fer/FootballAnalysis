@@ -7,7 +7,22 @@ export const pointSchema = z.object({
   y: z.number().min(0).max(1)
 });
 
+export const zoneMarkerSchema = z
+  .object({
+    x: z.number().min(0).max(1).optional(),
+    y: z.number().min(0).max(1).optional(),
+    label: z.string().optional(),
+    sector: z.string().optional()
+  })
+  .refine((v) => v.x !== undefined || v.y !== undefined || v.label || v.sector, {
+    message: "Fornece coordenadas ou etiqueta da zona"
+  });
+
 export const fieldDrawingSchema = pointSchema;
+
+const setPieceProfile = z.enum(["fechado", "aberto", "combinado"]);
+const throwProfile = z.enum(["area", "organizacao"]);
+const outletProfile = z.enum(["curto_para_longo", "bola_longa"]);
 
 export const goalInputSchema = z.object({
   opponentTeamId: z.number().int().positive(),
@@ -17,7 +32,7 @@ export const goalInputSchema = z.object({
   minute: z.number().int().min(0).max(130),
   momentId: z.number().int().positive(),
   subMomentId: z.number().int().positive(),
-  actionId: z.number().int().positive(),
+  actionIds: z.array(z.number().int().positive()).min(1),
   cornerTakerId: z.number().int().positive().optional().nullable(),
   freekickTakerId: z.number().int().positive().optional().nullable(),
   penaltyTakerId: z.number().int().positive().optional().nullable(),
@@ -25,6 +40,17 @@ export const goalInputSchema = z.object({
   goalCoordinates: pointSchema.optional(),
   videoPath: z.string().optional().or(z.literal("")).nullable(),
   fieldDrawing: fieldDrawingSchema.optional(),
+  assistCoordinates: zoneMarkerSchema.optional(),
+  assistSector: z.string().optional().or(z.literal("")),
+  shotSector: z.string().optional().or(z.literal("")),
+  finishSector: z.string().optional().or(z.literal("")),
+  buildUpPhase: z.string().optional().or(z.literal("")),
+  creationPhase: z.string().optional().or(z.literal("")),
+  finalizationPhase: z.string().optional().or(z.literal("")),
+  cornerProfile: setPieceProfile.optional().nullable(),
+  freekickProfile: setPieceProfile.optional().nullable(),
+  throwInProfile: throwProfile.optional().nullable(),
+  goalkeeperOutlet: outletProfile.optional().nullable(),
   notes: z.string().optional().or(z.literal("")),
   involvements: z
     .array(

@@ -202,15 +202,20 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Análises da Equipa</h1>
-        <p className="text-sm text-muted-foreground">
-          {seasonId && championshipId
-            ? `${seasons.find((s) => s.id === Number(seasonId))?.name ?? "Época"} · ${
-                championships.find((c) => c.id === Number(championshipId))?.name ?? "Campeonato"
-              }`
-            : "Seleciona época > campeonato > equipa para carregar as estatísticas."}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold">Análises da Equipa</h1>
+          <p className="text-sm text-muted-foreground">
+            {seasonId && championshipId
+              ? `${seasons.find((s) => s.id === Number(seasonId))?.name ?? "Época"} · ${
+                  championships.find((c) => c.id === Number(championshipId))?.name ?? "Campeonato"
+                }`
+              : "Seleciona época > campeonato > equipa para carregar as estatísticas."}
+          </p>
+        </div>
+        <Button asChild variant="secondary" size="sm">
+          <Link href="/teams/radiografia">Radiografia da Equipa</Link>
+        </Button>
       </div>
 
       <Card>

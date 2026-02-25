@@ -2,6 +2,7 @@ import { pgTable, bigserial, bigint, serial, smallint, text, date, jsonb, index,
 import { desc, sql } from "drizzle-orm";
 
 export type CoordinatePoint = { x: number; y: number };
+export type ZoneMarker = { x?: number; y?: number; label?: string; sector?: string };
 
 export const seasons = pgTable(
   "seasons",
@@ -152,6 +153,17 @@ export const goals = pgTable(
     crossAuthorId: bigint("cross_author_id", { mode: "number" }).references(() => players.id),
     goalCoordinates: jsonb("goal_coordinates").$type<CoordinatePoint | null>(),
     fieldDrawing: jsonb("field_drawing").$type<CoordinatePoint | null>(),
+    assistCoordinates: jsonb("assist_coordinates").$type<ZoneMarker | null>(),
+    assistSector: text("assist_sector"),
+    shotSector: text("shot_sector"),
+    finishSector: text("finish_sector"),
+    buildUpPhase: text("build_up_phase"),
+    creationPhase: text("creation_phase"),
+    finalizationPhase: text("finalization_phase"),
+    cornerProfile: text("corner_profile").$type<"fechado" | "aberto" | "combinado" | null>(),
+    freekickProfile: text("freekick_profile").$type<"fechado" | "aberto" | "combinado" | null>(),
+    throwInProfile: text("throw_in_profile").$type<"area" | "organizacao" | null>(),
+    goalkeeperOutlet: text("goalkeeper_outlet").$type<"curto_para_longo" | "bola_longa" | null>(),
     notes: text("notes")
   },
   (table) => ({
@@ -167,6 +179,24 @@ export const goals = pgTable(
     idxFreekickTaker: index("idx_goals_freekick_taker").on(table.freekickTakerId),
     idxPenaltyTaker: index("idx_goals_penalty_taker").on(table.penaltyTakerId),
     idxCrossAuthor: index("idx_goals_cross_author").on(table.crossAuthorId)
+  })
+);
+
+export const goalActions = pgTable(
+  "goal_actions",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    goalId: bigint("goal_id", { mode: "number" })
+      .notNull()
+      .references(() => goals.id, { onDelete: "cascade" }),
+    actionId: bigint("action_id", { mode: "number" })
+      .notNull()
+      .references(() => actions.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    uniqGoalAction: uniqueIndex("goal_actions_goal_action_key").on(table.goalId, table.actionId),
+    idxGoal: index("idx_goal_actions_goal").on(table.goalId),
+    idxAction: index("idx_goal_actions_action").on(table.actionId)
   })
 );
 
@@ -194,4 +224,5 @@ export type Championship = typeof championships.$inferSelect;
 export type Team = typeof teams.$inferSelect;
 export type Player = typeof players.$inferSelect;
 export type Goal = typeof goals.$inferSelect;
+export type GoalAction = typeof goalActions.$inferSelect;
 export type GoalInvolvement = typeof goalInvolvements.$inferSelect;
