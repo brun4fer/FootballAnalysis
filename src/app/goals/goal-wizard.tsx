@@ -62,6 +62,9 @@ type LookupResponse = {
 
 
 
+type LookupAction = LookupResponse["actions"][number];
+
+
 type Team = { id: number; name: string };
 
 
@@ -85,6 +88,24 @@ const zoneOptions = [
 ] as const;
 
 const normalizeActionName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+const getSetPieceProfileFromName = (name: string) => {
+  const normalized = normalizeActionName(name);
+  if (normalized.includes("aberto")) return "aberto";
+  if (normalized.includes("fechado")) return "fechado";
+  if (normalized.includes("combinado")) return "combinado";
+  return "";
+};
+
+const deriveFreekickProfileFromActions = (actions: LookupAction[]) => {
+  for (const action of actions) {
+    const normalized = normalizeActionName(action.name);
+    if (normalized.includes("livre") || normalized.includes("falta")) {
+      return getSetPieceProfileFromName(action.name);
+    }
+  }
+  return "";
+};
 
 const hiddenActionNames = new Set([
   "marcador",
@@ -111,7 +132,6 @@ const creationPhases = [
 const finalizationPhases = [
   { value: "remate_posse", label: "Remate em posse" },
   { value: "remate_longo", label: "Remate longo" },
-  { value: "encarrilhamento", label: "Encarrilhamento" }
 ] as const;
 
 const cornerProfiles = [
@@ -894,6 +914,8 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     const selectedActions = lookupsQuery.data?.actions.filter((a) => actionIds.includes(a.id)) ?? [];
     const requiresGoal = selectedActions.some((a) => a.name.toLowerCase().includes("marcador") || a.context === "field_goal");
     const requiresField = selectedActions.length > 0;
+    const derivedFreekickProfile = deriveFreekickProfileFromActions(selectedActions);
+    const resolvedFreekickProfile = derivedFreekickProfile || freekickProfile;
 
     if (requiresGoal && !goalPoint) throw new Error("Esta a??o requer um ponto na baliza.");
     if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigat?rio para esta a??o.");
@@ -922,7 +944,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       creationPhase: creationPhase || undefined,
       finalizationPhase: finalizationPhase || undefined,
       cornerProfile: cornerProfile || undefined,
-      freekickProfile: freekickProfile || undefined,
+      freekickProfile: resolvedFreekickProfile || undefined,
       throwInProfile: throwInProfile || undefined,
       goalkeeperOutlet: goalkeeperOutlet || undefined,
       notes: notes || undefined,
@@ -1008,7 +1030,7 @@ const updateMutation = useMutation({
       creationPhase: creationPhase || undefined,
       finalizationPhase: finalizationPhase || undefined,
       cornerProfile: cornerProfile || undefined,
-      freekickProfile: freekickProfile || undefined,
+      freekickProfile: resolvedFreekickProfile || undefined,
       throwInProfile: throwInProfile || undefined,
       goalkeeperOutlet: goalkeeperOutlet || undefined,
       notes: notes || undefined,
@@ -1109,6 +1131,25 @@ const filteredChampionships = useMemo(() => {
     [filteredActions, actionIds]
   );
 
+  const normalizedSelectedActionNames = useMemo(
+    () => selectedActions.map((action) => normalizeActionName(action.name)),
+    [selectedActions]
+  );
+
+  const hasCornerAction = normalizedSelectedActionNames.some((name) => name.includes("canto"));
+  const hasFreekickAction = normalizedSelectedActionNames.some(
+    (name) => name.includes("livre") || name.includes("falta")
+  );
+  const hasPenaltyAction = normalizedSelectedActionNames.some((name) => name.includes("penal"));
+  const hasCrossAction = normalizedSelectedActionNames.some((name) => name.includes("cruzamento"));
+  const hasThrowInAction = normalizedSelectedActionNames.some((name) => name.includes("lancamento"));
+  const hasCornerMarkerAction = normalizedSelectedActionNames.some(
+    (name) => name.includes("marcador") && name.includes("canto")
+  );
+  const hasFreekickMarkerAction = normalizedSelectedActionNames.some(
+    (name) => name.includes("marcador") && (name.includes("livre") || name.includes("falta"))
+  );
+
   const requiresGoal = selectedActions.some((a) => a.name.toLowerCase().includes("marcador") || a.context === "field_goal");
   const requiresField = selectedActions.length > 0;
 
@@ -1119,7 +1160,6 @@ const filteredChampionships = useMemo(() => {
 
 
   const asciiSubName = subName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const needsGoalkeeperOutlet = asciiSubName.includes("saida") && asciiSubName.includes("gr");
 
   const isCorner = subName.includes("canto");
 
@@ -1135,6 +1175,36 @@ const filteredChampionships = useMemo(() => {
   const isThrowIn = subName.includes("lançamento") || subName.includes("lancamento");
 
     const currentPlayers = playersQuery.data ?? [];
+
+
+  useEffect(() => {
+    if (!hasCornerAction || !hasCornerMarkerAction) {
+      setCornerTakerId(undefined);
+    }
+    if (!hasFreekickAction || !hasFreekickMarkerAction) {
+      setFreekickTakerId(undefined);
+    }
+    if (!hasFreekickAction) {
+      setFreekickProfile("");
+    }
+    if (!hasPenaltyAction) {
+      setPenaltyTakerId(undefined);
+    }
+    if (!hasCrossAction) {
+      setCrossAuthorId(undefined);
+    }
+    if (!hasThrowInAction) {
+      setThrowInProfile("");
+    }
+  }, [
+    hasCornerAction,
+    hasCornerMarkerAction,
+    hasFreekickAction,
+    hasFreekickMarkerAction,
+    hasPenaltyAction,
+    hasCrossAction,
+    hasThrowInAction
+  ]);
 
 
   const addInvolvement = (playerId: number) => {
@@ -1351,16 +1421,16 @@ const filteredChampionships = useMemo(() => {
     actionIds.length > 0 &&
 
 
-    (!isCorner || cornerTakerId) &&
+    (!hasCornerMarkerAction || cornerTakerId) &&
 
 
-    (!isFreeKick || freekickTakerId) &&
+    (!hasFreekickMarkerAction || freekickTakerId) &&
 
 
-    (!isPenalty || penaltyTakerId) &&
+    (!hasPenaltyAction || penaltyTakerId) &&
 
 
-    (!isCross || crossAuthorId) &&
+    (!hasCrossAction || crossAuthorId) &&
 
 
     canNext("zone") &&
@@ -2293,55 +2363,73 @@ const filteredChampionships = useMemo(() => {
               </div>
 
 
-              {isCorner && (
+              {hasCornerAction && (
 
 
                 <>
 
 
-                  <div className="space-y-2">
+                  {hasCornerMarkerAction ? (
 
 
-                    <label className="text-sm font-medium">Marcador do Canto</label>
+                    <div className="space-y-2">
 
 
-                    <Select
+                      <label className="text-sm font-medium">Marcador do Canto</label>
 
 
-                      value={cornerTakerId?.toString() ?? ""}
+                      <Select
 
 
-                      onChange={(e) => setCornerTakerId(e.target.value ? Number(e.target.value) : undefined)}
+                        value={cornerTakerId?.toString() ?? ""}
 
 
-                      disabled={!teamId || playersQuery.isLoading}
+                        onChange={(e) => setCornerTakerId(e.target.value ? Number(e.target.value) : undefined)}
 
 
-                    >
+                        disabled={!teamId || playersQuery.isLoading}
 
 
-                      <option value="">Selecionar jogador</option>
+                      >
 
 
-                      {currentPlayers.map((p) => (
+                        <option value="">Selecionar jogador</option>
 
 
-                        <option key={p.id} value={p.id} className="text-black">
+                        {currentPlayers.map((p) => (
 
 
-                          {p.name}
+                          <option key={p.id} value={p.id} className="text-black">
 
 
-                        </option>
+                            {p.name}
 
 
-                      ))}
+                          </option>
 
 
-                    </Select>
+                        ))}
 
 
-                  </div>
+                      </Select>
+
+
+                    </div>
+
+
+                  ) : (
+
+
+                    <div className="rounded-xl border border-dashed border-border/60 bg-card/30 px-3 py-2 text-xs text-muted-foreground">
+
+
+                    Seleciona a ação &ldquo;Marcador do canto&rdquo; para indicar o jogador responsável.
+
+
+                    </div>
+
+
+                  )}
 
 
                   <div className="space-y-2">
@@ -2363,68 +2451,78 @@ const filteredChampionships = useMemo(() => {
               )}
 
 
-              {isFreeKick && (
+              {hasFreekickAction && (
 
 
                 <>
 
 
-                  <div className="space-y-2">
+                  {hasFreekickMarkerAction ? (
 
 
-                    <label className="text-sm font-medium">Marcador da Falta</label>
+                    <div className="space-y-2">
 
 
-                    <Select
+                      <label className="text-sm font-medium">Marcador da Falta</label>
 
 
-                      value={freekickTakerId?.toString() ?? ""}
+                      <Select
 
 
-                      onChange={(e) => setFreekickTakerId(e.target.value ? Number(e.target.value) : undefined)}
+                        value={freekickTakerId?.toString() ?? ""}
 
 
-                      disabled={!teamId || playersQuery.isLoading}
+                        onChange={(e) => setFreekickTakerId(e.target.value ? Number(e.target.value) : undefined)}
 
 
-                    >
+                        disabled={!teamId || playersQuery.isLoading}
 
 
-                      <option value="">Selecionar jogador</option>
+                      >
 
 
-                      {currentPlayers.map((p) => (
+                        <option value="">Selecionar jogador</option>
 
 
-                        <option key={p.id} value={p.id} className="text-black">
+                        {currentPlayers.map((p) => (
 
 
-                          {p.name}
+                          <option key={p.id} value={p.id} className="text-black">
 
 
-                        </option>
+                            {p.name}
 
 
-                      ))}
+                          </option>
 
 
-                    </Select>
+                        ))}
 
 
-                  </div>
+                      </Select>
 
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Perfil do livre</label>
-                    <Select value={freekickProfile} onChange={(e) => setFreekickProfile(e.target.value)}>
-                      <option value="">Sem perfil</option>
-                      {freekickProfiles.map((option) => (
-                        <option key={option.value} value={option.value} className="text-black">
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
+                    </div>
+
+
+                  ) : (
+
+
+                    <div className="rounded-xl border border-dashed border-border/60 bg-card/30 px-3 py-2 text-xs text-muted-foreground">
+
+
+                      Escolhe a ação &ldquo;Marcador da falta&rdquo; para desbloquear o seletor de jogador.
+
+
+                    </div>
+
+
+                  )}
+
+
+                  <p className="text-xs text-muted-foreground">
+                    O perfil do livre (Aberto, Fechado ou Combinado) segue o cartão de ação selecionado no passo anterior.
+                  </p>
 
 
                 </>
@@ -2433,7 +2531,7 @@ const filteredChampionships = useMemo(() => {
               )}
 
 
-              {isPenalty && (
+              {hasPenaltyAction && (
 
 
                 <div className="space-y-2">
@@ -2484,7 +2582,7 @@ const filteredChampionships = useMemo(() => {
               )}
 
 
-              {isCross && (
+              {hasCrossAction && (
 
 
                 <div className="space-y-2">
@@ -2537,7 +2635,7 @@ const filteredChampionships = useMemo(() => {
 
 
 
-              {isThrowIn && (
+              {hasThrowInAction && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Perfil do lançamento</label>
                   <Select value={throwInProfile} onChange={(e) => setThrowInProfile(e.target.value)}>
@@ -2634,24 +2732,6 @@ const filteredChampionships = useMemo(() => {
               <GoalNetPinpoint value={goalPoint} onChange={setGoalPoint} />
 
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Saída do GR</label>
-                  <span className="text-xs text-muted-foreground">
-                    {needsGoalkeeperOutlet
-                      ? "Requerido no sub-momento de saída do guarda-redes."
-                      : "Opcional para contextualizar a saída do GR."}
-                  </span>
-                </div>
-                <Select value={goalkeeperOutlet} onChange={(e) => setGoalkeeperOutlet(e.target.value)}>
-                  <option value="">Sem indicação</option>
-                  {goalkeeperOutlets.map((option) => (
-                    <option key={option.value} value={option.value} className="text-black">
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
             </div>
 
 

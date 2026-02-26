@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { getGoalById } from "@/server/goals";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 import Link from "next/link";
@@ -93,6 +94,43 @@ function Pitch({ x, y }: { x: number; y: number }) {
 }
 
 
+const TECH_LABEL_OVERRIDES: Record<string, string> = {
+  organizacao: "Organização",
+  curto_para_longo: "Curto para longo",
+  bola_longa: "Bola longa",
+  area: "Área",
+  aberto: "Aberto",
+  fechado: "Fechado",
+  combinado: "Combinado",
+  cruzamento: "Cruzamento",
+  "canto aberto": "Canto Aberto",
+  "canto fechado": "Canto Fechado"
+};
+
+const normalizeChartLabel = (value?: string | null) => {
+  const raw = value?.toString().trim();
+  if (!raw) return null;
+  if (raw.toLowerCase() === "indefinido") return null;
+  return raw;
+};
+
+const formatTechnicalLabel = (value?: string | null) => {
+  const normalized = normalizeChartLabel(value);
+  if (!normalized) return null;
+  const lower = normalized.toLowerCase();
+  if (TECH_LABEL_OVERRIDES[lower]) return TECH_LABEL_OVERRIDES[lower];
+  const words = normalized.replace(/_/g, " ").split(" ");
+  return words
+    .map((word) => (word ? `${word[0].toUpperCase()}${word.slice(1).toLowerCase()}` : ""))
+    .join(" ")
+    .trim();
+};
+
+const formatSectorLabel = (value?: string | null) => {
+  const normalized = normalizeChartLabel(value);
+  return normalized ?? "—";
+};
+
 
 export default async function GoalDetail({ params }: { params: { id: string } }) {
 
@@ -132,6 +170,29 @@ export default async function GoalDetail({ params }: { params: { id: string } })
         </div>
 
       </div>
+
+
+      <Card>
+        <CardHeader title="Análise Técnica" />
+        <CardContent className="space-y-3 text-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Fase de construção</span>
+            <span>{formatTechnicalLabel(goal.buildUpPhase) ?? "—"}</span>
+            <span className="text-muted-foreground">Fase de criação</span>
+            <span>{formatTechnicalLabel(goal.creationPhase) ?? "—"}</span>
+            <span className="text-muted-foreground">Fase de finalização</span>
+            <span>{formatTechnicalLabel(goal.finalizationPhase) ?? "—"}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <span className="text-muted-foreground">Zona de assistência</span>
+            <span>{formatSectorLabel(goal.assistSector)}</span>
+            <span className="text-muted-foreground">Zona de remate</span>
+            <span>{formatSectorLabel(goal.shotSector)}</span>
+            <span className="text-muted-foreground">Zona de finalização</span>
+            <span>{formatSectorLabel(goal.finishSector)}</span>
+          </div>
+        </CardContent>
+      </Card>
 
 
 
@@ -201,7 +262,29 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
           <CardHeader title="Dados do Lance" />
 
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="space-y-3 text-sm">
+
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              {goal.teamCoach && <span>Treinador: {goal.teamCoach}</span>}
+              {goal.teamStadium && <span>Estádio: {goal.teamStadium}</span>}
+              {goal.teamPitchDimensions && <span>Relvado: {goal.teamPitchDimensions}</span>}
+            </div>
+            <div className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Ações registadas</span>
+              <div className="flex flex-wrap gap-2">
+                {goal.actions && goal.actions.length > 0 ? (
+                  goal.actions.map((action) => (
+                    <Badge key={`goal-action-${action.actionId}`} className="bg-emerald-500/10 text-emerald-100">
+                      {action.actionName ?? `#${action.actionId}`}
+                    </Badge>
+                  ))
+                ) : goal.actionName ? (
+                  <Badge className="bg-emerald-500/10 text-emerald-100">{goal.actionName}</Badge>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Sem ações registadas.</span>
+                )}
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
 
@@ -236,9 +319,6 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
               <span>{goal.subMomentName ?? goal.subMomentId}</span>
 
-              <span className="text-muted-foreground">Ação</span>
-
-              <span>{goal.actionName ?? goal.actionId}</span>
 
               {goal.cornerTakerId && (
 

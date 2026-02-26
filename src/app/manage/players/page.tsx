@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "@/components/ui/app-context";
 import { FileUpload } from "@/components/ui/file-upload";
 
@@ -51,6 +51,8 @@ export default function ManagePlayersPage() {
     weightKg: ""
   });
   const [editingId, setEditingId] = useState<number | null>(null);
+  const PLAYER_PAGE_LIMIT = 5;
+  const [playersPage, setPlayersPage] = useState(0);
 
   const lookupsQuery = useQuery({
     queryKey: ["lookups"],
@@ -60,6 +62,13 @@ export default function ManagePlayersPage() {
     queryKey: ["manage-players", teamFilter],
     queryFn: () => fetchJson<Player[]>(`/api/manage/players${teamFilter ? `?teamId=${teamFilter}` : ""}`)
   });
+
+  useEffect(() => {
+    setPlayersPage(0);
+  }, [playersQuery.data?.length, teamFilter]);
+
+  const playerPageCount = Math.ceil((playersQuery.data?.length ?? 0) / PLAYER_PAGE_LIMIT);
+  const paginatedPlayers = (playersQuery.data ?? []).slice(playersPage * PLAYER_PAGE_LIMIT, (playersPage + 1) * PLAYER_PAGE_LIMIT);
 
   const teams = lookupsQuery.data?.teams ?? [];
   const seasons = lookupsQuery.data?.seasons ?? [];
@@ -311,7 +320,7 @@ export default function ManagePlayersPage() {
             </Select>
           </div>
           {playersQuery.data?.length ? (
-            playersQuery.data.map((player) => (
+            paginatedPlayers.map((player) => (
               <div key={player.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 hover:border-primary/60">
                 <div className="flex flex-col">
                   <span className="font-medium text-white">{player.name}</span>
@@ -355,6 +364,26 @@ export default function ManagePlayersPage() {
             ))
           ) : (
             <div className="text-muted-foreground">Ainda não existem jogadores.</div>
+          )}
+          {playerPageCount > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
+              <span>
+                Página {playersPage + 1} de {playerPageCount}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setPlayersPage((prev) => Math.max(prev - 1, 0))} disabled={playersPage === 0}>
+                  Anterior
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPlayersPage((prev) => Math.min(prev + 1, Math.max(playerPageCount - 1, 0)))}
+                  disabled={playersPage >= playerPageCount - 1}
+                >
+                  Seguinte
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

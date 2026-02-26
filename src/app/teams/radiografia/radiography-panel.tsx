@@ -44,14 +44,60 @@ type RadiographyResponse = {
 
 const defaultImage = "/images/default.png";
 
-const aggregateZones = (zones: Array<{ sector?: string | null }>) => {
-  const counts: Record<string, number> = {};
-  zones.forEach((zone) => {
-    const label = zone.sector?.trim() || "Indefinido";
-    counts[label] = (counts[label] ?? 0) + 1;
-  });
-  return Object.entries(counts).map(([label, goals]) => ({ label, goals }));
+const LABEL_OVERRIDES: Record<string, string> = {
+  organizacao: "Organização",
+  curto_para_longo: "Curto para longo",
+  bola_longa: "Bola longa",
+  area: "Área",
+  aberto: "Aberto",
+  fechado: "Fechado",
+  combinado: "Combinado",
+  cruzamento: "Cruzamento",
+  "canto aberto": "Canto Aberto",
+  "canto fechado": "Canto Fechado"
 };
+
+const formatTechnicalLabel = (value?: string | null) => {
+  const raw = value?.toString().trim();
+  if (!raw) return "";
+  const lower = raw.toLowerCase();
+  if (lower === "indefinido") return "";
+  if (LABEL_OVERRIDES[lower]) return LABEL_OVERRIDES[lower];
+  const words = raw.replace(/_/g, " ").split(" ");
+  return words.map((word) => (word ? `${word[0].toUpperCase()}${word.slice(1).toLowerCase()}` : "")).join(" ").trim();
+};
+
+const cleanDataset = <T extends Record<string, any>>(data: T[], labelKey: keyof T, valueKey: keyof T): T[] => {
+  return data
+    .map((entry) => {
+      const rawLabel = entry[labelKey];
+      const formattedLabel = formatTechnicalLabel(rawLabel);
+      const value = Number(entry[valueKey]);
+      if (!formattedLabel || !Number.isFinite(value) || value <= 0) return null;
+      return { ...entry, [labelKey]: formattedLabel };
+    })
+    .filter((entry): entry is T => entry !== null);
+};
+
+const aggregateZones = (zones: Array<{ sector?: string | null }>) => {
+  const counts = new Map<string, number>();
+  zones.forEach((zone) => {
+    const label = formatTechnicalLabel(zone.sector);
+    if (!label) return;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  });
+  return Array.from(counts.entries()).map(([label, goals]) => ({ label, goals }));
+};
+
+const EMPTY_GRAPH_MESSAGE = "Não há golos desta maneira";
+
+function EmptyGraphState() {
+  return (
+    <div className="flex min-h-[220px] w-full items-center justify-center text-sm text-muted-foreground">
+      {EMPTY_GRAPH_MESSAGE}
+    </div>
+  );
+}
 
 function TopPlayersCard({
   title,
@@ -164,23 +210,50 @@ export default function RadiographyPanel({
     };
   }, [teamId]);
 
-  const distribution = radiography?.distribution ?? [];
-  const assistZoneCounts = useMemo(() => aggregateZones(radiography?.assistZones ?? []), [
-    radiography?.assistZones
-  ]);
-  const shotZoneCounts = useMemo(() => aggregateZones(radiography?.shotZones ?? []), [
-    radiography?.shotZones
-  ]);
-  const finishZoneCounts = useMemo(() => aggregateZones(radiography?.finishZones ?? []), [
-    radiography?.finishZones
-  ]);
-  const buildUpPhases = radiography?.buildUpPhases ?? [];
-  const creationPhases = radiography?.creationPhases ?? [];
-  const finalizationPhases = radiography?.finalizationPhases ?? [];
-  const goalkeeperOutlets = radiography?.goalkeeperOutlets ?? [];
-  const cornerProfiles = radiography?.cornerProfiles ?? [];
-  const freekickProfiles = radiography?.freekickProfiles ?? [];
-  const throwInProfiles = radiography?.throwInProfiles ?? [];
+  const distribution = useMemo(
+    () => cleanDataset(radiography?.distribution ?? [], "category", "goals"),
+    [radiography?.distribution]
+  );
+  const assistZoneCounts = useMemo(
+    () => cleanDataset(aggregateZones(radiography?.assistZones ?? []), "label", "goals"),
+    [radiography?.assistZones]
+  );
+  const shotZoneCounts = useMemo(
+    () => cleanDataset(aggregateZones(radiography?.shotZones ?? []), "label", "goals"),
+    [radiography?.shotZones]
+  );
+  const finishZoneCounts = useMemo(
+    () => cleanDataset(aggregateZones(radiography?.finishZones ?? []), "label", "goals"),
+    [radiography?.finishZones]
+  );
+  const buildUpPhases = useMemo(
+    () => cleanDataset(radiography?.buildUpPhases ?? [], "phase", "goals"),
+    [radiography?.buildUpPhases]
+  );
+  const creationPhases = useMemo(
+    () => cleanDataset(radiography?.creationPhases ?? [], "phase", "goals"),
+    [radiography?.creationPhases]
+  );
+  const finalizationPhases = useMemo(
+    () => cleanDataset(radiography?.finalizationPhases ?? [], "phase", "goals"),
+    [radiography?.finalizationPhases]
+  );
+  const goalkeeperOutlets = useMemo(
+    () => cleanDataset(radiography?.goalkeeperOutlets ?? [], "outlet", "goals"),
+    [radiography?.goalkeeperOutlets]
+  );
+  const cornerProfiles = useMemo(
+    () => cleanDataset(radiography?.cornerProfiles ?? [], "profile", "goals"),
+    [radiography?.cornerProfiles]
+  );
+  const freekickProfiles = useMemo(
+    () => cleanDataset(radiography?.freekickProfiles ?? [], "profile", "goals"),
+    [radiography?.freekickProfiles]
+  );
+  const throwInProfiles = useMemo(
+    () => cleanDataset(radiography?.throwInProfiles ?? [], "profile", "goals"),
+    [radiography?.throwInProfiles]
+  );
   const currentTeam = teams.find((team) => team.id === teamId) ?? radiography?.team;
 
   if (!teams.length) {
@@ -237,11 +310,11 @@ export default function RadiographyPanel({
                 title="Distribuição por momentos"
                 description="Organização, transição e bola parada"
               />
-              <CardContent className="min-h-[220px]">
+              <CardContent className="min-h-[260px]">
                 {distribution.length > 0 ? (
                   <SimplePie data={distribution} labelKey="category" valueKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem dados de momentos.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>
@@ -250,11 +323,11 @@ export default function RadiographyPanel({
                 title="Saída do GR"
                 description="Curto para longo, bola longa e organização"
               />
-              <CardContent className="min-h-[220px]">
+              <CardContent className="min-h-[260px]">
                 {goalkeeperOutlets.length > 0 ? (
                   <SimplePie data={goalkeeperOutlets} labelKey="outlet" valueKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem registos do GR.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>
@@ -299,31 +372,31 @@ export default function RadiographyPanel({
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="bg-[#0c1420]/70 border border-border/60">
               <CardHeader title="Zonas de assistência" />
-              <CardContent>
+              <CardContent className="min-h-[260px] w-full px-0 py-0">
                 {assistZoneCounts.length > 0 ? (
                   <SimpleBar data={assistZoneCounts} xKey="label" yKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem dados de assistência.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>
             <Card className="bg-[#0c1420]/70 border border-border/60">
               <CardHeader title="Zonas de remate" />
-              <CardContent>
+              <CardContent className="min-h-[260px] w-full px-0 py-0">
                 {shotZoneCounts.length > 0 ? (
                   <SimpleBar data={shotZoneCounts} xKey="label" yKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem remates registados.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>
             <Card className="bg-[#0c1420]/70 border border-border/60">
               <CardHeader title="Zonas de finalização" />
-              <CardContent>
+              <CardContent className="min-h-[260px] w-full px-0 py-0">
                 {finishZoneCounts.length > 0 ? (
                   <SimpleBar data={finishZoneCounts} xKey="label" yKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem finalizações registadas.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>
@@ -332,31 +405,31 @@ export default function RadiographyPanel({
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="bg-[#0c1420]/70 border border-border/60">
               <CardHeader title="Fase de construção" />
-              <CardContent>
+              <CardContent className="min-h-[260px] w-full px-0 py-0">
                 {buildUpPhases.length > 0 ? (
                   <SimpleBar data={buildUpPhases} xKey="phase" yKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem dados de construção.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>
             <Card className="bg-[#0c1420]/70 border border-border/60">
               <CardHeader title="Fase de criação" />
-              <CardContent>
+              <CardContent className="min-h-[260px] w-full px-0 py-0">
                 {creationPhases.length > 0 ? (
                   <SimpleBar data={creationPhases} xKey="phase" yKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem dados de criação.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>
             <Card className="bg-[#0c1420]/70 border border-border/60">
               <CardHeader title="Fase de finalização" />
-              <CardContent>
+              <CardContent className="min-h-[260px] w-full px-0 py-0">
                 {finalizationPhases.length > 0 ? (
                   <SimpleBar data={finalizationPhases} xKey="phase" yKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem dados de finalização.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>
@@ -365,31 +438,31 @@ export default function RadiographyPanel({
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="bg-[#0c1420]/70 border border-border/60">
               <CardHeader title="Cantos" />
-              <CardContent>
+              <CardContent className="min-h-[260px]">
                 {cornerProfiles.length > 0 ? (
                   <SimplePie data={cornerProfiles} labelKey="profile" valueKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem cantos registados.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>
             <Card className="bg-[#0c1420]/70 border border-border/60">
               <CardHeader title="Livres" />
-              <CardContent>
+              <CardContent className="min-h-[260px]">
                 {freekickProfiles.length > 0 ? (
                   <SimplePie data={freekickProfiles} labelKey="profile" valueKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem livres registados.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>
             <Card className="bg-[#0c1420]/70 border border-border/60">
               <CardHeader title="Lançamentos" />
-              <CardContent>
+              <CardContent className="min-h-[260px]">
                 {throwInProfiles.length > 0 ? (
                   <SimplePie data={throwInProfiles} labelKey="profile" valueKey="goals" />
                 ) : (
-                  <div className="text-sm text-muted-foreground">Sem lançamentos registados.</div>
+                  <EmptyGraphState />
                 )}
               </CardContent>
             </Card>

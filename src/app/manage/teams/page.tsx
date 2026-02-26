@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,8 @@ export default function ManageTeamsPage() {
     pitchRating: ""
   });
   const [editingId, setEditingId] = useState<number | null>(null);
+  const TEAM_PAGE_LIMIT = 5;
+  const [teamPage, setTeamPage] = useState(0);
 
   const lookupsQuery = useQuery({
     queryKey: ["teams-lookups"],
@@ -60,11 +62,17 @@ export default function ManageTeamsPage() {
     queryFn: () => fetchJson<Team[]>(`/api/teams?championshipId=${filterChampionshipId}`)
   });
 
+  useEffect(() => {
+    setTeamPage(0);
+  }, [teamsQuery.data?.length, filterChampionshipId]);
+
   const championships = lookupsQuery.data?.championships ?? [];
   const seasons = lookupsQuery.data?.seasons ?? [];
 
   const championshipMap = useMemo(() => new Map(championships.map((c) => [c.id, c])), [championships]);
   const seasonMap = useMemo(() => new Map(seasons.map((s) => [s.id, s.name])), [seasons]);
+  const teamPageCount = Math.ceil((teamsQuery.data?.length ?? 0) / TEAM_PAGE_LIMIT);
+  const visibleTeams = (teamsQuery.data ?? []).slice(teamPage * TEAM_PAGE_LIMIT, (teamPage + 1) * TEAM_PAGE_LIMIT);
 
   const filteredChampsForFilters = championships.filter((c) => (!filterSeasonId ? true : c.seasonId === Number(filterSeasonId)));
   const filteredChampsForForm = championships.filter((c) => (!formSeasonId ? true : c.seasonId === Number(formSeasonId)));
@@ -268,12 +276,13 @@ export default function ManageTeamsPage() {
           )}
 
           {filterChampionshipId && teamsQuery.data?.length ? (
-            <div className="grid gap-3">
-              {teamsQuery.data.map((team) => {
-                const champ = championshipMap.get(team.championshipId);
-                return (
-                  <div key={team.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 hover:border-primary/60">
-                    <div className="flex flex-col">
+            <>
+              <div className="grid gap-3">
+                {visibleTeams.map((team) => {
+                  const champ = championshipMap.get(team.championshipId);
+                  return (
+                    <div key={team.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 hover:border-primary/60">
+                      <div className="flex flex-col">
                       <span className="font-medium text-white">{team.name}</span>
                       <span className="text-xs text-muted-foreground">
                         {champ?.name ?? `Campeonato #${team.championshipId}`}
@@ -317,11 +326,32 @@ export default function ManageTeamsPage() {
                       <Button variant="ghost" size="sm" onClick={() => deleteTeam.mutate(team.id)}>
                         Apagar
                       </Button>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+              {teamPageCount > 1 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
+                  <span>
+                    Página {teamPage + 1} de {teamPageCount}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setTeamPage((prev) => Math.max(prev - 1, 0))} disabled={teamPage === 0}>
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setTeamPage((prev) => Math.min(prev + 1, Math.max(teamPageCount - 1, 0)))}
+                      disabled={teamPage >= teamPageCount - 1}
+                    >
+                      Seguinte
+                    </Button>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              )}
+            </>
           ) : filterChampionshipId ? (
             <div className="text-muted-foreground">Sem equipas para este campeonato.</div>
           ) : null}

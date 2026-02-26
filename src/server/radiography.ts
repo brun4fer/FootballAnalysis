@@ -118,59 +118,97 @@ export async function getRadiography(teamId: number) {
   `);
 
   const buildUpPhases = db.execute<{ phase: string; goals: number }>(sql`
-    SELECT COALESCE(NULLIF(build_up_phase, ''), 'Indefinido') AS phase, COUNT(*)::int AS goals
+    SELECT build_up_phase AS phase, COUNT(*)::int AS goals
     FROM ${goals}
     WHERE team_id = ${teamId}
-    GROUP BY phase
-    ORDER BY goals DESC, phase
+      AND build_up_phase IS NOT NULL
+      AND TRIM(build_up_phase) <> ''
+      AND lower(build_up_phase) <> 'indefinido'
+    GROUP BY build_up_phase
+    ORDER BY goals DESC, build_up_phase
   `);
 
   const creationPhases = db.execute<{ phase: string; goals: number }>(sql`
-    SELECT COALESCE(NULLIF(creation_phase, ''), 'Indefinido') AS phase, COUNT(*)::int AS goals
+    SELECT creation_phase AS phase, COUNT(*)::int AS goals
     FROM ${goals}
     WHERE team_id = ${teamId}
-    GROUP BY phase
-    ORDER BY goals DESC, phase
+      AND creation_phase IS NOT NULL
+      AND TRIM(creation_phase) <> ''
+      AND lower(creation_phase) <> 'indefinido'
+    GROUP BY creation_phase
+    ORDER BY goals DESC, creation_phase
   `);
 
   const finalizationPhases = db.execute<{ phase: string; goals: number }>(sql`
-    SELECT COALESCE(NULLIF(finalization_phase, ''), 'Indefinido') AS phase, COUNT(*)::int AS goals
+    SELECT finalization_phase AS phase, COUNT(*)::int AS goals
     FROM ${goals}
     WHERE team_id = ${teamId}
-    GROUP BY phase
-    ORDER BY goals DESC, phase
+      AND finalization_phase IS NOT NULL
+      AND TRIM(finalization_phase) <> ''
+      AND lower(finalization_phase) <> 'indefinido'
+    GROUP BY finalization_phase
+    ORDER BY goals DESC, finalization_phase
   `);
 
   const goalkeeperOutlets = db.execute<{ outlet: string; goals: number }>(sql`
-    SELECT COALESCE(goalkeeper_outlet, 'Indefinido') AS outlet, COUNT(*)::int AS goals
+    SELECT goalkeeper_outlet AS outlet, COUNT(*)::int AS goals
     FROM ${goals}
     WHERE team_id = ${teamId}
-    GROUP BY outlet
-    ORDER BY goals DESC, outlet
+      AND goalkeeper_outlet IS NOT NULL
+      AND TRIM(goalkeeper_outlet) <> ''
+      AND lower(goalkeeper_outlet) <> 'indefinido'
+    GROUP BY goalkeeper_outlet
+    ORDER BY goals DESC, goalkeeper_outlet
   `);
 
   const cornerProfiles = db.execute<{ profile: string; goals: number }>(sql`
-    SELECT COALESCE(corner_profile, 'Indefinido') AS profile, COUNT(*)::int AS goals
+    SELECT corner_profile AS profile, COUNT(*)::int AS goals
     FROM ${goals}
     WHERE team_id = ${teamId}
-    GROUP BY profile
-    ORDER BY goals DESC, profile
+      AND corner_profile IS NOT NULL
+      AND TRIM(corner_profile) <> ''
+      AND lower(corner_profile) <> 'indefinido'
+    GROUP BY corner_profile
+    ORDER BY goals DESC, corner_profile
   `);
 
   const freekickProfiles = db.execute<{ profile: string; goals: number }>(sql`
-    SELECT COALESCE(freekick_profile, 'Indefinido') AS profile, COUNT(*)::int AS goals
-    FROM ${goals}
-    WHERE team_id = ${teamId}
+    SELECT profile, COUNT(*)::int AS goals
+    FROM (
+      SELECT
+        CASE
+          WHEN g.freekick_profile IS NOT NULL
+            AND TRIM(g.freekick_profile) <> ''
+            AND lower(g.freekick_profile) <> 'indefinido'
+          THEN g.freekick_profile
+          ELSE 'livre'
+        END AS profile
+      FROM ${goals} g
+      LEFT JOIN ${moments} m ON m.id = g.moment_id
+      LEFT JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
+      WHERE g.team_id = ${teamId}
+        AND (
+          (g.freekick_profile IS NOT NULL
+            AND TRIM(g.freekick_profile) <> ''
+            AND lower(g.freekick_profile) <> 'indefinido')
+          OR (
+            lower(m.name) LIKE '%bola parada%' AND lower(sm.name) LIKE '%livre%'
+          )
+        )
+    ) freekick_data
     GROUP BY profile
     ORDER BY goals DESC, profile
   `);
 
   const throwInProfiles = db.execute<{ profile: string; goals: number }>(sql`
-    SELECT COALESCE(throw_in_profile, 'Indefinido') AS profile, COUNT(*)::int AS goals
+    SELECT throw_in_profile AS profile, COUNT(*)::int AS goals
     FROM ${goals}
     WHERE team_id = ${teamId}
-    GROUP BY profile
-    ORDER BY goals DESC, profile
+      AND throw_in_profile IS NOT NULL
+      AND TRIM(throw_in_profile) <> ''
+      AND lower(throw_in_profile) <> 'indefinido'
+    GROUP BY throw_in_profile
+    ORDER BY goals DESC, throw_in_profile
   `);
 
   const teamMeta = await db.query.teams.findFirst({
@@ -217,6 +255,13 @@ export async function getRadiography(teamId: number) {
     throwInProfiles
   ]);
 
+  const normalizeSectorValue = (value?: string | null) => {
+    const cleaned = value?.toString().trim();
+    if (!cleaned) return null;
+    if (cleaned.toLowerCase() === "indefinido") return null;
+    return cleaned;
+  };
+
   const normalizePoints = (
     rows: Array<{
       assistCoordinates?: any;
@@ -228,17 +273,22 @@ export async function getRadiography(teamId: number) {
     }>
   ) =>
     rows
-      .map((r) => ({
-        x: r.assistCoordinates?.x ?? r.fieldDrawing?.x ?? r.goalCoordinates?.x ?? null,
-        y: r.assistCoordinates?.y ?? r.fieldDrawing?.y ?? r.goalCoordinates?.y ?? null,
-        sector:
-          (r.assistSector ?? r.shotSector ?? r.finishSector) ||
-          r.assistCoordinates?.sector ||
-          r.fieldDrawing?.sector ||
-          r.goalCoordinates?.sector ||
-          null
-      }))
-      .filter((p) => p.x !== null || p.y !== null || p.sector);
+      .map((r) => {
+        const sector =
+          normalizeSectorValue(r.assistSector) ??
+          normalizeSectorValue(r.shotSector) ??
+          normalizeSectorValue(r.finishSector) ??
+          normalizeSectorValue(r.assistCoordinates?.sector) ??
+          normalizeSectorValue(r.fieldDrawing?.sector) ??
+          normalizeSectorValue(r.goalCoordinates?.sector);
+        if (!sector) return null;
+        return {
+          x: r.assistCoordinates?.x ?? r.fieldDrawing?.x ?? r.goalCoordinates?.x ?? null,
+          y: r.assistCoordinates?.y ?? r.fieldDrawing?.y ?? r.goalCoordinates?.y ?? null,
+          sector
+        };
+      })
+      .filter((point): point is { x: number | null; y: number | null; sector: string } => Boolean(point));
 
   return {
     distribution: distributionRows.rows,

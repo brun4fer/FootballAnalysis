@@ -68,15 +68,15 @@ export async function zoneDistribution(teamId: number) {
       CASE
         WHEN (g.goal_coordinates ->> 'y')::float <= 0.5 THEN
           CASE
-            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Upper Left'
-            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Upper Center'
-            ELSE 'Upper Right'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Superior Esquerdo'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Superior Centro'
+            ELSE 'Superior Direito'
           END
         ELSE
           CASE
-            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Lower Left'
-            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Lower Center'
-            ELSE 'Lower Right'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Inferior Esquerdo'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Inferior Centro'
+            ELSE 'Inferior Direito'
           END
       END AS name,
       COUNT(*)::int AS goals
@@ -119,15 +119,15 @@ export async function penaltiesByZone(teamId: number) {
       CASE
         WHEN (g.goal_coordinates ->> 'y')::float <= 0.5 THEN
           CASE
-            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Upper Left'
-            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Upper Center'
-            ELSE 'Upper Right'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Superior Esquerdo'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Superior Centro'
+            ELSE 'Superior Direito'
           END
         ELSE
           CASE
-            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Lower Left'
-            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Lower Center'
-            ELSE 'Lower Right'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.33 THEN 'Inferior Esquerdo'
+            WHEN (g.goal_coordinates ->> 'x')::float < 0.66 THEN 'Inferior Centro'
+            ELSE 'Inferior Direito'
           END
       END AS zone,
       COUNT(*)::int AS goals

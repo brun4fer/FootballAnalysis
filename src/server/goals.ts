@@ -165,6 +165,9 @@ export async function getGoalById(goalId: number) {
       scorerName: players.name,
       opponentName: teams.name,
       teamName: teamTable.name,
+      teamCoach: teamTable.coach,
+      teamStadium: teamTable.stadium,
+      teamPitchDimensions: teamTable.pitchDimensions,
       assistName: assistPlayer.name,
       cornerTakerName: cornerTaker.name,
       freekickTakerName: freekickTaker.name,
@@ -287,6 +290,10 @@ export async function createGoal(payload: unknown) {
   const isPenalty = subName.includes("penal");
   const isThrowIn = subName.includes("lançamento") || subName.includes("lancamento");
   const isCross = actionNames.some((name) => name.includes("cruzamento"));
+  const hasCornerMarkerAction = actionNames.some((name) => name.includes("marcador") && name.includes("canto"));
+  const hasFreekickMarkerAction = actionNames.some(
+    (name) => name.includes("marcador") && (name.includes("livre") || name.includes("falta"))
+  );
 
   async function validateTaker(playerId: number | null | undefined, label: string) {
     if (!playerId) throw new Error(`${label} é obrigatório para esta jogada`);
@@ -296,8 +303,12 @@ export async function createGoal(payload: unknown) {
     return p.id;
   }
 
-  const cornerTakerId = isCorner ? await validateTaker(parsed.cornerTakerId, "Marcador do canto") : parsed.cornerTakerId ?? null;
-  const freekickTakerId = isFreeKick ? await validateTaker(parsed.freekickTakerId, "Marcador da falta") : parsed.freekickTakerId ?? null;
+  const cornerTakerId = hasCornerMarkerAction
+    ? await validateTaker(parsed.cornerTakerId, "Marcador do canto")
+    : parsed.cornerTakerId ?? null;
+  const freekickTakerId = hasFreekickMarkerAction
+    ? await validateTaker(parsed.freekickTakerId, "Marcador da falta")
+    : parsed.freekickTakerId ?? null;
   const penaltyTakerId = isPenalty ? await validateTaker(parsed.penaltyTakerId, "Marcador do penálti") : parsed.penaltyTakerId ?? null;
   const crossAuthorId = isCross ? await validateTaker(parsed.crossAuthorId, "Autor do cruzamento") : parsed.crossAuthorId ?? null;
 
@@ -447,6 +458,10 @@ export async function updateGoal(id: number, payload: unknown) {
   const isPenalty = subName.includes("penal");
   const isThrowIn = subName.includes("lançamento") || subName.includes("lancamento");
   const isCross = actionNames.some((name) => name.includes("cruzamento"));
+  const hasCornerMarkerAction = actionNames.some((name) => name.includes("marcador") && name.includes("canto"));
+  const hasFreekickMarkerAction = actionNames.some(
+    (name) => name.includes("marcador") && (name.includes("livre") || name.includes("falta"))
+  );
 
   async function validateTaker(playerId: number | null | undefined, label: string) {
     if (!playerId) throw new Error(`${label} é obrigatório para esta jogada`);
@@ -456,8 +471,12 @@ export async function updateGoal(id: number, payload: unknown) {
     return p.id;
   }
 
-  const cornerTakerId = isCorner ? await validateTaker(parsed.cornerTakerId, "Marcador do canto") : parsed.cornerTakerId ?? null;
-  const freekickTakerId = isFreeKick ? await validateTaker(parsed.freekickTakerId, "Marcador da falta") : parsed.freekickTakerId ?? null;
+  const cornerTakerId = hasCornerMarkerAction
+    ? await validateTaker(parsed.cornerTakerId, "Marcador do canto")
+    : parsed.cornerTakerId ?? null;
+  const freekickTakerId = hasFreekickMarkerAction
+    ? await validateTaker(parsed.freekickTakerId, "Marcador da falta")
+    : parsed.freekickTakerId ?? null;
   const penaltyTakerId = isPenalty ? await validateTaker(parsed.penaltyTakerId, "Marcador do penálti") : parsed.penaltyTakerId ?? null;
   const crossAuthorId = isCross ? await validateTaker(parsed.crossAuthorId, "Autor do cruzamento") : parsed.crossAuthorId ?? null;
 
