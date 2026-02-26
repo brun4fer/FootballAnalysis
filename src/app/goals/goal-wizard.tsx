@@ -154,7 +154,7 @@ const goalkeeperOutlets = [
 ] as const;
 
 const labelFromOption = (
-  list: Array<{ value: string; label: string }>,
+  list: ReadonlyArray<{ value: string; label: string }>,
   value?: string | null,
   fallback = "—"
 ) => {
@@ -1003,6 +1003,8 @@ const updateMutation = useMutation({
     const selectedActions = lookupsQuery.data?.actions.filter((a) => actionIds.includes(a.id)) ?? [];
     const requiresGoal = selectedActions.some((a) => a.name.toLowerCase().includes("marcador") || a.context === "field_goal");
     const requiresField = selectedActions.length > 0;
+    const derivedFreekickProfile = deriveFreekickProfileFromActions(selectedActions);
+    const resolvedFreekickProfile = derivedFreekickProfile || freekickProfile;
     if (requiresGoal && !goalPoint) throw new Error("Esta a??o requer um ponto na baliza.");
     if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigat?rio para esta a??o.");
 

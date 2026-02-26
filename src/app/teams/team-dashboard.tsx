@@ -27,66 +27,6 @@ type GoalEvent = {
   action?: string;
 };
 
-const TECH_LABEL_OVERRIDES: Record<string, string> = {
-  organizacao: "Organização",
-  curto_para_longo: "Curto para longo",
-  bola_longa: "Bola longa",
-  area: "Área",
-  aberto: "Aberto",
-  fechado: "Fechado",
-  combinado: "Combinado",
-  cruzamento: "Cruzamento",
-  "canto aberto": "Canto Aberto",
-  "canto fechado": "Canto Fechado"
-};
-
-const normalizeChartLabel = (value?: string | null) => {
-  const raw = value?.toString().trim();
-  if (!raw) return null;
-  if (raw.toLowerCase() === "indefinido") return null;
-  return raw;
-};
-
-const formatTechnicalLabel = (value?: string | null) => {
-  const normalized = normalizeChartLabel(value);
-  if (!normalized) return null;
-  const lower = normalized.toLowerCase();
-  if (TECH_LABEL_OVERRIDES[lower]) return TECH_LABEL_OVERRIDES[lower];
-  const words = normalized.replace(/_/g, " ").split(" ");
-  return words
-    .map((word) => (word ? `${word[0].toUpperCase()}${word.slice(1).toLowerCase()}` : ""))
-    .join(" ")
-    .trim();
-};
-
-const cleanChartData = <T extends Record<string, any>>(
-  data: T[] | undefined,
-  labelKey: keyof T,
-  valueKey: keyof T,
-  labelFormatter?: (value?: string | null) => string | null
-) => {
-  const formatter = labelFormatter ?? normalizeChartLabel;
-  return (data ?? [])
-    .map((entry) => {
-      const rawLabel = entry[labelKey];
-      const label = formatter(rawLabel ?? null);
-      const value = Number(entry[valueKey]);
-      if (!label || !Number.isFinite(value) || value <= 0) return null;
-      return { ...entry, [labelKey]: label };
-    })
-    .filter((entry): entry is T => entry !== null);
-};
-
-const EMPTY_GRAPH_MESSAGE = "Não há golos desta maneira";
-
-function EmptyGraphState() {
-  return (
-    <div className="flex min-h-[220px] w-full items-center justify-center text-sm text-muted-foreground">
-      {EMPTY_GRAPH_MESSAGE}
-    </div>
-  );
-}
-
 const fetcher = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url);
   if (!res.ok) throw new Error(await res.text());
@@ -252,29 +192,6 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
   };
 
   const goalEvents = useMemo(() => goalsQuery.data ?? [], [goalsQuery.data]);
-  const HISTORY_PAGE_LIMIT = 5;
-  const [historyPage, setHistoryPage] = useState(0);
-  const historyPageCount = Math.max(1, Math.ceil(goalEvents.length / HISTORY_PAGE_LIMIT));
-  const pagedGoalEvents = goalEvents.slice(historyPage * HISTORY_PAGE_LIMIT, (historyPage + 1) * HISTORY_PAGE_LIMIT);
-  const historyCanPrev = historyPage > 0;
-  const historyCanNext = historyPage < historyPageCount - 1;
-
-  useEffect(() => {
-    setHistoryPage(0);
-  }, [goalEvents.length]);
-
-  const actionsData = useMemo(
-    () => cleanChartData(actionsQuery.data, "action", "goals", formatTechnicalLabel),
-    [actionsQuery.data]
-  );
-  const momentsData = useMemo(
-    () => cleanChartData(momentsQuery.data, "moment", "goals"),
-    [momentsQuery.data]
-  );
-  const penaltiesData = useMemo(
-    () => cleanChartData(penaltiesQuery.data, "zone", "goals"),
-    [penaltiesQuery.data]
-  );
 
   const loadGoalForEdit = async (id: number) => {
     setEditingGoalId(id);
@@ -369,14 +286,14 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
             <div className="flex flex-wrap gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3">
               {selectedTeam.emblemPath && <img src={selectedTeam.emblemPath} alt="Emblema" className="h-8 w-8 rounded-full border border-border/50 bg-white/10" />}
               {selectedTeam.radiographyPdfUrl && (
-                <Button asChild variant="ghost" size="sm" className="gap-2">
+                <Button variant="ghost" size="sm" className="gap-2">
                   <a href={selectedTeam.radiographyPdfUrl} target="_blank" rel="noreferrer">
                     <FileText className="h-4 w-4" /> Radiografia Ofensiva (PDF)
                   </a>
                 </Button>
               )}
               {selectedTeam.videoReportUrl && (
-                <Button asChild variant="ghost" size="sm" className="gap-2">
+                <Button variant="ghost" size="sm" className="gap-2">
                   <a href={selectedTeam.videoReportUrl} target="_blank" rel="noreferrer">
                     <PlayCircle className="h-4 w-4" /> Vídeo de Análise
                   </a>
@@ -406,12 +323,8 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
             </Card>
             <Card>
               <CardHeader title="Distribuição por Ação" />
-              <CardContent className="w-full px-0 py-0">
-                {actionsData.length > 0 ? (
-                  <SimpleBar data={actionsData} xKey="action" yKey="goals" />
-                ) : (
-                  <EmptyGraphState />
-                )}
+              <CardContent>
+                {actionsQuery.data ? <SimpleBar data={actionsQuery.data} xKey="action" yKey="goals" /> : <div className="text-sm text-muted-foreground">Sem dados</div>}
               </CardContent>
             </Card>
           </div>
@@ -419,21 +332,17 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader title="Momentos do Golo" />
-              <CardContent className="w-full px-0 py-0">
-                {momentsData.length > 0 ? (
-                  <SimpleBar data={momentsData} xKey="moment" yKey="goals" />
-                ) : (
-                  <EmptyGraphState />
-                )}
+              <CardContent>
+                {momentsQuery.data ? <SimpleBar data={momentsQuery.data} xKey="moment" yKey="goals" /> : <div className="text-sm text-muted-foreground">Sem dados</div>}
               </CardContent>
             </Card>
             <Card>
               <CardHeader title="Penáltis por Zona" />
               <CardContent>
-                {penaltiesData.length > 0 ? (
-                  <SimplePie data={penaltiesData} labelKey="zone" valueKey="goals" />
+                {penaltiesQuery.data && penaltiesQuery.data.length > 0 ? (
+                  <SimplePie data={penaltiesQuery.data} labelKey="zone" valueKey="goals" />
                 ) : (
-                  <EmptyGraphState />
+                  <div className="text-sm text-muted-foreground">Sem penáltis.</div>
                 )}
               </CardContent>
             </Card>
@@ -443,7 +352,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
             <CardHeader title="Histórico de Golos" description="Editar rapidamente qualquer golo" />
             <CardContent className="space-y-2 text-sm">
               {goalEvents.length > 0 ? (
-                pagedGoalEvents.map((g) => (
+                goalEvents.map((g) => (
                   <div key={g.id} className="flex items-center justify-between rounded-lg border border-border/60 bg-card px-3 py-2">
                     <div className="flex items-center gap-3">
                       <span className="text-muted-foreground">
@@ -459,7 +368,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button asChild variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm">
                         <Link href={`/stats/goal/${g.id}`} className="flex items-center gap-1">
                           <Eye className="h-4 w-4" /> Ver
                         </Link>
@@ -472,26 +381,6 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                 ))
               ) : (
                 <div className="text-muted-foreground">Ainda sem eventos.</div>
-              )}
-              {historyPageCount > 1 && (
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
-                  <span>
-                    Página {historyPage + 1} de {historyPageCount}
-                  </span>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setHistoryPage((prev) => Math.max(prev - 1, 0))} disabled={!historyCanPrev}>
-                      Anterior
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setHistoryPage((prev) => Math.min(prev + 1, historyPageCount - 1))}
-                      disabled={!historyCanNext}
-                    >
-                      Seguinte
-                    </Button>
-                  </div>
-                </div>
               )}
             </CardContent>
           </Card>

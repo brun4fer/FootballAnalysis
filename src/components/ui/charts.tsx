@@ -34,7 +34,17 @@ const palette = ["#67e8f9", "#22d3ee", "#a78bfa", "#f97316", "#22c55e", "#38bdf8
 const computeHeight = (length: number) => Math.min(Math.max(length * 44 + 120, 280), 540);
 const BAR_SIZE = 30;
 
-export function SimpleBar({ data, xKey, yKey }: { data: any[]; xKey: string; yKey: string }) {
+export function SimpleBar({
+  data,
+  xKey,
+  yKey,
+  yAxisWidth = 200
+}: {
+  data: any[];
+  xKey: string;
+  yKey: string;
+  yAxisWidth?: number;
+}) {
   const height = computeHeight(data.length);
   const yTickStyle = { ...tickStyle, textAnchor: "end" as const };
 
