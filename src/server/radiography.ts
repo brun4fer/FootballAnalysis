@@ -27,7 +27,79 @@ const setPieceCase = sql`
 
 const onlyLocal = (path?: string | null) => (path && path.startsWith("http") ? null : path || null);
 
-export async function getRadiography(teamId: number) {
+export type RadiographyBpoCategory = "corners" | "free_kicks" | "direct_free_kicks" | "throw_ins";
+
+type RadiographyFilters = {
+  momentId?: number;
+  bpoCategory?: RadiographyBpoCategory;
+};
+
+export async function getRadiography(teamId: number, filters?: RadiographyFilters) {
+  const momentId = filters?.momentId;
+  const bpoCategory = filters?.bpoCategory;
+  const teamCondition = sql`g.team_id = ${teamId}`;
+  const momentCondition = momentId ? sql` AND g.moment_id = ${momentId}` : sql``;
+  const isCornerGoal = sql`EXISTS (
+    SELECT 1
+    FROM ${subMoments} sm_filter
+    WHERE sm_filter.id = g.sub_moment_id
+      AND lower(coalesce(sm_filter.name, '')) LIKE '%canto%'
+  )`;
+  const isThrowInGoal = sql`EXISTS (
+    SELECT 1
+    FROM ${subMoments} sm_filter
+    WHERE sm_filter.id = g.sub_moment_id
+      AND (
+        lower(coalesce(sm_filter.name, '')) LIKE '%lançamento%'
+        OR lower(coalesce(sm_filter.name, '')) LIKE '%lancamento%'
+      )
+  )`;
+  const isFreeKickGoal = sql`EXISTS (
+    SELECT 1
+    FROM ${subMoments} sm_filter
+    WHERE sm_filter.id = g.sub_moment_id
+      AND lower(coalesce(sm_filter.name, '')) LIKE '%livre%'
+      AND lower(coalesce(sm_filter.name, '')) NOT LIKE '%direto%'
+  )`;
+  const hasDirectAction = sql`(
+    EXISTS (
+      SELECT 1
+      FROM ${actions} a_filter
+      WHERE a_filter.id = g.action_id
+        AND (
+          lower(coalesce(a_filter.name, '')) LIKE '%diret%'
+          OR lower(coalesce(a_filter.name, '')) LIKE '%direct%'
+        )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM ${goalActions} ga_filter
+      JOIN ${actions} a_filter ON a_filter.id = ga_filter.action_id
+      WHERE ga_filter.goal_id = g.id
+        AND (
+          lower(coalesce(a_filter.name, '')) LIKE '%diret%'
+          OR lower(coalesce(a_filter.name, '')) LIKE '%direct%'
+        )
+    )
+  )`;
+  const isDirectFreeKickGoal = sql`(
+    EXISTS (
+      SELECT 1
+      FROM ${subMoments} sm_filter
+      WHERE sm_filter.id = g.sub_moment_id
+        AND lower(coalesce(sm_filter.name, '')) LIKE '%livre direto%'
+    )
+    OR (${isFreeKickGoal} AND ${hasDirectAction})
+  )`;
+  const bpoCondition = (() => {
+    if (!bpoCategory) return sql``;
+    if (bpoCategory === "corners") return sql` AND ${isCornerGoal}`;
+    if (bpoCategory === "free_kicks") return sql` AND ${isFreeKickGoal} AND NOT ${hasDirectAction}`;
+    if (bpoCategory === "direct_free_kicks") return sql` AND ${isDirectFreeKickGoal}`;
+    if (bpoCategory === "throw_ins") return sql` AND ${isThrowInGoal}`;
+    return sql``;
+  })();
+  const goalFilter = sql`${teamCondition}${momentCondition}${bpoCondition}`;
   const distribution = db.execute<{ category: string; goals: number }>(sql`
     SELECT category, COUNT(*)::int AS goals
     FROM (
@@ -40,35 +112,65 @@ export async function getRadiography(teamId: number) {
       FROM ${goals} g
       JOIN ${moments} m ON m.id = g.moment_id
       JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
-      WHERE g.team_id = ${teamId}
+      WHERE ${goalFilter}
     ) sub
     GROUP BY category
     ORDER BY category;
   `);
 
-  const assistZones = db.execute<{ assistCoordinates: any; assistSector: string | null }>(sql`
-    SELECT assist_coordinates AS "assistCoordinates", assist_sector AS "assistSector"
-    FROM ${goals}
-    WHERE team_id = ${teamId} AND (assist_coordinates IS NOT NULL OR assist_sector IS NOT NULL)
+  const assistZones = db.execute<{
+    assistCoordinates: any;
+    assistSector: string | null;
+    scorerName: string;
+    minute: number;
+  }>(sql`
+    SELECT
+      g.assist_coordinates AS "assistCoordinates",
+      g.assist_sector AS "assistSector",
+      p.name AS "scorerName",
+      g.minute AS minute
+    FROM ${goals} g
+    JOIN ${players} p ON p.id = g.scorer_id
+    WHERE ${goalFilter} AND (g.assist_coordinates IS NOT NULL OR g.assist_sector IS NOT NULL)
   `);
 
-  const shotZones = db.execute<{ fieldDrawing: any; shotSector: string | null }>(sql`
-    SELECT field_drawing AS "fieldDrawing", shot_sector AS "shotSector"
-    FROM ${goals}
-    WHERE team_id = ${teamId} AND (field_drawing IS NOT NULL OR shot_sector IS NOT NULL)
+  const shotZones = db.execute<{
+    fieldDrawing: any;
+    shotSector: string | null;
+    scorerName: string;
+    minute: number;
+  }>(sql`
+    SELECT
+      g.field_drawing AS "fieldDrawing",
+      g.shot_sector AS "shotSector",
+      p.name AS "scorerName",
+      g.minute AS minute
+    FROM ${goals} g
+    JOIN ${players} p ON p.id = g.scorer_id
+    WHERE ${goalFilter} AND (g.field_drawing IS NOT NULL OR g.shot_sector IS NOT NULL)
   `);
 
-  const finishZones = db.execute<{ goalCoordinates: any; finishSector: string | null }>(sql`
-    SELECT goal_coordinates AS "goalCoordinates", finish_sector AS "finishSector"
-    FROM ${goals}
-    WHERE team_id = ${teamId} AND (finish_sector IS NOT NULL OR goal_coordinates IS NOT NULL)
+  const finishZones = db.execute<{
+    goalCoordinates: any;
+    finishSector: string | null;
+    scorerName: string;
+    minute: number;
+  }>(sql`
+    SELECT
+      g.goal_coordinates AS "goalCoordinates",
+      g.finish_sector AS "finishSector",
+      p.name AS "scorerName",
+      g.minute AS minute
+    FROM ${goals} g
+    JOIN ${players} p ON p.id = g.scorer_id
+    WHERE ${goalFilter} AND (g.finish_sector IS NOT NULL OR g.goal_coordinates IS NOT NULL)
   `);
 
   const topScorers = db.execute<{ id: number; name: string; goals: number; photoPath: string | null }>(sql`
     SELECT p.id, p.name, COUNT(*)::int AS goals, COALESCE(p.photo_path, '') AS "photoPath"
     FROM ${goals} g
     JOIN ${players} p ON p.id = g.scorer_id
-    WHERE g.team_id = ${teamId}
+    WHERE ${goalFilter}
     GROUP BY p.id, p.name, p.photo_path
     ORDER BY goals DESC, p.name
     LIMIT 3
@@ -78,7 +180,7 @@ export async function getRadiography(teamId: number) {
     SELECT p.id, p.name, COUNT(*)::int AS assists, COALESCE(p.photo_path, '') AS "photoPath"
     FROM ${goals} g
     JOIN ${players} p ON p.id = g.assist_id
-    WHERE g.team_id = ${teamId} AND g.assist_id IS NOT NULL
+    WHERE ${goalFilter} AND g.assist_id IS NOT NULL
     GROUP BY p.id, p.name, p.photo_path
     ORDER BY assists DESC, p.name
     LIMIT 3
@@ -87,21 +189,21 @@ export async function getRadiography(teamId: number) {
   const topParticipation = db.execute<{ id: number; name: string; involvement: number; photoPath: string | null }>(sql`
     WITH scorer AS (
       SELECT scorer_id AS player_id, COUNT(*)::int AS goals
-      FROM ${goals}
-      WHERE team_id = ${teamId}
+      FROM ${goals} g
+      WHERE ${goalFilter}
       GROUP BY scorer_id
     ),
     assist AS (
       SELECT assist_id AS player_id, COUNT(*)::int AS assists
-      FROM ${goals}
-      WHERE team_id = ${teamId} AND assist_id IS NOT NULL
+      FROM ${goals} g
+      WHERE ${goalFilter} AND g.assist_id IS NOT NULL
       GROUP BY assist_id
     ),
     inv AS (
       SELECT gi.player_id, COUNT(*)::int AS involvements
       FROM ${goalInvolvements} gi
       JOIN ${goals} g ON g.id = gi.goal_id
-      WHERE g.team_id = ${teamId}
+      WHERE ${goalFilter}
       GROUP BY gi.player_id
     )
     SELECT p.id, p.name,
@@ -118,58 +220,58 @@ export async function getRadiography(teamId: number) {
   `);
 
   const buildUpPhases = db.execute<{ phase: string; goals: number }>(sql`
-    SELECT build_up_phase AS phase, COUNT(*)::int AS goals
-    FROM ${goals}
-    WHERE team_id = ${teamId}
-      AND build_up_phase IS NOT NULL
-      AND TRIM(build_up_phase) <> ''
-      AND lower(build_up_phase) <> 'indefinido'
-    GROUP BY build_up_phase
-    ORDER BY goals DESC, build_up_phase
+    SELECT g.build_up_phase AS phase, COUNT(*)::int AS goals
+    FROM ${goals} g
+    WHERE ${goalFilter}
+      AND g.build_up_phase IS NOT NULL
+      AND TRIM(g.build_up_phase) <> ''
+      AND lower(g.build_up_phase) <> 'indefinido'
+    GROUP BY g.build_up_phase
+    ORDER BY goals DESC, g.build_up_phase
   `);
 
   const creationPhases = db.execute<{ phase: string; goals: number }>(sql`
-    SELECT creation_phase AS phase, COUNT(*)::int AS goals
-    FROM ${goals}
-    WHERE team_id = ${teamId}
-      AND creation_phase IS NOT NULL
-      AND TRIM(creation_phase) <> ''
-      AND lower(creation_phase) <> 'indefinido'
-    GROUP BY creation_phase
-    ORDER BY goals DESC, creation_phase
+    SELECT g.creation_phase AS phase, COUNT(*)::int AS goals
+    FROM ${goals} g
+    WHERE ${goalFilter}
+      AND g.creation_phase IS NOT NULL
+      AND TRIM(g.creation_phase) <> ''
+      AND lower(g.creation_phase) <> 'indefinido'
+    GROUP BY g.creation_phase
+    ORDER BY goals DESC, g.creation_phase
   `);
 
   const finalizationPhases = db.execute<{ phase: string; goals: number }>(sql`
-    SELECT finalization_phase AS phase, COUNT(*)::int AS goals
-    FROM ${goals}
-    WHERE team_id = ${teamId}
-      AND finalization_phase IS NOT NULL
-      AND TRIM(finalization_phase) <> ''
-      AND lower(finalization_phase) <> 'indefinido'
-    GROUP BY finalization_phase
-    ORDER BY goals DESC, finalization_phase
+    SELECT g.finalization_phase AS phase, COUNT(*)::int AS goals
+    FROM ${goals} g
+    WHERE ${goalFilter}
+      AND g.finalization_phase IS NOT NULL
+      AND TRIM(g.finalization_phase) <> ''
+      AND lower(g.finalization_phase) <> 'indefinido'
+    GROUP BY g.finalization_phase
+    ORDER BY goals DESC, g.finalization_phase
   `);
 
   const goalkeeperOutlets = db.execute<{ outlet: string; goals: number }>(sql`
-    SELECT goalkeeper_outlet AS outlet, COUNT(*)::int AS goals
-    FROM ${goals}
-    WHERE team_id = ${teamId}
-      AND goalkeeper_outlet IS NOT NULL
-      AND TRIM(goalkeeper_outlet) <> ''
-      AND lower(goalkeeper_outlet) <> 'indefinido'
-    GROUP BY goalkeeper_outlet
-    ORDER BY goals DESC, goalkeeper_outlet
+    SELECT g.goalkeeper_outlet AS outlet, COUNT(*)::int AS goals
+    FROM ${goals} g
+    WHERE ${goalFilter}
+      AND g.goalkeeper_outlet IS NOT NULL
+      AND TRIM(g.goalkeeper_outlet) <> ''
+      AND lower(g.goalkeeper_outlet) <> 'indefinido'
+    GROUP BY g.goalkeeper_outlet
+    ORDER BY goals DESC, g.goalkeeper_outlet
   `);
 
   const cornerProfiles = db.execute<{ profile: string; goals: number }>(sql`
-    SELECT corner_profile AS profile, COUNT(*)::int AS goals
-    FROM ${goals}
-    WHERE team_id = ${teamId}
-      AND corner_profile IS NOT NULL
-      AND TRIM(corner_profile) <> ''
-      AND lower(corner_profile) <> 'indefinido'
-    GROUP BY corner_profile
-    ORDER BY goals DESC, corner_profile
+    SELECT g.corner_profile AS profile, COUNT(*)::int AS goals
+    FROM ${goals} g
+    WHERE ${goalFilter}
+      AND g.corner_profile IS NOT NULL
+      AND TRIM(g.corner_profile) <> ''
+      AND lower(g.corner_profile) <> 'indefinido'
+    GROUP BY g.corner_profile
+    ORDER BY goals DESC, g.corner_profile
   `);
 
   const freekickProfiles = db.execute<{ profile: string; goals: number }>(sql`
@@ -186,7 +288,7 @@ export async function getRadiography(teamId: number) {
       FROM ${goals} g
       LEFT JOIN ${moments} m ON m.id = g.moment_id
       LEFT JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
-      WHERE g.team_id = ${teamId}
+      WHERE ${goalFilter}
         AND (
           (g.freekick_profile IS NOT NULL
             AND TRIM(g.freekick_profile) <> ''
@@ -201,14 +303,26 @@ export async function getRadiography(teamId: number) {
   `);
 
   const throwInProfiles = db.execute<{ profile: string; goals: number }>(sql`
-    SELECT throw_in_profile AS profile, COUNT(*)::int AS goals
-    FROM ${goals}
-    WHERE team_id = ${teamId}
-      AND throw_in_profile IS NOT NULL
-      AND TRIM(throw_in_profile) <> ''
-      AND lower(throw_in_profile) <> 'indefinido'
-    GROUP BY throw_in_profile
-    ORDER BY goals DESC, throw_in_profile
+    SELECT g.throw_in_profile AS profile, COUNT(*)::int AS goals
+    FROM ${goals} g
+    WHERE ${goalFilter}
+      AND g.throw_in_profile IS NOT NULL
+      AND TRIM(g.throw_in_profile) <> ''
+      AND lower(g.throw_in_profile) <> 'indefinido'
+    GROUP BY g.throw_in_profile
+    ORDER BY goals DESC, g.throw_in_profile
+  `);
+
+  const momentGoalsCount = db.execute<{ goals: number }>(sql`
+    SELECT COUNT(*)::int AS goals
+    FROM ${goals} g
+    WHERE ${goalFilter}
+  `);
+
+  const teamGoalsCount = db.execute<{ goals: number }>(sql`
+    SELECT COUNT(*)::int AS goals
+    FROM ${goals} g
+    WHERE g.team_id = ${teamId}
   `);
 
   const teamMeta = await db.query.teams.findFirst({
@@ -237,7 +351,9 @@ export async function getRadiography(teamId: number) {
     goalkeeperOutletRows,
     cornerProfileRows,
     freekickProfileRows,
-    throwInProfileRows
+    throwInProfileRows,
+    momentGoalsRows,
+    teamGoalsRows
   ] = await Promise.all([
     distribution,
     assistZones,
@@ -252,7 +368,9 @@ export async function getRadiography(teamId: number) {
     goalkeeperOutlets,
     cornerProfiles,
     freekickProfiles,
-    throwInProfiles
+    throwInProfiles,
+    momentGoalsCount,
+    teamGoalsCount
   ]);
 
   const normalizeSectorValue = (value?: string | null) => {
@@ -270,10 +388,15 @@ export async function getRadiography(teamId: number) {
       shotSector?: string | null;
       assistSector?: string | null;
       finishSector?: string | null;
+      scorerName?: string | null;
+      minute?: number | null;
     }>
   ) =>
     rows
       .map((r) => {
+        const xValue = r.assistCoordinates?.x ?? r.fieldDrawing?.x ?? r.goalCoordinates?.x ?? null;
+        const yValue = r.assistCoordinates?.y ?? r.fieldDrawing?.y ?? r.goalCoordinates?.y ?? null;
+        const hasCoordinates = typeof xValue === "number" && typeof yValue === "number";
         const sector =
           normalizeSectorValue(r.assistSector) ??
           normalizeSectorValue(r.shotSector) ??
@@ -281,14 +404,24 @@ export async function getRadiography(teamId: number) {
           normalizeSectorValue(r.assistCoordinates?.sector) ??
           normalizeSectorValue(r.fieldDrawing?.sector) ??
           normalizeSectorValue(r.goalCoordinates?.sector);
-        if (!sector) return null;
+        if (!sector && !hasCoordinates) return null;
         return {
-          x: r.assistCoordinates?.x ?? r.fieldDrawing?.x ?? r.goalCoordinates?.x ?? null,
-          y: r.assistCoordinates?.y ?? r.fieldDrawing?.y ?? r.goalCoordinates?.y ?? null,
-          sector
+          x: hasCoordinates ? xValue : null,
+          y: hasCoordinates ? yValue : null,
+          sector: sector ?? null,
+          scorerName: r.scorerName ?? null,
+          minute: typeof r.minute === "number" ? r.minute : null
         };
       })
-      .filter((point): point is { x: number | null; y: number | null; sector: string } => Boolean(point));
+      .filter(
+        (point): point is {
+          x: number | null;
+          y: number | null;
+          sector: string | null;
+          scorerName: string | null;
+          minute: number | null;
+        } => Boolean(point)
+      );
 
   return {
     distribution: distributionRows.rows,
@@ -305,6 +438,8 @@ export async function getRadiography(teamId: number) {
     cornerProfiles: cornerProfileRows.rows,
     freekickProfiles: freekickProfileRows.rows,
     throwInProfiles: throwInProfileRows.rows,
+    momentGoals: momentGoalsRows.rows[0]?.goals ?? 0,
+    teamGoals: teamGoalsRows.rows[0]?.goals ?? 0,
     team: teamMeta ? { ...teamMeta, emblemPath: onlyLocal(teamMeta.emblemPath) } : null
   };
 }
