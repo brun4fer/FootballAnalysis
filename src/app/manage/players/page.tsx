@@ -65,8 +65,14 @@ export default function ManagePlayersPage() {
   const seasons = lookupsQuery.data?.seasons ?? [];
   const championships = lookupsQuery.data?.championships ?? [];
 
-  const filteredChamps = championships.filter((c) => (!seasonId ? true : c.seasonId === Number(seasonId)));
-  const filteredTeams = teams.filter((t) => (!championshipId ? true : t.championshipId === Number(championshipId)));
+  const filteredChamps = useMemo(
+    () => championships.filter((c) => (!seasonId ? true : c.seasonId === Number(seasonId))),
+    [championships, seasonId]
+  );
+  const filteredTeams = useMemo(
+    () => teams.filter((t) => (!championshipId ? true : t.championshipId === Number(championshipId))),
+    [teams, championshipId]
+  );
 
   const savePlayer = useMutation({
     mutationFn: async () => {

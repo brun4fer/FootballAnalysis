@@ -163,7 +163,7 @@ export const goals = pgTable(
     cornerProfile: text("corner_profile").$type<"fechado" | "aberto" | "combinado" | null>(),
     freekickProfile: text("freekick_profile").$type<"fechado" | "aberto" | "combinado" | null>(),
     throwInProfile: text("throw_in_profile").$type<"area" | "organizacao" | null>(),
-    goalkeeperOutlet: text("goalkeeper_outlet").$type<"curto_para_longo" | "bola_longa" | null>(),
+    goalkeeperOutlet: text("goalkeeper_outlet").$type<"organizacao" | "curto_para_longo" | "bola_longa" | null>(),
     notes: text("notes")
   },
   (table) => ({

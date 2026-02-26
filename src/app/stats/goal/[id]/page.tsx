@@ -223,7 +223,10 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
               <span className="text-muted-foreground">Minuto</span>
 
-              <span>{goal.minute}'</span>
+              <span>
+                {goal.minute}
+                &apos;
+              </span>
 
               <span className="text-muted-foreground">Momento</span>
 

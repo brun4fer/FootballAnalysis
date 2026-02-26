@@ -84,6 +84,18 @@ const zoneOptions = [
   { value: "penetração", label: "Zona de Penetração" }
 ] as const;
 
+const normalizeActionName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+const hiddenActionNames = new Set([
+  "marcador",
+  "assistencia",
+  "assistência",
+  "marcador & assistencia",
+  "marcador & assistência",
+  "unidades de ligacao",
+  "unidades de ligação"
+]);
+
 const buildUpPhases = [
   { value: "posse_controlada", label: "Posse controlada" },
   { value: "transicao_controlada", label: "Transição controlada" },
@@ -116,6 +128,7 @@ const throwInProfiles = [
 ] as const;
 
 const goalkeeperOutlets = [
+  { value: "organizacao", label: "Em Organização" },
   { value: "curto_para_longo", label: "Curto para longo" },
   { value: "bola_longa", label: "Bola longa" }
 ] as const;
@@ -1083,7 +1096,12 @@ const filteredChampionships = useMemo(() => {
 
   const filteredActions = useMemo(() => {
     if (!subMomentId || !lookupsQuery.data) return [];
-    return lookupsQuery.data.actions.filter((a) => a.subMomentId === subMomentId);
+    return lookupsQuery.data.actions.filter((a) => {
+      if (a.subMomentId !== subMomentId) return false;
+      const normalized = normalizeActionName(a.name);
+      if (hiddenActionNames.has(normalized)) return false;
+      return true;
+    });
   }, [lookupsQuery.data, subMomentId]);
 
   const selectedActions = useMemo(
@@ -2616,19 +2634,24 @@ const filteredChampionships = useMemo(() => {
               <GoalNetPinpoint value={goalPoint} onChange={setGoalPoint} />
 
 
-              {needsGoalkeeperOutlet && (
-                <div className="space-y-2">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Saída do GR</label>
-                  <Select value={goalkeeperOutlet} onChange={(e) => setGoalkeeperOutlet(e.target.value)}>
-                    <option value="">Sem indicação</option>
-                    {goalkeeperOutlets.map((option) => (
-                      <option key={option.value} value={option.value} className="text-black">
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
+                  <span className="text-xs text-muted-foreground">
+                    {needsGoalkeeperOutlet
+                      ? "Requerido no sub-momento de saída do guarda-redes."
+                      : "Opcional para contextualizar a saída do GR."}
+                  </span>
                 </div>
-              )}
+                <Select value={goalkeeperOutlet} onChange={(e) => setGoalkeeperOutlet(e.target.value)}>
+                  <option value="">Sem indicação</option>
+                  {goalkeeperOutlets.map((option) => (
+                    <option key={option.value} value={option.value} className="text-black">
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             </div>
 
 

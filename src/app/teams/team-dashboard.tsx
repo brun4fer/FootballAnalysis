@@ -46,7 +46,7 @@ function StatTile({ title, value, hint }: { title: string; value: string | numbe
 }
 
 function GoalNetPinMap({ goals }: { goals: GoalEvent[] }) {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; minute: number } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   return (
@@ -73,11 +73,12 @@ function GoalNetPinMap({ goals }: { goals: GoalEvent[] }) {
                 onMouseEnter={(e) => {
                   const rect = svgRef.current?.getBoundingClientRect();
                   if (!rect) return;
-                  const text = `${g.scorerName ?? "Marcador"} — ${g.minute}'`;
+                  const label = `${g.scorerName ?? "Marcador"} —`;
                   setTooltip({
                     x: e.clientX - rect.left,
                     y: e.clientY - rect.top,
-                    text
+                    label,
+                    minute: g.minute
                   });
                 }}
                 onMouseLeave={() => setTooltip(null)}
@@ -99,7 +100,11 @@ function GoalNetPinMap({ goals }: { goals: GoalEvent[] }) {
             className="pointer-events-none absolute z-10 rounded-md bg-slate-900/95 px-2 py-1 text-xs text-white shadow-lg border border-slate-700"
             style={{ left: tooltip.x + 6, top: tooltip.y - 10 }}
           >
-            {tooltip.text}
+            {tooltip.label}{" "}
+            <span>
+              {tooltip.minute}
+              &apos;
+            </span>
           </div>
         )}
       </div>
@@ -213,7 +218,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
               : "Seleciona época > campeonato > equipa para carregar as estatísticas."}
           </p>
         </div>
-        <Button asChild variant="secondary" size="sm">
+        <Button variant="secondary" size="sm">
           <Link href="/teams/radiografia">Radiografia da Equipa</Link>
         </Button>
       </div>
@@ -350,7 +355,10 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                 goalEvents.map((g) => (
                   <div key={g.id} className="flex items-center justify-between rounded-lg border border-border/60 bg-card px-3 py-2">
                     <div className="flex items-center gap-3">
-                      <span className="text-muted-foreground">{g.minute}'</span>
+                      <span className="text-muted-foreground">
+                        {g.minute}
+                        &apos;
+                      </span>
                       <span className="font-medium">{g.scorerName ?? `#${g.scorerId}`}</span>
                       <Badge className="bg-slate-700/60 text-slate-50">vs {g.opponentName ?? "Adversário indefinido"}</Badge>
                       {g.goalCoordinates && (

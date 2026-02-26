@@ -39,7 +39,7 @@ ALTER TABLE "goals" ADD CONSTRAINT "goals_throw_in_profile_check" CHECK (
 
 ALTER TABLE "goals" DROP CONSTRAINT IF EXISTS "goals_goalkeeper_outlet_check";
 ALTER TABLE "goals" ADD CONSTRAINT "goals_goalkeeper_outlet_check" CHECK (
-  goalkeeper_outlet IS NULL OR goalkeeper_outlet IN ('curto_para_longo','bola_longa')
+  goalkeeper_outlet IS NULL OR goalkeeper_outlet IN ('organizacao','curto_para_longo','bola_longa')
 );
 
 -- Seed goal_actions from legacy single action_id

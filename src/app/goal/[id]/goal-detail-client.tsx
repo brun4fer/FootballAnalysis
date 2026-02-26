@@ -35,7 +35,7 @@ type GoalDetailProps = {
     cornerProfile?: "fechado" | "aberto" | "combinado" | null;
     freekickProfile?: "fechado" | "aberto" | "combinado" | null;
     throwInProfile?: "area" | "organizacao" | null;
-    goalkeeperOutlet?: "curto_para_longo" | "bola_longa" | null;
+    goalkeeperOutlet?: "organizacao" | "curto_para_longo" | "bola_longa" | null;
     notes?: string | null;
     scorerName?: string | null;
     opponentName?: string | null;
@@ -60,6 +60,7 @@ const throwInProfiles = {
 } as const;
 
 const goalkeeperOutlets = {
+  organizacao: "Em Organização",
   curto_para_longo: "Curto para longo",
   bola_longa: "Bola longa"
 } as const;
@@ -176,7 +177,10 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
               <span className="text-muted-foreground">Assistência</span>
               <span>{goal.assistName ?? goal.assistId ?? "—"}</span>
               <span className="text-muted-foreground">Minuto</span>
-              <span>{goal.minute}'</span>
+              <span>
+                {goal.minute}
+                &apos;
+              </span>
               <span className="text-muted-foreground">Momento</span>
               <span>{goal.momentName ?? "—"}</span>
               <span className="text-muted-foreground">Sub-momento</span>

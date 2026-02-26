@@ -22,7 +22,7 @@ export const fieldDrawingSchema = pointSchema;
 
 const setPieceProfile = z.enum(["fechado", "aberto", "combinado"]);
 const throwProfile = z.enum(["area", "organizacao"]);
-const outletProfile = z.enum(["curto_para_longo", "bola_longa"]);
+const outletProfile = z.enum(["organizacao", "curto_para_longo", "bola_longa"]);
 
 export const goalInputSchema = z.object({
   opponentTeamId: z.number().int().positive(),
@@ -37,10 +37,10 @@ export const goalInputSchema = z.object({
   freekickTakerId: z.number().int().positive().optional().nullable(),
   penaltyTakerId: z.number().int().positive().optional().nullable(),
   crossAuthorId: z.number().int().positive().optional().nullable(),
-  goalCoordinates: pointSchema.optional(),
+  goalCoordinates: pointSchema.optional().nullable(),
   videoPath: z.string().optional().or(z.literal("")).nullable(),
   fieldDrawing: fieldDrawingSchema.optional(),
-  assistCoordinates: zoneMarkerSchema.optional(),
+  assistCoordinates: zoneMarkerSchema.optional().nullable(),
   assistSector: z.string().optional().or(z.literal("")),
   shotSector: z.string().optional().or(z.literal("")),
   finishSector: z.string().optional().or(z.literal("")),
