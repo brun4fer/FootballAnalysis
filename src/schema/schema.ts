@@ -151,6 +151,8 @@ export const goals = pgTable(
     freekickTakerId: bigint("freekick_taker_id", { mode: "number" }).references(() => players.id),
     penaltyTakerId: bigint("penalty_taker_id", { mode: "number" }).references(() => players.id),
     crossAuthorId: bigint("cross_author_id", { mode: "number" }).references(() => players.id),
+    foulSufferedById: bigint("foul_suffered_by_id", { mode: "number" }).references(() => players.id),
+    previousMomentDescription: text("previous_moment_description"),
     goalCoordinates: jsonb("goal_coordinates").$type<CoordinatePoint | null>(),
     fieldDrawing: jsonb("field_drawing").$type<CoordinatePoint | null>(),
     assistCoordinates: jsonb("assist_coordinates").$type<ZoneMarker | null>(),
@@ -178,7 +180,8 @@ export const goals = pgTable(
     idxCornerTaker: index("idx_goals_corner_taker").on(table.cornerTakerId),
     idxFreekickTaker: index("idx_goals_freekick_taker").on(table.freekickTakerId),
     idxPenaltyTaker: index("idx_goals_penalty_taker").on(table.penaltyTakerId),
-    idxCrossAuthor: index("idx_goals_cross_author").on(table.crossAuthorId)
+    idxCrossAuthor: index("idx_goals_cross_author").on(table.crossAuthorId),
+    idxFoulSufferedBy: index("idx_goals_foul_suffered_by").on(table.foulSufferedById)
   })
 );
 

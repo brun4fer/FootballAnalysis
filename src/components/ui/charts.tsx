@@ -38,7 +38,7 @@ export function SimpleBar({
   data,
   xKey,
   yKey,
-  yAxisWidth = 200
+  yAxisWidth = 180
 }: {
   data: any[];
   xKey: string;
@@ -69,7 +69,7 @@ export function SimpleBar({
           <YAxis
             type="category"
             dataKey={xKey}
-            width={200}
+            width={yAxisWidth}
             interval={0}
             {...axisStyle}
             tick={yTickStyle}

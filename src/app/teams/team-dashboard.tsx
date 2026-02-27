@@ -114,9 +114,12 @@ function GoalNetPinMap({ goals }: { goals: GoalEvent[] }) {
 
 export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
   const { selection } = useAppContext();
+  const PAGE_SIZE = 5;
   const [seasonId, setSeasonId] = useState<string>(selection.seasonId ? String(selection.seasonId) : "");
   const [championshipId, setChampionshipId] = useState<string>(selection.championshipId ? String(selection.championshipId) : "");
   const [teamId, setTeamId] = useState<number | undefined>(selection.teamId);
+  const [teamPage, setTeamPage] = useState(0);
+  const [goalPage, setGoalPage] = useState(0);
   const [editingGoalId, setEditingGoalId] = useState<number | null>(null);
   const [editingGoal, setEditingGoal] = useState<any | null>(null);
 
@@ -131,12 +134,18 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
 
   const filteredChamps = championships.filter((c) => (!seasonId ? true : c.seasonId === Number(seasonId)));
   const filteredTeams = teams.filter((t) => (!championshipId ? true : t.championshipId === Number(championshipId)));
+  const teamPageCount = Math.ceil(filteredTeams.length / PAGE_SIZE);
+  const paginatedTeams = filteredTeams.slice(teamPage * PAGE_SIZE, (teamPage + 1) * PAGE_SIZE);
 
   useEffect(() => {
     if (filteredTeams.length > 0 && (!teamId || !filteredTeams.some((t) => t.id === teamId))) {
       setTeamId(filteredTeams[0].id);
     }
   }, [filteredTeams, teamId]);
+
+  useEffect(() => {
+    setTeamPage(0);
+  }, [seasonId, championshipId, filteredTeams.length]);
 
   const selectedTeam = useMemo(() => filteredTeams.find((t) => t.id === teamId), [filteredTeams, teamId]);
 
@@ -192,6 +201,12 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
   };
 
   const goalEvents = useMemo(() => goalsQuery.data ?? [], [goalsQuery.data]);
+  const goalPageCount = Math.ceil(goalEvents.length / PAGE_SIZE);
+  const paginatedGoalEvents = goalEvents.slice(goalPage * PAGE_SIZE, (goalPage + 1) * PAGE_SIZE);
+
+  useEffect(() => {
+    setGoalPage(0);
+  }, [seasonId, championshipId, teamId, goalEvents.length]);
 
   const loadGoalForEdit = async (id: number) => {
     setEditingGoalId(id);
@@ -276,6 +291,8 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
         </CardContent>
       </Card>
 
+     
+
       {!teamId && (
         <div className="rounded-lg border border-dashed border-border/60 bg-card/50 p-4 text-muted-foreground">Seleciona uma equipa para ver as estatísticas.</div>
       )}
@@ -352,7 +369,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
             <CardHeader title="Histórico de Golos" description="Editar rapidamente qualquer golo" />
             <CardContent className="space-y-2 text-sm">
               {goalEvents.length > 0 ? (
-                goalEvents.map((g) => (
+                paginatedGoalEvents.map((g) => (
                   <div key={g.id} className="flex items-center justify-between rounded-lg border border-border/60 bg-card px-3 py-2">
                     <div className="flex items-center gap-3">
                       <span className="text-muted-foreground">
@@ -381,6 +398,26 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                 ))
               ) : (
                 <div className="text-muted-foreground">Ainda sem eventos.</div>
+              )}
+              {goalPageCount > 1 && (
+                <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground">
+                  <span>
+                    Página {goalPage + 1} de {goalPageCount}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setGoalPage((prev) => Math.max(prev - 1, 0))} disabled={goalPage === 0}>
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setGoalPage((prev) => Math.min(prev + 1, Math.max(goalPageCount - 1, 0)))}
+                      disabled={goalPage >= goalPageCount - 1}
+                    >
+                      Seguinte
+                    </Button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

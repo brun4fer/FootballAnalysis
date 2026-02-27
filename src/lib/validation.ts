@@ -37,6 +37,8 @@ export const goalInputSchema = z.object({
   freekickTakerId: z.number().int().positive().optional().nullable(),
   penaltyTakerId: z.number().int().positive().optional().nullable(),
   crossAuthorId: z.number().int().positive().optional().nullable(),
+  foulSufferedById: z.number().int().positive().optional().nullable(),
+  previousMomentDescription: z.string().optional().or(z.literal("")).nullable(),
   goalCoordinates: pointSchema.optional().nullable(),
   videoPath: z.string().optional().or(z.literal("")).nullable(),
   fieldDrawing: fieldDrawingSchema.optional(),

@@ -907,9 +907,9 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
   const createMutation = useMutation({
   mutationFn: async () => {
     if (!teamId || !opponentTeamId || !scorerId || !momentId || !subMomentId || actionIds.length === 0) {
-      throw new Error("Campos obrigat?rios em falta");
+      throw new Error("Campos obrigatórios em falta");
     }
-    if (!seasonId || !championshipId) throw new Error("Selecione ?poca e campeonato.");
+    if (!seasonId || !championshipId) throw new Error("Selecione época e campeonato.");
 
     const selectedActions = lookupsQuery.data?.actions.filter((a) => actionIds.includes(a.id)) ?? [];
     const requiresGoal = selectedActions.some((a) => a.name.toLowerCase().includes("marcador") || a.context === "field_goal");
@@ -917,8 +917,8 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     const derivedFreekickProfile = deriveFreekickProfileFromActions(selectedActions);
     const resolvedFreekickProfile = derivedFreekickProfile || freekickProfile;
 
-    if (requiresGoal && !goalPoint) throw new Error("Esta a??o requer um ponto na baliza.");
-    if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigat?rio para esta a??o.");
+    if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
+    if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
 
     const payload = {
       opponentTeamId,
@@ -996,17 +996,17 @@ const updateMutation = useMutation({
   mutationFn: async () => {
     if (!existingGoal) return;
     if (!teamId || !opponentTeamId || !scorerId || !momentId || !subMomentId || actionIds.length === 0) {
-      throw new Error("Campos obrigat?rios em falta");
+      throw new Error("Campos obrigatórios em falta");
     }
-    if (!seasonId || !championshipId) throw new Error("Selecione ?poca e campeonato.");
+    if (!seasonId || !championshipId) throw new Error("Selecione época e campeonato.");
 
     const selectedActions = lookupsQuery.data?.actions.filter((a) => actionIds.includes(a.id)) ?? [];
     const requiresGoal = selectedActions.some((a) => a.name.toLowerCase().includes("marcador") || a.context === "field_goal");
     const requiresField = selectedActions.length > 0;
     const derivedFreekickProfile = deriveFreekickProfileFromActions(selectedActions);
     const resolvedFreekickProfile = derivedFreekickProfile || freekickProfile;
-    if (requiresGoal && !goalPoint) throw new Error("Esta a??o requer um ponto na baliza.");
-    if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigat?rio para esta a??o.");
+    if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
+    if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
 
     const payload = {
       opponentTeamId,

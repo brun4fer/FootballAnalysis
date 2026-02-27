@@ -418,6 +418,10 @@ export default function RadiographyPanel({
     () => cleanDataset(aggregateZones(radiography?.finishZones ?? []), "label", "goals"),
     [radiography?.finishZones]
   );
+  const assistZoneCounts = useMemo(
+    () => cleanDataset(aggregateZones(radiography?.assistZones ?? []), "label", "goals"),
+    [radiography?.assistZones]
+  );
   const buildUpPhases = useMemo(
     () => cleanDataset(radiography?.buildUpPhases ?? [], "phase", "goals"),
     [radiography?.buildUpPhases]
@@ -619,15 +623,19 @@ export default function RadiographyPanel({
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Zonas de assistência" />
+                  <CardHeader title="Mapa de remate" />
                   <CardContent className="min-h-[260px] w-full px-0 py-0">
-                    <FieldPinMap points={assistZonePoints} />
+                    <FieldPinMap points={shotZonePoints} />
                   </CardContent>
                 </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Zonas de remate" />
+                  <CardHeader title="Zonas de assistência" />
                   <CardContent className="min-h-[260px] w-full px-0 py-0">
-                    <FieldPinMap points={shotZonePoints} />
+                    {assistZoneCounts.length > 0 ? (
+                      <SimpleBar data={assistZoneCounts} xKey="label" yKey="goals" yAxisWidth={180} />
+                    ) : (
+                      <EmptyGraphState />
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -672,15 +680,19 @@ export default function RadiographyPanel({
 
               <div className="grid gap-4 lg:grid-cols-3">
                 <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Zonas de assistência" />
+                  <CardHeader title="Mapa de remate" />
                   <CardContent className="min-h-[260px] w-full px-0 py-0">
-                    <FieldPinMap points={assistZonePoints} />
+                    <FieldPinMap points={shotZonePoints} />
                   </CardContent>
                 </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Zonas de remate" />
+                  <CardHeader title="Zonas de assistência" />
                   <CardContent className="min-h-[260px] w-full px-0 py-0">
-                    <FieldPinMap points={shotZonePoints} />
+                    {assistZoneCounts.length > 0 ? (
+                      <SimpleBar data={assistZoneCounts} xKey="label" yKey="goals" yAxisWidth={180} />
+                    ) : (
+                      <EmptyGraphState />
+                    )}
                   </CardContent>
                 </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">

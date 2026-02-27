@@ -59,7 +59,9 @@ export async function getGoalsByTeam(teamId: number) {
       cornerTakerId: goals.cornerTakerId,
       freekickTakerId: goals.freekickTakerId,
       penaltyTakerId: goals.penaltyTakerId,
-      crossAuthorId: goals.crossAuthorId
+      crossAuthorId: goals.crossAuthorId,
+      foulSufferedById: goals.foulSufferedById,
+      previousMomentDescription: goals.previousMomentDescription
     })
     .from(goals)
     .leftJoin(moments, eq(goals.momentId, moments.id))
@@ -130,6 +132,7 @@ export async function getGoalById(goalId: number) {
   const freekickTaker = alias(players, "freekick_taker");
   const penaltyTaker = alias(players, "penalty_taker");
   const crossAuthor = alias(players, "cross_author");
+  const foulSufferedBy = alias(players, "foul_suffered_by");
   const teamTable = alias(teams, "team_table");
   const invPlayer = alias(players, "inv_player");
 
@@ -173,10 +176,13 @@ export async function getGoalById(goalId: number) {
       freekickTakerName: freekickTaker.name,
       penaltyTakerName: penaltyTaker.name,
       crossAuthorName: crossAuthor.name,
+      foulSufferedByName: foulSufferedBy.name,
       cornerTakerId: goals.cornerTakerId,
       freekickTakerId: goals.freekickTakerId,
       penaltyTakerId: goals.penaltyTakerId,
-      crossAuthorId: goals.crossAuthorId
+      crossAuthorId: goals.crossAuthorId,
+      foulSufferedById: goals.foulSufferedById,
+      previousMomentDescription: goals.previousMomentDescription
     })
     .from(goals)
     .leftJoin(players, eq(goals.scorerId, players.id))
@@ -188,6 +194,7 @@ export async function getGoalById(goalId: number) {
     .leftJoin(freekickTaker, eq(goals.freekickTakerId, freekickTaker.id))
     .leftJoin(penaltyTaker, eq(goals.penaltyTakerId, penaltyTaker.id))
     .leftJoin(crossAuthor, eq(goals.crossAuthorId, crossAuthor.id))
+    .leftJoin(foulSufferedBy, eq(goals.foulSufferedById, foulSufferedBy.id))
     .leftJoin(teams, eq(goals.opponentTeamId, teams.id))
     .leftJoin(teamTable, eq(goals.teamId, teamTable.id))
     .where(eq(goals.id, goalId))
@@ -311,6 +318,10 @@ export async function createGoal(payload: unknown) {
     : parsed.freekickTakerId ?? null;
   const penaltyTakerId = isPenalty ? await validateTaker(parsed.penaltyTakerId, "Marcador do penálti") : parsed.penaltyTakerId ?? null;
   const crossAuthorId = isCross ? await validateTaker(parsed.crossAuthorId, "Autor do cruzamento") : parsed.crossAuthorId ?? null;
+  const foulSufferedById = parsed.foulSufferedById
+    ? await validateTaker(parsed.foulSufferedById, "Jogador que sofreu a falta")
+    : null;
+  const previousMomentDescription = parsed.previousMomentDescription?.toString().trim() || null;
 
   const primaryActionId = parsed.actionIds[0];
   if (parsed.involvements) {
@@ -363,7 +374,9 @@ export async function createGoal(payload: unknown) {
         cornerTakerId,
         freekickTakerId,
         penaltyTakerId,
-        crossAuthorId
+        crossAuthorId,
+        foulSufferedById,
+        previousMomentDescription
       })
       .returning({ id: goals.id });
 
@@ -479,6 +492,10 @@ export async function updateGoal(id: number, payload: unknown) {
     : parsed.freekickTakerId ?? null;
   const penaltyTakerId = isPenalty ? await validateTaker(parsed.penaltyTakerId, "Marcador do penálti") : parsed.penaltyTakerId ?? null;
   const crossAuthorId = isCross ? await validateTaker(parsed.crossAuthorId, "Autor do cruzamento") : parsed.crossAuthorId ?? null;
+  const foulSufferedById = parsed.foulSufferedById
+    ? await validateTaker(parsed.foulSufferedById, "Jogador que sofreu a falta")
+    : null;
+  const previousMomentDescription = parsed.previousMomentDescription?.toString().trim() || null;
 
   const primaryActionId = parsed.actionIds[0];
   const requiresGoal = actionRows.some((a) => a.context === "field_goal" || a.name.toLowerCase().includes("marcador"));
@@ -522,7 +539,9 @@ export async function updateGoal(id: number, payload: unknown) {
         cornerTakerId,
         freekickTakerId,
         penaltyTakerId,
-        crossAuthorId
+        crossAuthorId,
+        foulSufferedById,
+        previousMomentDescription
       })
       .where(eq(goals.id, id))
       .returning({ id: goals.id });

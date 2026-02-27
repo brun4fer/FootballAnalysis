@@ -240,7 +240,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
                         <div className="text-sm font-semibold">{inv.playerName ?? inv.playerId}</div>
 
-                        <div className="text-xs text-muted-foreground">{inv.role === "assist" ? "AssistÃƒÂªncia" : "Envolvimento"}</div>
+                        <div className="text-xs text-muted-foreground">{inv.role === "assist" ? "Assistência" : "Envolvimento"}</div>
 
                       </div>
 

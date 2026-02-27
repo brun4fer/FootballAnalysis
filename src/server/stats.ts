@@ -2,6 +2,29 @@ import { sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { goalInvolvements, goals, moments, actions, subMoments, players, goalActions } from "../schema/schema";
 
+const normalizeActionLabel = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+function shouldHideFromActionChart(actionName: string) {
+  const normalized = normalizeActionLabel(actionName);
+  const isSetPieceMarker =
+    normalized.includes("marcador") &&
+    (normalized.includes("falta") || normalized.includes("canto") || normalized.includes("lancamento"));
+  const hiddenExactPatterns = [
+    "jogador referencia",
+    "jogadores referencia",
+    "espacos que atacam",
+    "falta sobre",
+    "momento anterior"
+  ];
+
+  return isSetPieceMarker || hiddenExactPatterns.some((pattern) => normalized.includes(pattern));
+}
+
 export async function topScorers(teamId: number) {
   const result = await db.execute<{ id: number; name: string; goals: number; assists: number }>(sql`
     WITH goal_counts AS (
@@ -110,7 +133,7 @@ export async function actionsBreakdown(teamId: number) {
     GROUP BY a.name
     ORDER BY goals DESC, a.name;
   `);
-  return result.rows;
+  return result.rows.filter((row) => !shouldHideFromActionChart(row.action));
 }
 
 export async function penaltiesByZone(teamId: number) {

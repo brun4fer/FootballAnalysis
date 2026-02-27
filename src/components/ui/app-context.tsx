@@ -8,6 +8,7 @@ export type Selection = {
   championshipId?: number;
   championshipName?: string;
   championshipLogo?: string | null;
+  teamId?: number;
 };
 
 type AppContextValue = {
