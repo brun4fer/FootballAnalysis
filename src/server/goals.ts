@@ -1,10 +1,34 @@
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "../db/client";
 import { actions, goalActions, goals, goalInvolvements, moments, players, subMoments, teams } from "../schema/schema";
 import { goalInputSchema } from "../lib/validation";
 
 type RawGoalPayload = Record<string, unknown>;
+
+function normalizeToken(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+async function hasGoalsColumn(columnName: string) {
+  try {
+    const res = await db.execute<{ exists: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = ANY(current_schemas(false))
+          AND table_name = 'goals'
+          AND column_name = ${columnName}
+      ) AS "exists"
+    `);
+    return Boolean(res.rows[0]?.exists);
+  } catch {
+    return false;
+  }
+}
 
 async function normalizeGoalPayload(payload: RawGoalPayload) {
   const minuteValue = payload?.minute;
@@ -72,6 +96,29 @@ export async function getGoalsByTeam(teamId: number) {
 
   if (rows.length === 0) return [];
 
+  const referenceByGoalId = new Map<number, number | null>();
+  if (await hasGoalsColumn("reference_player_id")) {
+    const referenceRows = await db
+      .select({
+        goalId: goals.id,
+        referencePlayerId: goals.referencePlayerId
+      })
+      .from(goals)
+      .where(inArray(goals.id, rows.map((r) => r.id)));
+    referenceRows.forEach((r) => referenceByGoalId.set(r.goalId, r.referencePlayerId ?? null));
+  }
+  const throwInTakerByGoalId = new Map<number, number | null>();
+  if (await hasGoalsColumn("throw_in_taker_id")) {
+    const throwInRows = await db
+      .select({
+        goalId: goals.id,
+        throwInTakerId: goals.throwInTakerId
+      })
+      .from(goals)
+      .where(inArray(goals.id, rows.map((r) => r.id)));
+    throwInRows.forEach((r) => throwInTakerByGoalId.set(r.goalId, r.throwInTakerId ?? null));
+  }
+
   const involvementRows = await db
     .select({
       goalId: goalInvolvements.goalId,
@@ -116,6 +163,8 @@ export async function getGoalsByTeam(teamId: number) {
     const primaryActionName = actionsForGoal[0]?.actionName ?? (g as any).action;
     return {
       ...g,
+      referencePlayerId: referenceByGoalId.get(g.id) ?? null,
+      throwInTakerId: throwInTakerByGoalId.get(g.id) ?? null,
       action: primaryActionName,
       actions: actionsForGoal,
       actionIds: actionsForGoal.map((a) => a.actionId),
@@ -199,6 +248,39 @@ export async function getGoalById(goalId: number) {
     .limit(1);
   if (!row[0]) return null;
 
+  let referencePlayerId: number | null = null;
+  let referencePlayerName: string | null = null;
+  if (await hasGoalsColumn("reference_player_id")) {
+    const referencePlayer = alias(players, "reference_player");
+    const referenceRow = await db
+      .select({
+        referencePlayerId: goals.referencePlayerId,
+        referencePlayerName: referencePlayer.name
+      })
+      .from(goals)
+      .leftJoin(referencePlayer, eq(goals.referencePlayerId, referencePlayer.id))
+      .where(eq(goals.id, goalId))
+      .limit(1);
+    referencePlayerId = referenceRow[0]?.referencePlayerId ?? null;
+    referencePlayerName = referenceRow[0]?.referencePlayerName ?? null;
+  }
+  let throwInTakerId: number | null = null;
+  let throwInTakerName: string | null = null;
+  if (await hasGoalsColumn("throw_in_taker_id")) {
+    const throwInTaker = alias(players, "throw_in_taker");
+    const throwInRow = await db
+      .select({
+        throwInTakerId: goals.throwInTakerId,
+        throwInTakerName: throwInTaker.name
+      })
+      .from(goals)
+      .leftJoin(throwInTaker, eq(goals.throwInTakerId, throwInTaker.id))
+      .where(eq(goals.id, goalId))
+      .limit(1);
+    throwInTakerId = throwInRow[0]?.throwInTakerId ?? null;
+    throwInTakerName = throwInRow[0]?.throwInTakerName ?? null;
+  }
+
   const involvements = await db
     .select({
       goalId: goalInvolvements.goalId,
@@ -221,12 +303,24 @@ export async function getGoalById(goalId: number) {
     .leftJoin(actions, eq(goalActions.actionId, actions.id))
     .where(eq(goalActions.goalId, goalId));
 
-  return { ...row[0], actions: actionsForGoal, actionIds: actionsForGoal.map((a) => a.actionId), involvements };
+  return {
+    ...row[0],
+    referencePlayerId,
+    referencePlayerName,
+    throwInTakerId,
+    throwInTakerName,
+    foulVictimName: row[0].foulSufferedByName ?? null,
+    actions: actionsForGoal,
+    actionIds: actionsForGoal.map((a) => a.actionId),
+    involvements
+  };
 }
 
 export async function createGoal(payload: unknown) {
   const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
   const parsed = goalInputSchema.parse(normalized);
+  const supportsReferencePlayer = await hasGoalsColumn("reference_player_id");
+  const supportsThrowInTaker = await hasGoalsColumn("throw_in_taker_id");
 
   const [team, scorer, opponent, subMoment] = await Promise.all([
     db.query.teams.findFirst({ where: eq(teams.id, parsed.teamId) }),
@@ -288,16 +382,23 @@ export async function createGoal(payload: unknown) {
     if (assistPlayer.teamId !== parsed.teamId) throw new Error("Assist player does not belong to team");
   }
 
-  const subName = subMoment.name.toLowerCase();
-  const actionNames = actionRows.map((a) => a.name.toLowerCase());
+  const subName = normalizeToken(subMoment.name);
+  const actionNames = actionRows.map((a) => normalizeToken(a.name));
   const isCorner = subName.includes("canto");
   const isFreeKick = subName.includes("livre");
   const isPenalty = subName.includes("penal");
-  const isThrowIn = subName.includes("lançamento") || subName.includes("lancamento");
+  const isThrowIn = subName.includes("lancamento");
   const isCross = actionNames.some((name) => name.includes("cruzamento"));
   const hasCornerMarkerAction = actionNames.some((name) => name.includes("marcador") && name.includes("canto"));
   const hasFreekickMarkerAction = actionNames.some(
     (name) => name.includes("marcador") && (name.includes("livre") || name.includes("falta"))
+  );
+  const hasThrowInMarkerAction = actionNames.some((name) => name.includes("marcador") && name.includes("lancamento"));
+  const hasFoulSufferedAction = actionNames.some(
+    (name) =>
+      name.includes("falta sobre") ||
+      name.includes("falta sofrida") ||
+      name.includes("sofreu a falta")
   );
 
   async function validateTaker(playerId: number | null | undefined, label: string) {
@@ -316,7 +417,13 @@ export async function createGoal(payload: unknown) {
     : parsed.freekickTakerId ?? null;
   const penaltyTakerId = isPenalty ? await validateTaker(parsed.penaltyTakerId, "Marcador do penálti") : parsed.penaltyTakerId ?? null;
   const crossAuthorId = isCross ? await validateTaker(parsed.crossAuthorId, "Autor do cruzamento") : parsed.crossAuthorId ?? null;
-  const foulSufferedById = parsed.foulSufferedById
+  const throwInTakerId = supportsThrowInTaker && hasThrowInMarkerAction
+    ? await validateTaker(parsed.throwInTakerId, "Marcador do lançamento")
+    : null;
+  const referencePlayerId = supportsReferencePlayer && parsed.referencePlayerId
+    ? await validateTaker(parsed.referencePlayerId, "Jogador referência")
+    : null;
+  const foulSufferedById = hasFoulSufferedAction
     ? await validateTaker(parsed.foulSufferedById, "Jogador que sofreu a falta")
     : null;
   const previousMomentDescription = parsed.previousMomentDescription?.toString().trim() || null;
@@ -342,40 +449,48 @@ export async function createGoal(payload: unknown) {
   }
 
   const goalId = await db.transaction(async (tx) => {
+    const goalValues: any = {
+      opponentTeamId: parsed.opponentTeamId,
+      teamId: parsed.teamId,
+      scorerId: parsed.scorerId,
+      assistId,
+      minute: parsed.minute,
+      momentId: parsed.momentId,
+      subMomentId: parsed.subMomentId,
+      actionId: primaryActionId,
+      goalZoneId: null,
+      goalCoordinates: parsed.goalCoordinates ?? null,
+      videoPath: parsed.videoPath || null,
+      fieldDrawing: parsed.fieldDrawing ?? null,
+      assistCoordinates: parsed.assistCoordinates ?? null,
+      assistSector: parsed.assistSector || null,
+      shotSector: parsed.shotSector || null,
+      finishSector: parsed.finishSector || null,
+      buildUpPhase: parsed.buildUpPhase || null,
+      creationPhase: parsed.creationPhase || null,
+      finalizationPhase: parsed.finalizationPhase || null,
+      cornerProfile: isCorner ? parsed.cornerProfile ?? null : null,
+      freekickProfile: isFreeKick ? parsed.freekickProfile ?? null : null,
+      throwInProfile: isThrowIn ? parsed.throwInProfile ?? null : null,
+      goalkeeperOutlet: parsed.goalkeeperOutlet ?? null,
+      notes: parsed.notes || null,
+      cornerTakerId,
+      freekickTakerId,
+      penaltyTakerId,
+      crossAuthorId,
+      foulSufferedById,
+      previousMomentDescription
+    };
+    if (supportsThrowInTaker) {
+      goalValues.throwInTakerId = throwInTakerId;
+    }
+    if (supportsReferencePlayer) {
+      goalValues.referencePlayerId = referencePlayerId;
+    }
+
     const [inserted] = await tx
       .insert(goals)
-      .values({
-        opponentTeamId: parsed.opponentTeamId,
-        teamId: parsed.teamId,
-        scorerId: parsed.scorerId,
-        assistId,
-        minute: parsed.minute,
-        momentId: parsed.momentId,
-        subMomentId: parsed.subMomentId,
-        actionId: primaryActionId,
-        goalZoneId: null,
-        goalCoordinates: parsed.goalCoordinates ?? null,
-        videoPath: parsed.videoPath || null,
-        fieldDrawing: parsed.fieldDrawing ?? null,
-        assistCoordinates: parsed.assistCoordinates ?? null,
-        assistSector: parsed.assistSector || null,
-        shotSector: parsed.shotSector || null,
-        finishSector: parsed.finishSector || null,
-        buildUpPhase: parsed.buildUpPhase || null,
-        creationPhase: parsed.creationPhase || null,
-        finalizationPhase: parsed.finalizationPhase || null,
-        cornerProfile: isCorner ? parsed.cornerProfile ?? null : null,
-        freekickProfile: isFreeKick ? parsed.freekickProfile ?? null : null,
-        throwInProfile: isThrowIn ? parsed.throwInProfile ?? null : null,
-        goalkeeperOutlet: parsed.goalkeeperOutlet ?? null,
-        notes: parsed.notes || null,
-        cornerTakerId,
-        freekickTakerId,
-        penaltyTakerId,
-        crossAuthorId,
-        foulSufferedById,
-        previousMomentDescription
-      })
+      .values(goalValues)
       .returning({ id: goals.id });
 
     if (parsed.involvements && parsed.involvements.length > 0) {
@@ -399,6 +514,8 @@ export async function createGoal(payload: unknown) {
 export async function updateGoal(id: number, payload: unknown) {
   const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
   const parsed = goalInputSchema.parse(normalized);
+  const supportsReferencePlayer = await hasGoalsColumn("reference_player_id");
+  const supportsThrowInTaker = await hasGoalsColumn("throw_in_taker_id");
 
   const existing = await db.query.goals.findFirst({ where: eq(goals.id, id) });
   if (!existing) throw new Error("Goal not found");
@@ -462,16 +579,23 @@ export async function updateGoal(id: number, payload: unknown) {
     }
   }
 
-  const subName = subMoment.name.toLowerCase();
-  const actionNames = actionRows.map((a) => a.name.toLowerCase());
+  const subName = normalizeToken(subMoment.name);
+  const actionNames = actionRows.map((a) => normalizeToken(a.name));
   const isCorner = subName.includes("canto");
   const isFreeKick = subName.includes("livre");
   const isPenalty = subName.includes("penal");
-  const isThrowIn = subName.includes("lançamento") || subName.includes("lancamento");
+  const isThrowIn = subName.includes("lancamento");
   const isCross = actionNames.some((name) => name.includes("cruzamento"));
   const hasCornerMarkerAction = actionNames.some((name) => name.includes("marcador") && name.includes("canto"));
   const hasFreekickMarkerAction = actionNames.some(
     (name) => name.includes("marcador") && (name.includes("livre") || name.includes("falta"))
+  );
+  const hasThrowInMarkerAction = actionNames.some((name) => name.includes("marcador") && name.includes("lancamento"));
+  const hasFoulSufferedAction = actionNames.some(
+    (name) =>
+      name.includes("falta sobre") ||
+      name.includes("falta sofrida") ||
+      name.includes("sofreu a falta")
   );
 
   async function validateTaker(playerId: number | null | undefined, label: string) {
@@ -490,7 +614,13 @@ export async function updateGoal(id: number, payload: unknown) {
     : parsed.freekickTakerId ?? null;
   const penaltyTakerId = isPenalty ? await validateTaker(parsed.penaltyTakerId, "Marcador do penálti") : parsed.penaltyTakerId ?? null;
   const crossAuthorId = isCross ? await validateTaker(parsed.crossAuthorId, "Autor do cruzamento") : parsed.crossAuthorId ?? null;
-  const foulSufferedById = parsed.foulSufferedById
+  const throwInTakerId = supportsThrowInTaker && hasThrowInMarkerAction
+    ? await validateTaker(parsed.throwInTakerId, "Marcador do lançamento")
+    : null;
+  const referencePlayerId = supportsReferencePlayer && parsed.referencePlayerId
+    ? await validateTaker(parsed.referencePlayerId, "Jogador referência")
+    : null;
+  const foulSufferedById = hasFoulSufferedAction
     ? await validateTaker(parsed.foulSufferedById, "Jogador que sofreu a falta")
     : null;
   const previousMomentDescription = parsed.previousMomentDescription?.toString().trim() || null;
@@ -507,40 +637,48 @@ export async function updateGoal(id: number, payload: unknown) {
   }
 
   const [updated] = await db.transaction(async (tx) => {
+    const goalUpdateValues: any = {
+      opponentTeamId: parsed.opponentTeamId,
+      teamId: parsed.teamId,
+      scorerId: parsed.scorerId,
+      assistId: assistId ?? null,
+      minute: parsed.minute,
+      momentId: parsed.momentId,
+      subMomentId: parsed.subMomentId,
+      actionId: primaryActionId,
+      goalZoneId: null,
+      goalCoordinates: parsed.goalCoordinates ?? null,
+      videoPath: parsed.videoPath || null,
+      fieldDrawing: parsed.fieldDrawing ?? null,
+      assistCoordinates: parsed.assistCoordinates ?? null,
+      assistSector: parsed.assistSector || null,
+      shotSector: parsed.shotSector || null,
+      finishSector: parsed.finishSector || null,
+      buildUpPhase: parsed.buildUpPhase || null,
+      creationPhase: parsed.creationPhase || null,
+      finalizationPhase: parsed.finalizationPhase || null,
+      cornerProfile: isCorner ? parsed.cornerProfile ?? null : null,
+      freekickProfile: isFreeKick ? parsed.freekickProfile ?? null : null,
+      throwInProfile: isThrowIn ? parsed.throwInProfile ?? null : null,
+      goalkeeperOutlet: parsed.goalkeeperOutlet ?? null,
+      notes: parsed.notes || null,
+      cornerTakerId,
+      freekickTakerId,
+      penaltyTakerId,
+      crossAuthorId,
+      foulSufferedById,
+      previousMomentDescription
+    };
+    if (supportsThrowInTaker) {
+      goalUpdateValues.throwInTakerId = throwInTakerId;
+    }
+    if (supportsReferencePlayer) {
+      goalUpdateValues.referencePlayerId = referencePlayerId;
+    }
+
     const [goalRow] = await tx
       .update(goals)
-      .set({
-        opponentTeamId: parsed.opponentTeamId,
-        teamId: parsed.teamId,
-        scorerId: parsed.scorerId,
-        assistId: assistId ?? null,
-        minute: parsed.minute,
-        momentId: parsed.momentId,
-        subMomentId: parsed.subMomentId,
-        actionId: primaryActionId,
-        goalZoneId: null,
-        goalCoordinates: parsed.goalCoordinates ?? null,
-        videoPath: parsed.videoPath || null,
-        fieldDrawing: parsed.fieldDrawing ?? null,
-        assistCoordinates: parsed.assistCoordinates ?? null,
-        assistSector: parsed.assistSector || null,
-        shotSector: parsed.shotSector || null,
-        finishSector: parsed.finishSector || null,
-        buildUpPhase: parsed.buildUpPhase || null,
-        creationPhase: parsed.creationPhase || null,
-        finalizationPhase: parsed.finalizationPhase || null,
-        cornerProfile: isCorner ? parsed.cornerProfile ?? null : null,
-        freekickProfile: isFreeKick ? parsed.freekickProfile ?? null : null,
-        throwInProfile: isThrowIn ? parsed.throwInProfile ?? null : null,
-        goalkeeperOutlet: parsed.goalkeeperOutlet ?? null,
-        notes: parsed.notes || null,
-        cornerTakerId,
-        freekickTakerId,
-        penaltyTakerId,
-        crossAuthorId,
-        foulSufferedById,
-        previousMomentDescription
-      })
+      .set(goalUpdateValues)
       .where(eq(goals.id, id))
       .returning({ id: goals.id });
 

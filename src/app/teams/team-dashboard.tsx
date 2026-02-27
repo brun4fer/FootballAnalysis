@@ -458,7 +458,9 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                           cornerTakerId: editingGoal.cornerTakerId,
                           freekickTakerId: editingGoal.freekickTakerId,
                           penaltyTakerId: editingGoal.penaltyTakerId,
-                          crossAuthorId: editingGoal.crossAuthorId
+                          crossAuthorId: editingGoal.crossAuthorId,
+                          throwInTakerId: editingGoal.throwInTakerId,
+                          referencePlayerId: editingGoal.referencePlayerId
                         }}
                         onSaved={() => {
                           refreshAll();

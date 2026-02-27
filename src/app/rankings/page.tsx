@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { useAppContext } from "@/components/ui/app-context";
@@ -223,6 +223,7 @@ function ComparisonStat({
 
 export default function RankingsPage() {
   const { selection, updatePartial } = useAppContext();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<"ligas" | "comparar">("ligas");
   const [seasonId, setSeasonId] = useState<string>(selection.seasonId ? String(selection.seasonId) : "");
   const [championshipId, setChampionshipId] = useState<string>(selection.championshipId ? String(selection.championshipId) : "");
@@ -304,6 +305,7 @@ export default function RankingsPage() {
   const handleSeasonChange = (value: string) => {
     setSeasonId(value);
     setChampionshipId("");
+    queryClient.removeQueries({ queryKey: ["rankings"] });
     const seasonName = seasons.find((s) => s.id === Number(value))?.name;
     updatePartial({
       seasonId: value ? Number(value) : undefined,
@@ -315,6 +317,7 @@ export default function RankingsPage() {
 
   const handleChampionshipChange = (value: string) => {
     setChampionshipId(value);
+    queryClient.removeQueries({ queryKey: ["rankings"] });
     const champName = championships.find((c) => c.id === Number(value))?.name;
     updatePartial({
       championshipId: value ? Number(value) : undefined,

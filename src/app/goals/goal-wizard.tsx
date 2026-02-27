@@ -814,6 +814,10 @@ type ExistingGoal = {
   freekickTakerId?: number | null;
   penaltyTakerId?: number | null;
   crossAuthorId?: number | null;
+  throwInTakerId?: number | null;
+  referencePlayerId?: number | null;
+  foulSufferedById?: number | null;
+  previousMomentDescription?: string | null;
   goalCoordinates: Point | null;
   fieldDrawing: Point | null;
   assistCoordinates?: ZoneMarker | null;
@@ -866,6 +870,10 @@ const [cornerTakerId, setCornerTakerId] = useState<number | undefined>();
 const [freekickTakerId, setFreekickTakerId] = useState<number | undefined>();
 const [penaltyTakerId, setPenaltyTakerId] = useState<number | undefined>();
 const [crossAuthorId, setCrossAuthorId] = useState<number | undefined>();
+const [throwInTakerId, setThrowInTakerId] = useState<number | undefined>();
+const [referencePlayerId, setReferencePlayerId] = useState<number | undefined>();
+const [foulSufferedById, setFoulSufferedById] = useState<number | undefined>();
+const [previousMomentDescription, setPreviousMomentDescription] = useState("");
 const [goalPoint, setGoalPoint] = useState<Point | null>(null);
 const [assistPoint, setAssistPoint] = useState<ZoneMarker | null>(null);
 const [assistSector, setAssistSector] = useState("");
@@ -919,6 +927,31 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
 
     if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
     if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
+    const hasFoulSufferedAction = selectedActions.some((a) => {
+      const normalized = normalizeActionName(a.name);
+      return (
+        normalized.includes("falta sobre") ||
+        normalized.includes("falta sofrida") ||
+        normalized.includes("sofreu a falta")
+      );
+    });
+    if (hasFoulSufferedAction && !foulSufferedById) {
+      throw new Error("Seleciona o jogador que sofreu a falta.");
+    }
+    const selectedSubMomentName = normalizeActionName(
+      lookupsQuery.data?.subMoments.find((s) => s.id === subMomentId)?.name ?? ""
+    );
+    const isDirectFreekickOrPenalty =
+      ((selectedSubMomentName.includes("livre") &&
+        (selectedSubMomentName.includes("direto") || selectedSubMomentName.includes("directo"))) ||
+        selectedSubMomentName.includes("penal") ||
+        selectedSubMomentName.includes("penalty"));
+    const hasPreviousMomentAction = selectedActions.some((a) =>
+      normalizeActionName(a.name).includes("momento anterior")
+    );
+    if (hasPreviousMomentAction && isDirectFreekickOrPenalty && !previousMomentDescription.trim()) {
+      throw new Error("Descreve o momento anterior.");
+    }
 
     const payload = {
       opponentTeamId,
@@ -933,6 +966,9 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       freekickTakerId,
       penaltyTakerId,
       crossAuthorId,
+      throwInTakerId,
+      referencePlayerId,
+      foulSufferedById,
       goalCoordinates: goalPoint ?? undefined,
       videoPath: videoPath || undefined,
       fieldDrawing: fieldPoint ?? undefined,
@@ -947,6 +983,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       freekickProfile: resolvedFreekickProfile || undefined,
       throwInProfile: throwInProfile || undefined,
       goalkeeperOutlet: goalkeeperOutlet || undefined,
+      previousMomentDescription: previousMomentDescription || undefined,
       notes: notes || undefined,
       involvements
     };
@@ -988,6 +1025,10 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     setFreekickTakerId(undefined);
     setPenaltyTakerId(undefined);
     setCrossAuthorId(undefined);
+    setThrowInTakerId(undefined);
+    setReferencePlayerId(undefined);
+    setFoulSufferedById(undefined);
+    setPreviousMomentDescription("");
   },
   onError: (err: any) => setMessage(err.message ?? "Erro ao gravar o golo")
 });
@@ -1007,6 +1048,31 @@ const updateMutation = useMutation({
     const resolvedFreekickProfile = derivedFreekickProfile || freekickProfile;
     if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
     if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
+    const hasFoulSufferedAction = selectedActions.some((a) => {
+      const normalized = normalizeActionName(a.name);
+      return (
+        normalized.includes("falta sobre") ||
+        normalized.includes("falta sofrida") ||
+        normalized.includes("sofreu a falta")
+      );
+    });
+    if (hasFoulSufferedAction && !foulSufferedById) {
+      throw new Error("Seleciona o jogador que sofreu a falta.");
+    }
+    const selectedSubMomentName = normalizeActionName(
+      lookupsQuery.data?.subMoments.find((s) => s.id === subMomentId)?.name ?? ""
+    );
+    const isDirectFreekickOrPenalty =
+      ((selectedSubMomentName.includes("livre") &&
+        (selectedSubMomentName.includes("direto") || selectedSubMomentName.includes("directo"))) ||
+        selectedSubMomentName.includes("penal") ||
+        selectedSubMomentName.includes("penalty"));
+    const hasPreviousMomentAction = selectedActions.some((a) =>
+      normalizeActionName(a.name).includes("momento anterior")
+    );
+    if (hasPreviousMomentAction && isDirectFreekickOrPenalty && !previousMomentDescription.trim()) {
+      throw new Error("Descreve o momento anterior.");
+    }
 
     const payload = {
       opponentTeamId,
@@ -1021,6 +1087,9 @@ const updateMutation = useMutation({
       freekickTakerId,
       penaltyTakerId,
       crossAuthorId,
+      throwInTakerId,
+      referencePlayerId,
+      foulSufferedById,
       goalCoordinates: goalPoint ?? undefined,
       videoPath: videoPath || undefined,
       fieldDrawing: fieldPoint ?? undefined,
@@ -1035,6 +1104,7 @@ const updateMutation = useMutation({
       freekickProfile: resolvedFreekickProfile || undefined,
       throwInProfile: throwInProfile || undefined,
       goalkeeperOutlet: goalkeeperOutlet || undefined,
+      previousMomentDescription: previousMomentDescription || undefined,
       notes: notes || undefined,
       involvements
     };
@@ -1118,15 +1188,28 @@ const filteredChampionships = useMemo(() => {
 
 
 
+  const selectedMoment = momentId ? lookupsQuery.data?.moments.find((m) => m.id === momentId) : undefined;
+  const selectedSubMoment = subMomentId ? lookupsQuery.data?.subMoments.find((s) => s.id === subMomentId) : undefined;
+  const normalizedMomentName = normalizeActionName(selectedMoment?.name ?? "");
+  const normalizedSubMomentName = normalizeActionName(selectedSubMoment?.name ?? "");
+  const isTransitionRecoverySubMoment =
+    (normalizedSubMomentName.includes("recuperacao") &&
+      normalizedSubMomentName.includes("meio campo defensivo")) ||
+    (normalizedSubMomentName.includes("recuperacao") &&
+      normalizedSubMomentName.includes("meio campo ofensivo"));
+  const isOffensiveTransitionRecovery =
+    normalizedMomentName === "transicao ofensiva" && isTransitionRecoverySubMoment;
+
   const filteredActions = useMemo(() => {
     if (!subMomentId || !lookupsQuery.data) return [];
     return lookupsQuery.data.actions.filter((a) => {
       if (a.subMomentId !== subMomentId) return false;
       const normalized = normalizeActionName(a.name);
       if (hiddenActionNames.has(normalized)) return false;
+      if (isOffensiveTransitionRecovery && normalized === "espacos que atacam") return false;
       return true;
     });
-  }, [lookupsQuery.data, subMomentId]);
+  }, [lookupsQuery.data, subMomentId, isOffensiveTransitionRecovery]);
 
   const selectedActions = useMemo(
     () => filteredActions.filter((a) => actionIds.includes(a.id)),
@@ -1143,8 +1226,19 @@ const filteredChampionships = useMemo(() => {
     (name) => name.includes("livre") || name.includes("falta")
   );
   const hasPenaltyAction = normalizedSelectedActionNames.some((name) => name.includes("penal"));
+  const hasPreviousMomentAction = normalizedSelectedActionNames.some((name) => name.includes("momento anterior"));
   const hasCrossAction = normalizedSelectedActionNames.some((name) => name.includes("cruzamento"));
   const hasThrowInAction = normalizedSelectedActionNames.some((name) => name.includes("lancamento"));
+  const hasThrowInMarkerAction = normalizedSelectedActionNames.some(
+    (name) => name.includes("marcador") && name.includes("lancamento")
+  );
+  const hasReferencePlayersAction = normalizedSelectedActionNames.some((name) => name.includes("jogadores referencia"));
+  const hasFoulSufferedAction = normalizedSelectedActionNames.some(
+    (name) =>
+      name.includes("falta sobre") ||
+      name.includes("falta sofrida") ||
+      name.includes("sofreu a falta")
+  );
   const hasCornerMarkerAction = normalizedSelectedActionNames.some(
     (name) => name.includes("marcador") && name.includes("canto")
   );
@@ -1155,26 +1249,26 @@ const filteredChampionships = useMemo(() => {
   const requiresGoal = selectedActions.some((a) => a.name.toLowerCase().includes("marcador") || a.context === "field_goal");
   const requiresField = selectedActions.length > 0;
 
-  const selectedSubMoment = subMomentId ? lookupsQuery.data?.subMoments.find((s) => s.id === subMomentId) : undefined;
 
 
-  const subName = selectedSubMoment?.name.toLowerCase() ?? "";
+
+  const isCorner = normalizedSubMomentName.includes("canto");
 
 
-  const asciiSubName = subName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-  const isCorner = subName.includes("canto");
-
-
-  const isFreeKick = subName.includes("livre");
+  const isFreeKick = normalizedSubMomentName.includes("livre");
+  const isDirectFreekickSubMoment =
+    normalizedSubMomentName.includes("livre") &&
+    (normalizedSubMomentName.includes("direto") || normalizedSubMomentName.includes("directo"));
 
 
-  const isPenalty = subName.includes("penal") || subName.includes("penalty");
+  const isPenalty = normalizedSubMomentName.includes("penal") || normalizedSubMomentName.includes("penalty");
 
 
-  const isCross = selectedActions.some((a) => a.name.toLowerCase().includes("cruzamento"));
+  const isCross = hasCrossAction;
 
-  const isThrowIn = subName.includes("lançamento") || subName.includes("lancamento");
+  const isThrowIn = normalizedSubMomentName.includes("lancamento");
+  const shouldRequirePenaltyTaker = isPenalty || hasPenaltyAction;
+  const shouldShowPreviousMomentDescription = hasPreviousMomentAction && (isDirectFreekickSubMoment || isPenalty);
 
     const currentPlayers = playersQuery.data ?? [];
 
@@ -1189,7 +1283,7 @@ const filteredChampionships = useMemo(() => {
     if (!hasFreekickAction) {
       setFreekickProfile("");
     }
-    if (!hasPenaltyAction) {
+    if (!shouldRequirePenaltyTaker) {
       setPenaltyTakerId(undefined);
     }
     if (!hasCrossAction) {
@@ -1198,14 +1292,30 @@ const filteredChampionships = useMemo(() => {
     if (!hasThrowInAction) {
       setThrowInProfile("");
     }
+    if (!hasThrowInAction || !hasThrowInMarkerAction) {
+      setThrowInTakerId(undefined);
+    }
+    if (!hasReferencePlayersAction) {
+      setReferencePlayerId(undefined);
+    }
+    if (!hasFoulSufferedAction) {
+      setFoulSufferedById(undefined);
+    }
+    if (!shouldShowPreviousMomentDescription) {
+      setPreviousMomentDescription("");
+    }
   }, [
     hasCornerAction,
     hasCornerMarkerAction,
     hasFreekickAction,
     hasFreekickMarkerAction,
-    hasPenaltyAction,
+    shouldRequirePenaltyTaker,
     hasCrossAction,
-    hasThrowInAction
+    hasThrowInAction,
+    hasThrowInMarkerAction,
+    hasReferencePlayersAction,
+    hasFoulSufferedAction,
+    shouldShowPreviousMomentDescription
   ]);
 
 
@@ -1276,6 +1386,10 @@ const filteredChampionships = useMemo(() => {
     setFreekickTakerId(existingGoal.freekickTakerId ?? undefined);
     setPenaltyTakerId(existingGoal.penaltyTakerId ?? undefined);
     setCrossAuthorId(existingGoal.crossAuthorId ?? undefined);
+    setThrowInTakerId(existingGoal.throwInTakerId ?? undefined);
+    setReferencePlayerId(existingGoal.referencePlayerId ?? undefined);
+    setFoulSufferedById(existingGoal.foulSufferedById ?? undefined);
+    setPreviousMomentDescription(existingGoal.previousMomentDescription ?? "");
     setStep("season");
   }, [existingGoal]);
 
@@ -1429,10 +1543,19 @@ const filteredChampionships = useMemo(() => {
     (!hasFreekickMarkerAction || freekickTakerId) &&
 
 
-    (!hasPenaltyAction || penaltyTakerId) &&
+    (!shouldRequirePenaltyTaker || penaltyTakerId) &&
 
 
     (!hasCrossAction || crossAuthorId) &&
+
+
+    (!hasThrowInMarkerAction || throwInTakerId) &&
+
+
+    (!hasFoulSufferedAction || foulSufferedById) &&
+
+
+    (!shouldShowPreviousMomentDescription || previousMomentDescription.trim().length > 0) &&
 
 
     canNext("zone") &&
@@ -2362,6 +2485,60 @@ const filteredChampionships = useMemo(() => {
                     ))}
                   </div>
                 )}
+                {hasReferencePlayersAction && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Quem foi o jogador referência?</label>
+                    <Select
+                      value={referencePlayerId?.toString() ?? ""}
+                      onChange={(e) => setReferencePlayerId(e.target.value ? Number(e.target.value) : undefined)}
+                      disabled={!teamId || playersQuery.isLoading}
+                      className="bg-card/70 border-border/60 text-white"
+                    >
+                      <option value="">Selecionar jogador</option>
+                      {currentPlayers.map((p) => (
+                        <option key={p.id} value={p.id} className="text-black">
+                          {p.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+                {hasThrowInMarkerAction && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Quem efetuou o lançamento?</label>
+                    <Select
+                      value={throwInTakerId?.toString() ?? ""}
+                      onChange={(e) => setThrowInTakerId(e.target.value ? Number(e.target.value) : undefined)}
+                      disabled={!teamId || playersQuery.isLoading}
+                      className="bg-card/70 border-border/60 text-white"
+                    >
+                      <option value="">Selecionar jogador</option>
+                      {currentPlayers.map((p) => (
+                        <option key={p.id} value={p.id} className="text-black">
+                          {p.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
+                {hasFoulSufferedAction && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Quem sofreu a falta?</label>
+                    <Select
+                      value={foulSufferedById?.toString() ?? ""}
+                      onChange={(e) => setFoulSufferedById(e.target.value ? Number(e.target.value) : undefined)}
+                      disabled={!teamId || playersQuery.isLoading}
+                      className="bg-card/70 border-border/60 text-white"
+                    >
+                      <option value="">Selecionar jogador</option>
+                      {currentPlayers.map((p) => (
+                        <option key={p.id} value={p.id} className="text-black">
+                          {p.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
               </div>
 
 
@@ -2533,7 +2710,7 @@ const filteredChampionships = useMemo(() => {
               )}
 
 
-              {hasPenaltyAction && (
+              {shouldRequirePenaltyTaker && (
 
 
                 <div className="space-y-2">
@@ -2648,6 +2825,16 @@ const filteredChampionships = useMemo(() => {
                       </option>
                     ))}
                   </Select>
+                </div>
+              )}
+              {shouldShowPreviousMomentDescription && (
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-sm font-medium">Momento anterior</label>
+                  <Input
+                    value={previousMomentDescription}
+                    onChange={(e) => setPreviousMomentDescription(e.target.value)}
+                    placeholder="Descreve o momento anterior ao lance"
+                  />
                 </div>
               )}
               <div className="md:col-span-2 space-y-2">
@@ -2923,6 +3110,31 @@ const filteredChampionships = useMemo(() => {
                     ? selectedActions.map((action) => action.name).join(", ")
                     : "-"}
                 </span>
+                {hasReferencePlayersAction && (
+                  <>
+                    <span className="text-muted-foreground">Jogador referência</span>
+                    <span>{currentPlayers.find((p) => p.id === referencePlayerId)?.name ?? "-"}</span>
+                  </>
+                )}
+                {hasThrowInMarkerAction && (
+                  <>
+                    <span className="text-muted-foreground">Marcador do lançamento</span>
+                    <span>{currentPlayers.find((p) => p.id === throwInTakerId)?.name ?? "-"}</span>
+                  </>
+                )}
+
+                {hasFoulSufferedAction && (
+                  <>
+                    <span className="text-muted-foreground">Falta sobre</span>
+                    <span>{currentPlayers.find((p) => p.id === foulSufferedById)?.name ?? "-"}</span>
+                  </>
+                )}
+                {shouldShowPreviousMomentDescription && (
+                  <>
+                    <span className="text-muted-foreground">Momento anterior</span>
+                    <span>{previousMomentDescription || "-"}</span>
+                  </>
+                )}
 
                 <span className="text-muted-foreground">Saída do GR</span>
                 <span>{labelFromOption(goalkeeperOutlets, goalkeeperOutlet)}</span>

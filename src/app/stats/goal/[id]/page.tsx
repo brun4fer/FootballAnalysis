@@ -151,6 +151,10 @@ export default async function GoalDetail({ params }: { params: { id: string } })
   const hasFieldPoint = Boolean(goal.fieldDrawing);
 
   const involvements = goal.involvements ?? [];
+  const throwInTakerDisplay = goal.throwInTakerName ?? (goal.throwInTakerId ? `#${goal.throwInTakerId}` : null);
+  const referencePlayerName = goal.referencePlayerName ?? null;
+  const foulVictimName = goal.foulVictimName ?? goal.foulSufferedByName ?? null;
+  const previousMomentDescription = goal.previousMomentDescription ?? null;
 
 
 
@@ -210,7 +214,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
             ) : (
 
-              <div className="text-sm text-muted-foreground">Sem URL de ví­deo.</div>
+              <div className="text-sm text-muted-foreground">Sem URL de vídeo.</div>
 
             )}
 
@@ -303,6 +307,31 @@ export default async function GoalDetail({ params }: { params: { id: string } })
               <span className="text-muted-foreground">Assistência</span>
 
               <span>{goal.assistName ?? goal.assistId ?? "-"}</span>
+
+              {throwInTakerDisplay && (
+                <div className="col-span-2 grid grid-cols-2">
+                  <span className="text-muted-foreground">Marcador do lançamento</span>
+                  <span className="text-right font-medium">{throwInTakerDisplay}</span>
+                </div>
+              )}
+              {referencePlayerName && (
+                <div className="col-span-2 grid grid-cols-2">
+                  <span className="text-muted-foreground">Jogador Referência</span>
+                  <span className="text-right font-medium">{referencePlayerName}</span>
+                </div>
+              )}
+              {foulVictimName && (
+                <div className="col-span-2 grid grid-cols-2">
+                  <span className="text-muted-foreground">Falta sobre</span>
+                  <span className="text-right font-medium">{foulVictimName}</span>
+                </div>
+              )}
+              {previousMomentDescription && (
+                <div className="col-span-2 mt-2 border-t pt-2">
+                  <span className="text-muted-foreground mb-1 block text-xs uppercase">Momento Anterior</span>
+                  <p className="text-sm italic text-white/90">&apos;{previousMomentDescription}&apos;</p>
+                </div>
+              )}
 
               <span className="text-muted-foreground">Minuto</span>
 
@@ -427,4 +456,6 @@ export default async function GoalDetail({ params }: { params: { id: string } })
   );
 
 }
+
+
 
