@@ -59,9 +59,7 @@ export async function getGoalsByTeam(teamId: number) {
       cornerTakerId: goals.cornerTakerId,
       freekickTakerId: goals.freekickTakerId,
       penaltyTakerId: goals.penaltyTakerId,
-      crossAuthorId: goals.crossAuthorId,
-      foulSufferedById: goals.foulSufferedById,
-      previousMomentDescription: goals.previousMomentDescription
+      crossAuthorId: goals.crossAuthorId
     })
     .from(goals)
     .leftJoin(moments, eq(goals.momentId, moments.id))
