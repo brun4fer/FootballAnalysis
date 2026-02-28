@@ -1,4 +1,6 @@
-﻿import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
+import { NextResponse } from "next/server";
 import { getLookups } from "@/server/lookups";
 
 export async function GET() {

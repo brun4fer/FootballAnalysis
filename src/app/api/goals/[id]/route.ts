@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { getGoalById, updateGoal } from "@/server/goals";
 import { ZodError } from "zod";

@@ -1,4 +1,6 @@
-﻿import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
+import { NextResponse } from "next/server";
 import { listPlayers } from "@/server/catalog";
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {

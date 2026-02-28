@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { deleteSeason, updateSeason } from "@/server/admin";

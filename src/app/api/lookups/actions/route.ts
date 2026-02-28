@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { db } from "@/db/client";

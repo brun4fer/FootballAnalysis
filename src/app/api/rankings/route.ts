@@ -1,4 +1,6 @@
-﻿import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
+import { NextResponse } from "next/server";
 import { rankingsOverview, compareRankings } from "@/server/rankings";
 
 function parseIntParam(value: string | null, label: string) {

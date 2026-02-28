@@ -1,4 +1,6 @@
-﻿import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+
+import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { createGoal, getGoalsByTeam } from "@/server/goals";
 import { teamParamSchema } from "@/lib/validation";

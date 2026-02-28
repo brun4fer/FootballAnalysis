@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { getRadiography, type RadiographyBpoCategory } from "@/server/radiography";
 
