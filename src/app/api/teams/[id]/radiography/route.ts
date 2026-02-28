@@ -5,7 +5,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   const teamId = Number(params.id);
   if (Number.isNaN(teamId)) return NextResponse.json({ error: "Invalid team id" }, { status: 400 });
   try {
-    const url = new URL(_.url, "http://localhost");
+    const url = new URL(_.url);
     const rawMomentId = url.searchParams.get("momentId");
     let momentId: number | undefined;
     if (rawMomentId !== null && rawMomentId.trim() !== "") {
@@ -36,3 +36,4 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
+
