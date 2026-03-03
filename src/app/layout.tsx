@@ -17,7 +17,7 @@ const font = Space_Grotesk({
 
 export const metadata: Metadata = {
   title: "Football Analysis",
-  description: "Analise de golos para equipas tecnicas",
+  description: "Análise de golos para equipas técnicas",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

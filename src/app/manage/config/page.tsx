@@ -62,7 +62,7 @@ export default function ConfigPage() {
   const saveChamp = useMutation({
     mutationFn: async () => {
       const body = { ...champForm, seasonId: Number(champForm.seasonId) };
-      if (!body.seasonId) throw new Error("Ã‰poca obrigatÃ³ria");
+      if (!body.seasonId) throw new Error("Época obrigatória");
       if (editingChamp) {
         await fetchJson(`/api/manage/championships/${editingChamp}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       } else {
@@ -84,8 +84,8 @@ export default function ConfigPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold text-white">ConfiguraÃ§Ãµes</h1>
-        <p className="text-sm text-muted-foreground">GestÃ£o administrativa de Ã©pocas e campeonatos.</p>
+        <h1 className="text-2xl font-semibold text-white">Configurações</h1>
+        <p className="text-sm text-muted-foreground">Gestão administrativa de épocas e campeonatos.</p>
         <div className="flex flex-wrap gap-2">
           <Link href="/goals">
             <Button variant="secondary" size="sm" type="button">
@@ -96,7 +96,7 @@ export default function ConfigPage() {
       </div>
 
       <Card>
-        <CardHeader title={editingSeason ? "Atualizar Ã‰poca" : "Adicionar Ã‰poca"} description="Criar/editar Ã©pocas disponÃ­veis para campeonatos." />
+        <CardHeader title={editingSeason ? "Atualizar Época" : "Adicionar Época"} description="Criar/editar épocas disponíveis para campeonatos." />
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-1">
@@ -104,8 +104,8 @@ export default function ConfigPage() {
               <Input value={seasonForm.name} onChange={(e) => setSeasonForm({ ...seasonForm, name: e.target.value })} placeholder="2025/2026" />
             </div>
             <div className="md:col-span-2 space-y-1">
-              <label className="text-xs text-muted-foreground">DescriÃ§Ã£o</label>
-              <Input value={seasonForm.description} onChange={(e) => setSeasonForm({ ...seasonForm, description: e.target.value })} placeholder="Notas ou competiÃ§Ãµes" />
+              <label className="text-xs text-muted-foreground">Descrição</label>
+              <Input value={seasonForm.description} onChange={(e) => setSeasonForm({ ...seasonForm, description: e.target.value })} placeholder="Notas ou competições" />
             </div>
           </div>
           <div className="flex justify-end gap-2">
@@ -144,14 +144,14 @@ export default function ConfigPage() {
                 </div>
               ))
             ) : (
-              <div className="text-muted-foreground">Nenhuma Ã©poca registada.</div>
+              <div className="text-muted-foreground">Nenhuma época registada.</div>
             )}
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader title={editingChamp ? "Atualizar Campeonato" : "Adicionar Campeonato"} description="Associar campeonatos a Ã©pocas." />
+        <CardHeader title={editingChamp ? "Atualizar Campeonato" : "Adicionar Campeonato"} description="Associar campeonatos a épocas." />
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-4">
             <div className="space-y-1">
@@ -159,11 +159,11 @@ export default function ConfigPage() {
               <Input value={champForm.name} onChange={(e) => setChampForm({ ...champForm, name: e.target.value })} placeholder="Liga Portugal 2" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">PaÃ­s</label>
+              <label className="text-xs text-muted-foreground">País</label>
               <Input value={champForm.country} onChange={(e) => setChampForm({ ...champForm, country: e.target.value })} placeholder="Portugal" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Ã‰poca</label>
+              <label className="text-xs text-muted-foreground">Época</label>
               <Select value={champForm.seasonId} onChange={(e) => setChampForm({ ...champForm, seasonId: e.target.value })}>
                 <option value="">Selecionar</option>
                 {seasons.map((s) => (
@@ -195,7 +195,7 @@ export default function ConfigPage() {
                   <div className="flex flex-col">
                     <span className="font-medium text-white">{c.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {c.country} â€” {seasons.find((s) => s.id === c.seasonId)?.name ?? `Ã‰poca #${c.seasonId}`}
+                      {c.country} — {seasons.find((s) => s.id === c.seasonId)?.name ?? `Época #${c.seasonId}`}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">

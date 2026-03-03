@@ -1,7 +1,7 @@
 {
   "name": "Football Analysis Dashboard",
   "short_name": "FootballAnalysis",
-  "description": "Plataforma profissional de analise tatica e estatistica.",
+  "description": "Plataforma profissional de análise tática e estatística.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
