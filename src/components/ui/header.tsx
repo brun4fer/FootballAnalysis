@@ -13,8 +13,8 @@ export function Header() {
         <div className="flex items-center gap-2">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-400/70 to-emerald-500/70 shadow-lg shadow-emerald-500/30" />
           <div>
-            <div className="text-lg font-semibold tracking-tight">G.A.P. - Adversários</div>
-            {subtitle && <div className="text-xs text-muted-foreground">{subtitle}</div>}
+            <div className="text-lg font-semibold tracking-tight">G.A.P.</div>
+            <div className="text-xs text-muted-foreground">Adversários</div>
           </div>
         </div>
         <nav className="flex items-center gap-3 text-sm font-medium">
