@@ -4,7 +4,7 @@
 
 
 
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect, type ReactNode } from "react";
 
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -306,6 +306,15 @@ function StepIndicator({ current }: { current: StepId }) {
 }
 
 
+const mapSurfaceClass =
+  "rounded-2xl border border-border/80 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 shadow-[0_0_40px_rgba(0,0,0,0.4)]";
+const mapSvgClass = "w-full aspect-[3/2] max-h-[360px] cursor-crosshair touch-none";
+const mapStepContainerClass = "space-y-3 min-h-[620px] md:min-h-[700px]";
+
+function InteractiveMapFrame({ children }: { children: ReactNode }) {
+  return <div className={mapSurfaceClass}>{children}</div>;
+}
+
 function GoalNetPinpoint({ value, onChange }: { value: Point | null; onChange: (pt: Point) => void }) {
 
 
@@ -390,7 +399,7 @@ function GoalNetPinpoint({ value, onChange }: { value: Point | null; onChange: (
     <div className="space-y-2">
 
 
-      <div className="rounded-2xl border border-border/80 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 shadow-[0_0_40px_rgba(0,0,0,0.4)]">
+      <InteractiveMapFrame>
 
 
         <svg
@@ -402,7 +411,7 @@ function GoalNetPinpoint({ value, onChange }: { value: Point | null; onChange: (
           viewBox="0 0 120 80"
 
 
-          className="h-[260px] w-full cursor-crosshair touch-none"
+          className={mapSvgClass}
 
 
           onPointerDown={handleClick}
@@ -459,7 +468,7 @@ function GoalNetPinpoint({ value, onChange }: { value: Point | null; onChange: (
         </svg>
 
 
-      </div>
+      </InteractiveMapFrame>
 
 
       <p className="text-xs text-muted-foreground">Clique para colocar a bola em qualquer ponto da baliza.</p>
@@ -477,7 +486,15 @@ function GoalNetPinpoint({ value, onChange }: { value: Point | null; onChange: (
 
 
 
-function PitchPinpoint({ value, onChange }: { value: Point | null; onChange: (pt: Point) => void }) {
+function PitchPinpoint({
+  value,
+  onChange,
+  storageField
+}: {
+  value: Point | null;
+  onChange: (pt: Point) => void;
+  storageField: "assist_drawing" | "field_drawing";
+}) {
 
 
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -522,7 +539,7 @@ function PitchPinpoint({ value, onChange }: { value: Point | null; onChange: (pt
   const ball = value ? (
 
 
-    <g transform={`translate(${value.x * 105}, ${value.y * 68})`}>
+    <g transform={`translate(${value.x * 120}, ${value.y * 80})`}>
 
 
       <circle r="3.8" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
@@ -549,7 +566,7 @@ function PitchPinpoint({ value, onChange }: { value: Point | null; onChange: (pt
     <div className="space-y-2">
 
 
-      <div className="rounded-2xl border border-border/70 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-3 shadow-[0_10px_60px_rgba(0,0,0,0.4)]">
+      <InteractiveMapFrame>
 
 
         <svg
@@ -558,10 +575,10 @@ function PitchPinpoint({ value, onChange }: { value: Point | null; onChange: (pt
           ref={svgRef}
 
 
-          viewBox="0 0 105 68"
+          viewBox="0 0 120 80"
 
 
-          className="h-[340px] w-full cursor-crosshair touch-none"
+          className={mapSvgClass}
 
 
           onPointerDown={handleClick}
@@ -570,37 +587,56 @@ function PitchPinpoint({ value, onChange }: { value: Point | null; onChange: (pt
         >
 
 
-          <rect x="1" y="1" width="103" height="66" rx="8" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
+          <rect x="4" y="6" width="112" height="68" rx="6" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
 
 
-          <rect x="1" y="1" width="103" height="66" rx="8" stroke="rgba(103,232,249,0.35)" strokeWidth="0.8" strokeDasharray="4 4" fill="none" />
+          <rect x="8" y="10" width="104" height="60" rx="4" fill="url(#pitchGradient)" stroke="rgba(148,163,184,0.35)" strokeWidth="0.8" />
 
 
-          <line x1="52.5" y1="1" x2="52.5" y2="67" stroke="rgba(148,163,184,0.35)" strokeDasharray="3 3" />
+          <line x1="60" y1="10" x2="60" y2="70" stroke="rgba(148,163,184,0.35)" strokeWidth="0.8" strokeDasharray="3 3" />
 
 
-          <circle cx="52.5" cy="34" r="9.15" stroke="rgba(148,163,184,0.35)" fill="none" />
+          <circle cx="60" cy="40" r="9" stroke="rgba(148,163,184,0.35)" strokeWidth="0.8" fill="none" />
 
 
-          <rect x="1" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
+          <circle cx="60" cy="40" r="0.9" fill="rgba(148,163,184,0.65)" />
 
 
-          <rect x="90" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
+          <rect x="8" y="22" width="16" height="36" fill="none" stroke="rgba(148,163,184,0.38)" strokeWidth="0.8" />
+          <rect x="8" y="29" width="7" height="22" fill="none" stroke="rgba(148,163,184,0.38)" strokeWidth="0.8" />
+          <circle cx="20" cy="40" r="0.8" fill="rgba(148,163,184,0.65)" />
+
+
+          <rect x="96" y="22" width="16" height="36" fill="none" stroke="rgba(148,163,184,0.38)" strokeWidth="0.8" />
+          <rect x="105" y="29" width="7" height="22" fill="none" stroke="rgba(148,163,184,0.38)" strokeWidth="0.8" />
+          <circle cx="100" cy="40" r="0.8" fill="rgba(148,163,184,0.65)" />
+
+
+          <path d="M24 33a9 9 0 0 0 0 14" fill="none" stroke="rgba(148,163,184,0.28)" strokeWidth="0.8" />
+          <path d="M96 33a9 9 0 0 1 0 14" fill="none" stroke="rgba(148,163,184,0.28)" strokeWidth="0.8" />
 
 
           {ball}
 
 
+          <defs>
+            <linearGradient id="pitchGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(2,6,23,0.85)" />
+              <stop offset="100%" stopColor="rgba(3,18,35,0.92)" />
+            </linearGradient>
+          </defs>
+
+
         </svg>
 
 
-      </div>
+      </InteractiveMapFrame>
 
 
       <p className="text-xs text-muted-foreground">
 
 
-        Apenas um ponto é guardado em <code className="font-mono text-emerald-300">field_drawing</code> com coordenadas normalizadas (0-1).
+        Apenas um ponto é guardado em <code className="font-mono text-emerald-300">{storageField}</code> com coordenadas normalizadas (0-1).
 
 
       </p>
@@ -2883,7 +2919,7 @@ const filteredChampionships = useMemo(() => {
           {step === "assist" && (
 
 
-            <div className="space-y-3">
+            <div className={mapStepContainerClass}>
 
 
               <div className="flex items-center justify-between">
@@ -2900,7 +2936,7 @@ const filteredChampionships = useMemo(() => {
               </div>
 
 
-              <PitchPinpoint value={assistDrawingPoint} onChange={setAssistDrawingPoint} />
+              <PitchPinpoint value={assistDrawingPoint} onChange={setAssistDrawingPoint} storageField="assist_drawing" />
 
 
             </div>
@@ -2915,7 +2951,7 @@ const filteredChampionships = useMemo(() => {
           {step === "zone" && (
 
 
-            <div className="space-y-3">
+            <div className={mapStepContainerClass}>
 
 
               <div className="flex items-center justify-between">
@@ -2957,7 +2993,7 @@ const filteredChampionships = useMemo(() => {
           {step === "field" && (
 
 
-            <div className="space-y-3">
+            <div className={mapStepContainerClass}>
 
 
               <div className="flex items-center justify-between">
@@ -2978,7 +3014,7 @@ const filteredChampionships = useMemo(() => {
               </div>
 
 
-              <PitchPinpoint value={fieldPoint} onChange={setFieldPoint} />
+              <PitchPinpoint value={fieldPoint} onChange={setFieldPoint} storageField="field_drawing" />
 
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2 rounded-xl border border-border/60 bg-card/40 p-3">

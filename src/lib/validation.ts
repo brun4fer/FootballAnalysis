@@ -24,45 +24,65 @@ const setPieceProfile = z.enum(["fechado", "aberto", "combinado"]);
 const throwProfile = z.enum(["area", "organizacao"]);
 const outletProfile = z.enum(["organizacao", "curto_para_longo", "bola_longa"]);
 
-export const goalInputSchema = z.object({
-  opponentTeamId: z.number().int().positive(),
-  teamId: z.number().int().positive(),
-  scorerId: z.number().int().positive(),
-  assistId: z.number().int().positive().optional().nullable(),
-  minute: z.number().int().min(0).max(130),
-  momentId: z.number().int().positive(),
-  subMomentId: z.number().int().positive(),
-  actionIds: z.array(z.number().int().positive()).min(1),
-  cornerTakerId: z.number().int().positive().optional().nullable(),
-  freekickTakerId: z.number().int().positive().optional().nullable(),
-  penaltyTakerId: z.number().int().positive().optional().nullable(),
-  crossAuthorId: z.number().int().positive().optional().nullable(),
-  throwInTakerId: z.number().int().positive().optional().nullable(),
-  referencePlayerId: z.number().int().positive().optional().nullable(),
-  foulSufferedById: z.number().int().positive().optional().nullable(),
-  previousMomentDescription: z.string().optional().or(z.literal("")).nullable(),
-  goalCoordinates: pointSchema.optional().nullable(),
-  videoPath: z.string().optional().or(z.literal("")).nullable(),
-  fieldDrawing: fieldDrawingSchema.optional(),
-  assistCoordinates: zoneMarkerSchema.optional().nullable(),
-  assistDrawing: pointSchema.optional().nullable(),
-  buildUpPhase: z.string().optional().or(z.literal("")),
-  creationPhase: z.string().optional().or(z.literal("")),
-  finalizationPhase: z.string().optional().or(z.literal("")),
-  cornerProfile: setPieceProfile.optional().nullable(),
-  freekickProfile: setPieceProfile.optional().nullable(),
-  throwInProfile: throwProfile.optional().nullable(),
-  goalkeeperOutlet: outletProfile.optional().nullable(),
-  notes: z.string().optional().or(z.literal("")),
-  involvements: z
-    .array(
-      z.object({
-        playerId: z.number().int().positive(),
-        role: roleEnum
-      })
-    )
-    .optional()
-});
+const normalizeToken = (value?: string | null) =>
+  (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+export const goalInputSchema = z
+  .object({
+    opponentTeamId: z.number().int().positive(),
+    teamId: z.number().int().positive(),
+    scorerId: z.number().int().positive(),
+    assistId: z.number().int().positive().optional().nullable(),
+    minute: z.number().int().min(0).max(130),
+    momentId: z.number().int().positive(),
+    momentName: z.string().optional().nullable(),
+    subMomentId: z.number().int().positive(),
+    actionIds: z.array(z.number().int().positive()).min(1),
+    cornerTakerId: z.number().int().positive().optional().nullable(),
+    freekickTakerId: z.number().int().positive().optional().nullable(),
+    penaltyTakerId: z.number().int().positive().optional().nullable(),
+    crossAuthorId: z.number().int().positive().optional().nullable(),
+    throwInTakerId: z.number().int().positive().optional().nullable(),
+    referencePlayerId: z.number().int().positive().optional().nullable(),
+    foulSufferedById: z.number().int().positive().optional().nullable(),
+    previousMomentDescription: z.string().optional().or(z.literal("")).nullable(),
+    goalCoordinates: pointSchema.optional().nullable(),
+    videoPath: z.string().optional().or(z.literal("")).nullable(),
+    fieldDrawing: fieldDrawingSchema.optional(),
+    assistCoordinates: zoneMarkerSchema.optional().nullable(),
+    assistDrawing: pointSchema.optional().nullable(),
+    transitionDrawing: pointSchema.optional().nullable(),
+    buildUpPhase: z.string().optional().or(z.literal("")),
+    creationPhase: z.string().optional().or(z.literal("")),
+    finalizationPhase: z.string().optional().or(z.literal("")),
+    cornerProfile: setPieceProfile.optional().nullable(),
+    freekickProfile: setPieceProfile.optional().nullable(),
+    throwInProfile: throwProfile.optional().nullable(),
+    goalkeeperOutlet: outletProfile.optional().nullable(),
+    notes: z.string().optional().or(z.literal("")),
+    involvements: z
+      .array(
+        z.object({
+          playerId: z.number().int().positive(),
+          role: roleEnum
+        })
+      )
+      .optional()
+  })
+  .superRefine((value, ctx) => {
+    const isTransitionMoment = normalizeToken(value.momentName).includes("transicao ofensiva");
+    if (isTransitionMoment && !value.transitionDrawing) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["transitionDrawing"],
+        message: "transitionDrawing obrigatorio para Transicao Ofensiva"
+      });
+    }
+  });
 
 export const teamParamSchema = z.object({ teamId: z.coerce.number().int().positive() });
 

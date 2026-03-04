@@ -103,17 +103,11 @@ const cleanDataset = <T extends Record<string, any>>(data: T[], labelKey: keyof 
     .filter((entry): entry is T => entry !== null);
 };
 
-const aggregateZones = (zones: Array<{ sector?: string | null }>) => {
-  const counts = new Map<string, number>();
-  zones.forEach((zone) => {
-    const label = formatTechnicalLabel(zone.sector);
-    if (!label) return;
-    counts.set(label, (counts.get(label) ?? 0) + 1);
-  });
-  return Array.from(counts.entries()).map(([label, goals]) => ({ label, goals }));
-};
-
 const EMPTY_GRAPH_MESSAGE = "Não há golos desta maneira";
+const MAP_CARD_CONTENT_CLASS = "min-h-[300px] w-full px-0 py-0";
+const MAP_WRAPPER_CLASS =
+  "relative overflow-hidden rounded-2xl border border-border/70 bg-[#0c1322] p-4 shadow-[0_20px_80px_rgba(0,0,0,0.35)]";
+const MAP_SVG_CLASS = "w-full aspect-[3/2]";
 
 function EmptyGraphState() {
   return (
@@ -203,8 +197,8 @@ function GoalEntryMap({ points }: { points: MapPoint[] }) {
   if (!pins.length) return <EmptyGraphState />;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-[#0c1322] p-4" onMouseLeave={() => setTooltip(null)}>
-      <svg ref={svgRef} viewBox="0 0 120 80" className="w-full" preserveAspectRatio="xMidYMid meet">
+    <div className={MAP_WRAPPER_CLASS} onMouseLeave={() => setTooltip(null)}>
+      <svg ref={svgRef} viewBox="0 0 120 80" className={MAP_SVG_CLASS} preserveAspectRatio="xMidYMid meet">
         <rect x="4" y="6" width="112" height="68" rx="6" fill="#0b1220" stroke="#1f2937" strokeWidth="1.4" />
         <rect x="8" y="10" width="104" height="60" rx="5" fill="url(#goalGrid)" stroke="#0ea5e9" strokeWidth="0.6" strokeDasharray="4 3" />
         <path d="M8 22h104M8 36h104M8 50h104M8 64h104" stroke="rgba(226,232,240,0.18)" strokeWidth="0.6" />
@@ -248,7 +242,13 @@ function GoalEntryMap({ points }: { points: MapPoint[] }) {
   );
 }
 
-function FieldPinMap({ points }: { points: MapPoint[] }) {
+function FieldPinMap({
+  points,
+  pinColor
+}: {
+  points: MapPoint[];
+  pinColor: "#22c55e" | "#38bdf8";
+}) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const pins = points.filter((point) => typeof point.x === "number" && typeof point.y === "number");
@@ -256,16 +256,24 @@ function FieldPinMap({ points }: { points: MapPoint[] }) {
   if (!pins.length) return <EmptyGraphState />;
 
   return (
-    <div className="relative h-[260px] overflow-hidden rounded-2xl border border-border/70 bg-[#0a1321]" onMouseLeave={() => setTooltip(null)}>
-      <svg ref={svgRef} viewBox="0 0 100 100" className="h-full w-full" preserveAspectRatio="none">
-        <rect x="2" y="2" width="96" height="96" rx="4" fill="#10263a" stroke="#32556f" strokeWidth="1.2" />
-        <rect x="8" y="8" width="84" height="84" rx="3" fill="none" stroke="rgba(226,232,240,0.3)" strokeWidth="0.8" />
-        <path d="M50 8v84M8 50h84" stroke="rgba(226,232,240,0.25)" strokeWidth="0.8" />
-        <circle cx="50" cy="50" r="10" fill="none" stroke="rgba(226,232,240,0.25)" strokeWidth="0.8" />
+    <div className={MAP_WRAPPER_CLASS} onMouseLeave={() => setTooltip(null)}>
+      <svg ref={svgRef} viewBox="0 0 120 80" className={MAP_SVG_CLASS} preserveAspectRatio="xMidYMid meet">
+        <rect x="4" y="6" width="112" height="68" rx="6" fill="#0b1220" stroke="rgba(148,163,184,0.4)" strokeWidth="1.2" />
+        <line x1="60" y1="6" x2="60" y2="74" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
+        <circle cx="60" cy="40" r="9" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
+        <circle cx="60" cy="40" r="0.9" fill="rgba(148,163,184,0.65)" />
+        <rect x="4" y="22" width="16" height="36" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
+        <rect x="4" y="29" width="7" height="22" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
+        <circle cx="16" cy="40" r="0.8" fill="rgba(148,163,184,0.65)" />
+        <rect x="100" y="22" width="16" height="36" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
+        <rect x="109" y="29" width="7" height="22" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
+        <circle cx="104" cy="40" r="0.8" fill="rgba(148,163,184,0.65)" />
+        <path d="M20 33a9 9 0 0 0 0 14" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
+        <path d="M100 33a9 9 0 0 1 0 14" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
         {pins.map((pin, idx) => (
           <g
             key={`${pin.x}-${pin.y}-${idx}`}
-            transform={`translate(${(pin.x ?? 0) * 100}, ${(pin.y ?? 0) * 100})`}
+            transform={`translate(${(pin.x ?? 0) * 120}, ${(pin.y ?? 0) * 80})`}
             onMouseEnter={(event) => {
               const rect = svgRef.current?.getBoundingClientRect();
               if (!rect) return;
@@ -279,7 +287,7 @@ function FieldPinMap({ points }: { points: MapPoint[] }) {
           >
             <circle r="3.7" fill="transparent" />
             <circle r="2.2" fill="#f8fafc" stroke="#0f172a" strokeWidth="0.5" />
-            <circle r="1.1" fill="#f97316" />
+            <circle r="1.1" fill={pinColor} />
           </g>
         ))}
       </svg>
@@ -414,14 +422,6 @@ export default function RadiographyPanel({
     () => cleanDataset(radiography?.distribution ?? [], "category", "goals"),
     [radiography?.distribution]
   );
-  const finishZoneCounts = useMemo(
-    () => cleanDataset(aggregateZones(radiography?.finishZones ?? []), "label", "goals"),
-    [radiography?.finishZones]
-  );
-  const assistZoneCounts = useMemo(
-    () => cleanDataset(aggregateZones(radiography?.assistZones ?? []), "label", "goals"),
-    [radiography?.assistZones]
-  );
   const buildUpPhases = useMemo(
     () => cleanDataset(radiography?.buildUpPhases ?? [], "phase", "goals"),
     [radiography?.buildUpPhases]
@@ -433,10 +433,6 @@ export default function RadiographyPanel({
   const finalizationPhases = useMemo(
     () => cleanDataset(radiography?.finalizationPhases ?? [], "phase", "goals"),
     [radiography?.finalizationPhases]
-  );
-  const goalkeeperOutlets = useMemo(
-    () => cleanDataset(radiography?.goalkeeperOutlets ?? [], "outlet", "goals"),
-    [radiography?.goalkeeperOutlets]
   );
   const cornerProfiles = useMemo(
     () => cleanDataset(radiography?.cornerProfiles ?? [], "profile", "goals"),
@@ -579,28 +575,15 @@ export default function RadiographyPanel({
               />
             </div>
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4">
               <Card className="bg-[#0c1420]/70 border border-border/60">
                 <CardHeader
-                  title="Distribuição por momentos"
+                  title="Momentos de Jogo"
                   description="Organização, transição e bola parada"
                 />
-                <CardContent className="min-h-[260px]">
+                <CardContent className="min-h-[300px]">
                   {distribution.length > 0 ? (
                     <SimplePie data={distribution} labelKey="category" valueKey="goals" />
-                  ) : (
-                    <EmptyGraphState />
-                  )}
-                </CardContent>
-              </Card>
-              <Card className="bg-[#0c1420]/70 border border-border/60">
-                <CardHeader
-                  title="Saída do GR"
-                  description="Curto para longo, bola longa e organização"
-                />
-                <CardContent className="min-h-[260px]">
-                  {goalkeeperOutlets.length > 0 ? (
-                    <SimplePie data={goalkeeperOutlets} labelKey="outlet" valueKey="goals" />
                   ) : (
                     <EmptyGraphState />
                   )}
@@ -611,37 +594,50 @@ export default function RadiographyPanel({
 
           {isSpecificFilterActive ? (
             <>
-              <Card className="bg-[#0c1420]/70 border border-border/60">
-                <CardHeader
-                  title="Mapa da Baliza"
-                  description={`Ponto de entrada na baliza · ${selectedFilterLabel}`}
-                />
-                <CardContent className="min-h-[260px]">
-                  <GoalEntryMap points={goalEntryPoints} />
-                </CardContent>
-              </Card>
-
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 lg:grid-cols-3">
+                <Card className="bg-[#0c1420]/70 border border-border/60">
+                  <CardHeader title="Mapa da Baliza" />
+                  <CardContent className={MAP_CARD_CONTENT_CLASS}>
+                    <GoalEntryMap points={goalEntryPoints} />
+                  </CardContent>
+                </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">
                   <CardHeader title="Mapa de remate" />
-                  <CardContent className="min-h-[260px] w-full px-0 py-0">
-                    <FieldPinMap points={shotZonePoints} />
+                  <CardContent className={MAP_CARD_CONTENT_CLASS}>
+                    <FieldPinMap points={shotZonePoints} pinColor="#22c55e" />
                   </CardContent>
                 </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">
                   <CardHeader title="Zonas de assistência" />
-                  <CardContent className="min-h-[260px] w-full px-0 py-0">
-                    {assistZoneCounts.length > 0 ? (
-                      <SimpleBar data={assistZoneCounts} xKey="label" yKey="goals" yAxisWidth={180} />
-                    ) : (
-                      <EmptyGraphState />
-                    )}
+                  <CardContent className={MAP_CARD_CONTENT_CLASS}>
+                    <FieldPinMap points={assistZonePoints} pinColor="#38bdf8" />
                   </CardContent>
                 </Card>
               </div>
             </>
           ) : (
             <>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <Card className="bg-[#0c1420]/70 border border-border/60">
+                  <CardHeader title="Mapa da Baliza" />
+                  <CardContent className={MAP_CARD_CONTENT_CLASS}>
+                    <GoalEntryMap points={goalEntryPoints} />
+                  </CardContent>
+                </Card>
+                <Card className="bg-[#0c1420]/70 border border-border/60">
+                  <CardHeader title="Mapa de remate" />
+                  <CardContent className={MAP_CARD_CONTENT_CLASS}>
+                    <FieldPinMap points={shotZonePoints} pinColor="#22c55e" />
+                  </CardContent>
+                </Card>
+                <Card className="bg-[#0c1420]/70 border border-border/60">
+                  <CardHeader title="Zonas de assistência" />
+                  <CardContent className={MAP_CARD_CONTENT_CLASS}>
+                    <FieldPinMap points={assistZonePoints} pinColor="#38bdf8" />
+                  </CardContent>
+                </Card>
+              </div>
+
               <div className="grid gap-4 lg:grid-cols-3">
                 <Card className="bg-[#0c1420]/70 border border-border/60">
                   <CardHeader title="Top Marcadores" />
@@ -674,35 +670,6 @@ export default function RadiographyPanel({
                       valueKey="involvement"
                       valueLabel="Part."
                     />
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-3">
-                <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Mapa de remate" />
-                  <CardContent className="min-h-[260px] w-full px-0 py-0">
-                    <FieldPinMap points={shotZonePoints} />
-                  </CardContent>
-                </Card>
-                <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Zonas de assistência" />
-                  <CardContent className="min-h-[260px] w-full px-0 py-0">
-                    {assistZoneCounts.length > 0 ? (
-                      <SimpleBar data={assistZoneCounts} xKey="label" yKey="goals" yAxisWidth={180} />
-                    ) : (
-                      <EmptyGraphState />
-                    )}
-                  </CardContent>
-                </Card>
-                <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Zonas de finalização" />
-                  <CardContent className="min-h-[260px] w-full px-0 py-0">
-                    {finishZoneCounts.length > 0 ? (
-                      <SimpleBar data={finishZoneCounts} xKey="label" yKey="goals" />
-                    ) : (
-                      <EmptyGraphState />
-                    )}
                   </CardContent>
                 </Card>
               </div>

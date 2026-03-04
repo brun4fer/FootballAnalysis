@@ -30,9 +30,10 @@ async function hasGoalsColumn(columnName: string) {
   }
 }
 
-async function ensureGoalsAssistDrawingColumn() {
+async function ensureGoalsDrawingColumns() {
   try {
     await db.execute(sql`ALTER TABLE "goals" ADD COLUMN IF NOT EXISTS "assist_drawing" jsonb`);
+    await db.execute(sql`ALTER TABLE "goals" ADD COLUMN IF NOT EXISTS "transition_drawing" jsonb`);
   } catch {
     // Se não for possível alterar schema em runtime, o fluxo segue e o erro original será devolvido no insert/update.
   }
@@ -71,6 +72,10 @@ async function normalizeGoalPayload(payload: RawGoalPayload) {
     payload?.assistDrawing && typeof payload.assistDrawing === "object"
       ? JSON.parse(JSON.stringify(payload.assistDrawing))
       : assistDrawingFromCoordinates;
+  const transitionDrawing =
+    payload?.transitionDrawing && typeof payload.transitionDrawing === "object"
+      ? JSON.parse(JSON.stringify(payload.transitionDrawing))
+      : payload?.transitionDrawing ?? null;
 
   const actionIdsRaw = Array.isArray(payload?.actionIds)
     ? payload.actionIds
@@ -89,12 +94,16 @@ async function normalizeGoalPayload(payload: RawGoalPayload) {
     goalZoneId: null,
     fieldDrawing,
     assistCoordinates,
-    assistDrawing
+    assistDrawing,
+    transitionDrawing
   };
 }
 
 export async function getGoalsByTeam(teamId: number) {
-  const supportsAssistDrawing = await hasGoalsColumn("assist_drawing");
+  const [supportsAssistDrawing, supportsTransitionDrawing] = await Promise.all([
+    hasGoalsColumn("assist_drawing"),
+    hasGoalsColumn("transition_drawing")
+  ]);
   const rows = await db
     .select({
       id: goals.id,
@@ -107,6 +116,7 @@ export async function getGoalsByTeam(teamId: number) {
       fieldDrawing: goals.fieldDrawing,
       goalCoordinates: goals.goalCoordinates,
       assistDrawing: supportsAssistDrawing ? goals.assistDrawing : sql<null>`null`,
+      transitionDrawing: supportsTransitionDrawing ? goals.transitionDrawing : sql<null>`null`,
       moment: moments.name,
       subMoment: subMoments.name,
       action: actions.name,
@@ -207,7 +217,10 @@ export async function getGoalsByTeam(teamId: number) {
 }
 
 export async function getGoalById(goalId: number) {
-  const supportsAssistDrawing = await hasGoalsColumn("assist_drawing");
+  const [supportsAssistDrawing, supportsTransitionDrawing] = await Promise.all([
+    hasGoalsColumn("assist_drawing"),
+    hasGoalsColumn("transition_drawing")
+  ]);
   const assistPlayer = alias(players, "assist_player");
   const cornerTaker = alias(players, "corner_taker");
   const freekickTaker = alias(players, "freekick_taker");
@@ -236,6 +249,7 @@ export async function getGoalById(goalId: number) {
       goalCoordinates: goals.goalCoordinates,
       assistCoordinates: goals.assistCoordinates,
       assistDrawing: supportsAssistDrawing ? goals.assistDrawing : sql<null>`null`,
+      transitionDrawing: supportsTransitionDrawing ? goals.transitionDrawing : sql<null>`null`,
       buildUpPhase: goals.buildUpPhase,
       creationPhase: goals.creationPhase,
       finalizationPhase: goals.finalizationPhase,
@@ -349,7 +363,7 @@ export async function getGoalById(goalId: number) {
 }
 
 export async function createGoal(payload: unknown) {
-  await ensureGoalsAssistDrawingColumn();
+  await ensureGoalsDrawingColumns();
   const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
   const parsed = goalInputSchema.parse(normalized);
   const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing] = await Promise.all([
@@ -548,7 +562,7 @@ export async function createGoal(payload: unknown) {
 }
 
 export async function updateGoal(id: number, payload: unknown) {
-  await ensureGoalsAssistDrawingColumn();
+  await ensureGoalsDrawingColumns();
   const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
   const parsed = goalInputSchema.parse(normalized);
   const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing] = await Promise.all([

@@ -7,12 +7,22 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { SimpleBar, SimplePie } from "@/components/ui/charts";
+import { SimpleBar } from "@/components/ui/charts";
 import { FileText, PlayCircle, X, Eye } from "lucide-react";
 import { useAppContext } from "@/components/ui/app-context";
 import { GoalWizard } from "../goals/goal-wizard";
 
-type Team = { id: number; name: string; championshipId?: number | null; radiographyPdfUrl?: string | null; videoReportUrl?: string | null; emblemPath?: string | null };
+type Team = {
+  id: number;
+  name: string;
+  championshipId?: number | null;
+  radiographyPdfUrl?: string | null;
+  videoReportUrl?: string | null;
+  emblemPath?: string | null;
+  coach?: string | null;
+  stadium?: string | null;
+  pitchDimensions?: string | null;
+};
 type Season = { id: number; name: string };
 type Championship = { id: number; name: string; seasonId: number };
 type GoalEvent = {
@@ -33,17 +43,15 @@ const fetcher = async <T,>(url: string): Promise<T> => {
   return res.json();
 };
 
-function StatTile({ title, value, hint }: { title: string; value: string | number; hint?: string }) {
-  return (
-    <Card className="bg-gradient-to-br from-slate-900/70 via-slate-900/50 to-emerald-900/20">
-      <CardHeader title={title} />
-      <CardContent className="space-y-1">
-        <div className="text-3xl font-semibold text-white">{value}</div>
-        {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
-      </CardContent>
-    </Card>
-  );
-}
+const getInitials = (value?: string | null) => {
+  if (!value) return "TR";
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+};
 
 function GoalNetPinMap({ goals }: { goals: GoalEvent[] }) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; minute: number } | null>(null);
@@ -161,43 +169,34 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
     queryFn: () => fetcher<Array<{ id: number; name: string; goals: number; assists: number }>>(`/api/stats/top-scorers?teamId=${teamId}`)
   });
 
-  const involvementQuery = useQuery({
-    queryKey: ["involvement", teamId],
-    enabled: Boolean(teamId),
-    queryFn: () => fetcher<Array<{ id: number; name: string; involvement: number }>>(`/api/stats/involvement?teamId=${teamId}`)
-  });
-
   const momentsQuery = useQuery({
     queryKey: ["moments", teamId],
     enabled: Boolean(teamId),
     queryFn: () => fetcher<Array<{ moment: string; goals: number }>>(`/api/stats/moments?teamId=${teamId}`)
   });
 
-  const actionsQuery = useQuery({
-    queryKey: ["actions", teamId],
-    enabled: Boolean(teamId),
-    queryFn: () => fetcher<Array<{ action: string; goals: number }>>(`/api/stats/actions?teamId=${teamId}`)
-  });
-
-  const penaltiesQuery = useQuery({
-    queryKey: ["penalties", teamId],
-    enabled: Boolean(teamId),
-    queryFn: () => fetcher<Array<{ zone: string; goals: number }>>(`/api/stats/penalties-by-zone?teamId=${teamId}`)
-  });
-
   const totalGoals = goalsQuery.data?.length ?? 0;
-  const penaltyGoals = penaltiesQuery.data?.reduce((sum, row) => sum + row.goals, 0) ?? 0;
-  const openPlayGoals = Math.max(0, totalGoals - penaltyGoals);
-  const topScorer = topScorersQuery.data?.[0];
-  const mostInvolved = involvementQuery.data?.[0];
+  const topScorers = topScorersQuery.data ?? [];
+  const topScorer = topScorers.reduce<{ id: number; name: string; goals: number; assists: number } | null>(
+    (best, current) => (!best || current.goals > best.goals ? current : best),
+    null
+  );
+  const topAssistant = topScorers.reduce<{ id: number; name: string; goals: number; assists: number } | null>(
+    (best, current) => (!best || current.assists > best.assists ? current : best),
+    null
+  );
+  const topParticipation = topScorers.reduce<{ id: number; name: string; participations: number } | null>((best, current) => {
+    const participations = (current.goals ?? 0) + (current.assists ?? 0);
+    if (!best || participations > best.participations) {
+      return { id: current.id, name: current.name, participations };
+    }
+    return best;
+  }, null);
 
   const refreshAll = () => {
     goalsQuery.refetch();
     topScorersQuery.refetch();
-    involvementQuery.refetch();
     momentsQuery.refetch();
-    actionsQuery.refetch();
-    penaltiesQuery.refetch();
   };
 
   const goalEvents = useMemo(() => goalsQuery.data ?? [], [goalsQuery.data]);
@@ -326,11 +325,90 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
             </Button>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
-            <StatTile title="Total de Golos" value={totalGoals} hint={`${goalEvents.length} registos de golo`} />
-            <StatTile title="Bola Corrida" value={openPlayGoals} hint={`${penaltyGoals} de penálti`} />
-            <StatTile title="Melhor Marcador" value={topScorer ? topScorer.name : "—"} hint={topScorer ? `${topScorer.goals} G / ${topScorer.assists} A` : "Sem golos"} />
-            <StatTile title="Mais Interveniente" value={mostInvolved ? mostInvolved.name : "—"} hint={mostInvolved ? `${mostInvolved.involvement} participações` : "A aguardar dados"} />
+          <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-5">
+              <Card className="border-border/60 bg-slate-900/55">
+                <CardHeader title="Emblema da Equipa" />
+                <CardContent className="flex items-center gap-3">
+                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-slate-800/60">
+                    {selectedTeam?.emblemPath ? (
+                      <img src={selectedTeam.emblemPath} alt={`Emblema ${selectedTeam.name}`} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sem imagem</span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-white">{selectedTeam?.name ?? "Equipa"}</div>
+                    <div className="text-xs text-muted-foreground">Placeholder circular ativo</div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/60 bg-slate-900/55">
+                <CardHeader title="Melhor Marcador" />
+                <CardContent>
+                  <div className="text-sm font-semibold text-white">{topScorer?.name ?? "Sem dados"}</div>
+                  <div className="text-xs text-muted-foreground">{topScorer ? `${topScorer.goals} golos` : "Sem registos"}</div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/60 bg-slate-900/55">
+                <CardHeader title="Mais Assistencias" />
+                <CardContent>
+                  <div className="text-sm font-semibold text-white">{topAssistant?.name ?? "Sem dados"}</div>
+                  <div className="text-xs text-muted-foreground">{topAssistant ? `${topAssistant.assists} assistencias` : "Sem registos"}</div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/60 bg-slate-900/55">
+                <CardHeader title="Mais Participacoes em Golo" />
+                <CardContent>
+                  <div className="text-sm font-semibold text-white">{topParticipation?.name ?? "Sem dados"}</div>
+                  <div className="text-xs text-muted-foreground">{topParticipation ? `${topParticipation.participations} participacoes` : "Sem registos"}</div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/60 bg-slate-900/55">
+                <CardHeader title="Total de Golos" />
+                <CardContent>
+                  <div className="text-3xl font-semibold text-white">{totalGoals}</div>
+                  <div className="text-xs text-muted-foreground">{goalEvents.length} registos</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-5">
+              <Card className="border-border/60 bg-slate-900/55 lg:col-span-3">
+                <CardHeader title="Estadio e Dimensoes do Relvado" />
+                <CardContent className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <div className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Estadio</div>
+                    <div className="rounded-md border border-border/60 bg-slate-950/35 px-3 py-2 text-sm text-white">
+                      {selectedTeam?.stadium?.trim() || "Por definir"}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Dimensoes</div>
+                    <div className="rounded-md border border-border/60 bg-slate-950/35 px-3 py-2 text-sm text-white">
+                      {selectedTeam?.pitchDimensions?.trim() || "Por definir"}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/60 bg-slate-900/55 lg:col-span-2">
+                <CardHeader title="Treinador" />
+                <CardContent className="flex items-center gap-3">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border/70 bg-slate-800/65 text-sm font-semibold text-slate-100">
+                    {getInitials(selectedTeam?.coach)}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-white">{selectedTeam?.coach?.trim() || "Treinador por definir"}</div>
+                    <div className="text-xs text-muted-foreground">Espaco reservado para foto</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -339,32 +417,12 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
               <CardContent>{goalEvents.length ? <GoalNetPinMap goals={goalEvents} /> : <div className="text-sm text-muted-foreground">Sem dados</div>}</CardContent>
             </Card>
             <Card>
-              <CardHeader title="Distribuição por Ação" />
-              <CardContent>
-                {actionsQuery.data ? <SimpleBar data={actionsQuery.data} xKey="action" yKey="goals" /> : <div className="text-sm text-muted-foreground">Sem dados</div>}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
               <CardHeader title="Momentos do Golo" />
               <CardContent>
                 {momentsQuery.data ? <SimpleBar data={momentsQuery.data} xKey="moment" yKey="goals" /> : <div className="text-sm text-muted-foreground">Sem dados</div>}
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader title="Penáltis por Zona" />
-              <CardContent>
-                {penaltiesQuery.data && penaltiesQuery.data.length > 0 ? (
-                  <SimplePie data={penaltiesQuery.data} labelKey="zone" valueKey="goals" />
-                ) : (
-                  <div className="text-sm text-muted-foreground">Sem penáltis.</div>
-                )}
-              </CardContent>
-            </Card>
           </div>
-
           <Card>
             <CardHeader title="Histórico de Golos" description="Editar rapidamente qualquer golo" />
             <CardContent className="space-y-2 text-sm">
