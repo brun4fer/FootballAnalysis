@@ -42,9 +42,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <AppProvider>
             <div className="min-h-screen">
               <Header />
-              <div className="mx-auto flex max-w-6xl gap-6 px-6 py-6">
+              <div className="mx-auto flex w-full max-w-6xl gap-4 px-4 py-4 md:gap-6 md:px-6 md:py-6">
                 <Sidebar />
-                <main className="flex-1">{children}</main>
+                <main className="min-w-0 flex-1">{children}</main>
               </div>
             </div>
           </AppProvider>
@@ -53,4 +53,3 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     </html>
   );
 }
-

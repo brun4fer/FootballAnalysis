@@ -233,14 +233,11 @@ function StepIndicator({ current, steps }: { current: StepId; steps: readonly { 
 
   return (
 
+    <div className="overflow-x-auto pb-1">
+      <div className="relative inline-flex min-w-max items-center gap-2 rounded-2xl border border-border/60 bg-gradient-to-r from-cyan-500/10 via-emerald-500/5 to-transparent px-3 py-2 sm:px-4 sm:py-3">
+        <div className="absolute inset-x-0 top-1 h-[2px] bg-gradient-to-r from-cyan-500/50 via-emerald-400/50 to-transparent" />
 
-    <div className="relative flex items-center justify-between overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-r from-cyan-500/10 via-emerald-500/5 to-transparent px-4 py-3">
-
-
-      <div className="absolute inset-x-0 top-1 h-[2px] bg-gradient-to-r from-cyan-500/50 via-emerald-400/50 to-transparent" />
-
-
-      {steps.map((step, idx) => {
+        {steps.map((step, idx) => {
 
 
         const isActive = idx === currentIndex;
@@ -249,10 +246,8 @@ function StepIndicator({ current, steps }: { current: StepId; steps: readonly { 
         const isDone = idx < currentIndex;
 
 
-        return (
-
-
-          <div key={step.id} className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em]">
+          return (
+            <div key={step.id} className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] sm:text-xs">
 
 
             <div
@@ -288,18 +283,17 @@ function StepIndicator({ current, steps }: { current: StepId; steps: readonly { 
             </div>
 
 
-            <span className={isActive ? "text-white" : isDone ? "text-emerald-100" : "text-muted-foreground"}>{step.label}</span>
+              <span className={cn("hidden sm:inline", isActive ? "text-white" : isDone ? "text-emerald-100" : "text-muted-foreground")}>
+                {step.label}
+              </span>
 
+            </div>
 
-          </div>
+          );
 
+        })}
 
-        );
-
-
-      })}
-
-
+      </div>
     </div>
 
 
@@ -311,8 +305,8 @@ function StepIndicator({ current, steps }: { current: StepId; steps: readonly { 
 
 const mapSurfaceClass =
   "rounded-2xl border border-border/80 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 shadow-[0_0_40px_rgba(0,0,0,0.4)]";
-const mapSvgClass = "w-full aspect-[3/2] max-h-[360px] cursor-crosshair touch-none";
-const mapStepContainerClass = "space-y-3 min-h-[620px] md:min-h-[700px]";
+const mapSvgClass = "h-auto w-full max-w-full aspect-[3/2] cursor-crosshair touch-none";
+const mapStepContainerClass = "space-y-3 pb-2";
 
 function InteractiveMapFrame({ children }: { children: ReactNode }) {
   return <div className={mapSurfaceClass}>{children}</div>;
@@ -1716,7 +1710,7 @@ const filteredChampionships = useMemo(() => {
         <CardHeader title="Wizard de Registo de Golo" description="Fluxo estruturado para guardar eventos de golo em tempo real." />
 
 
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pb-28 md:pb-6">
 
 
           <StepIndicator current={step} steps={visibleSteps} />
@@ -3152,7 +3146,7 @@ const filteredChampionships = useMemo(() => {
             <div className="space-y-4 text-sm">
 
 
-              <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-card/70 p-4">
+              <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/70 bg-card/70 p-4 sm:grid-cols-2">
 
 
                 <span className="text-muted-foreground">Época</span>
@@ -3649,87 +3643,39 @@ const filteredChampionships = useMemo(() => {
 
 
 
-          <div className="flex items-center justify-between pt-2">
+          <div className="sticky bottom-0 z-20 -mx-6 mt-6 border-t border-border/60 bg-[#0b1220]/85 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur-xl md:static md:mx-0 md:mt-2 md:border-0 md:bg-transparent md:px-0 md:pb-0 md:pt-2">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                Step {currentIndex + 1} / {visibleSteps.length}
+              </div>
 
-
-            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-
-
-              Step {currentIndex + 1} / {visibleSteps.length}
-
-
-            </div>
-
-
-            <div className="flex gap-2">
-
-
-              <Button variant="ghost" type="button" onClick={movePrev} disabled={currentIndex === 0}>
-
-
-                Voltar
-
-
-              </Button>
-
-
-              {currentIndex < visibleSteps.length - 1 && (
-
-
-                <Button type="button" onClick={moveNext} disabled={!canNext(step)}>
-
-
-                  Seguinte
-
-
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                <Button className="w-full sm:w-auto" variant="ghost" type="button" onClick={movePrev} disabled={currentIndex === 0}>
+                  Voltar
                 </Button>
 
+                {currentIndex < visibleSteps.length - 1 && (
+                  <Button className="w-full sm:w-auto" type="button" onClick={moveNext} disabled={!canNext(step)}>
+                    Seguinte
+                  </Button>
+                )}
 
-              )}
-
-
-              {step === "review" && (
-
-
-                <Button
-
-
-                  type="button"
-
-
-                  onClick={() => (existingGoal ? updateMutation.mutate() : createMutation.mutate())}
-
-
-                  disabled={createMutation.isPending || updateMutation.isPending || !readyToSave}
-
-
-                >
-
-
-                  {createMutation.isPending || updateMutation.isPending
-
-
-                    ? "A gravar..."
-
-
-                    : existingGoal
-
-
-                      ? "Atualizar Golo"
-
-
-                      : "Gravar Golo"}
-
-
-                </Button>
-
-
-              )}
-
-
+                {step === "review" && (
+                  <Button
+                    className="col-span-2 w-full sm:col-span-1 sm:w-auto"
+                    type="button"
+                    onClick={() => (existingGoal ? updateMutation.mutate() : createMutation.mutate())}
+                    disabled={createMutation.isPending || updateMutation.isPending || !readyToSave}
+                  >
+                    {createMutation.isPending || updateMutation.isPending
+                      ? "A gravar..."
+                      : existingGoal
+                        ? "Atualizar Golo"
+                        : "Gravar Golo"}
+                  </Button>
+                )}
+              </div>
             </div>
-
-
           </div>
 
 
