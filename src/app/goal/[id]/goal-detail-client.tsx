@@ -26,9 +26,6 @@ type GoalDetailProps = {
     fieldDrawing?: Coordinate | null;
     goalCoordinates?: Coordinate | null;
     assistCoordinates?: { x?: number; y?: number; label?: string } | null;
-    assistSector?: string | null;
-    shotSector?: string | null;
-    finishSector?: string | null;
     buildUpPhase?: string | null;
     creationPhase?: string | null;
     finalizationPhase?: string | null;
@@ -225,12 +222,6 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
               )}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <span className="text-muted-foreground">Zona de assistência</span>
-              <span>{formatValue(goal.assistSector)}</span>
-              <span className="text-muted-foreground">Zona de remate</span>
-              <span>{formatValue(goal.shotSector)}</span>
-              <span className="text-muted-foreground">Zona de finalização</span>
-              <span>{formatValue(goal.finishSector)}</span>
               <span className="text-muted-foreground">Saída do GR</span>
               <span>{formatOutlet(goal.goalkeeperOutlet)}</span>
               <span className="text-muted-foreground">Fase de construção</span>

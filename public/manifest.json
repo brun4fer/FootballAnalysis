@@ -1,6 +1,6 @@
 {
-  "name": "Football Analysis Dashboard",
-  "short_name": "FootballAnalysis",
+  "name": "G.A.P. - Adversários Dashboard",
+  "short_name": "G.A.P.",
   "description": "Plataforma profissional de análise tática e estatística.",
   "start_url": "/",
   "scope": "/",

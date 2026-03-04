@@ -76,16 +76,13 @@ type Player = { id: number; name: string };
 
 type Involvement = { playerId: number; role: "assist" | "involvement" };
 type Point = { x: number; y: number };
-type ZoneMarker = { x?: number; y?: number; sector?: string | null };
 
-const zoneOptions = [
-  { value: "central", label: "Zona Central" },
-  { value: "esquerda", label: "Zona Esquerda" },
-  { value: "direita", label: "Zona Direita" },
-  { value: "superior", label: "Zona Superior" },
-  { value: "inferior", label: "Zona Inferior" },
-  { value: "penetração", label: "Zona de Penetração" }
-] as const;
+const toPoint = (value: unknown): Point | null => {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as { x?: unknown; y?: unknown };
+  if (typeof raw.x !== "number" || typeof raw.y !== "number") return null;
+  return { x: raw.x, y: raw.y };
+};
 
 const normalizeActionName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
@@ -183,10 +180,13 @@ const steps = [
   { id: "context", label: "Momentos" },
 
 
+  { id: "assist", label: "Zona Assistencia" },
+
+
+  { id: "field", label: "Zona Remate" },
+
+
   { id: "zone", label: "Baliza" },
-
-
-  { id: "field", label: "Campo" },
 
 
   { id: "review", label: "Revisão" }
@@ -820,10 +820,8 @@ type ExistingGoal = {
   previousMomentDescription?: string | null;
   goalCoordinates: Point | null;
   fieldDrawing: Point | null;
-  assistCoordinates?: ZoneMarker | null;
-  assistSector?: string | null;
-  shotSector?: string | null;
-  finishSector?: string | null;
+  assistCoordinates?: { x?: number; y?: number; sector?: string | null } | null;
+  assistDrawing?: Point | null;
   buildUpPhase?: string | null;
   creationPhase?: string | null;
   finalizationPhase?: string | null;
@@ -875,10 +873,7 @@ const [referencePlayerId, setReferencePlayerId] = useState<number | undefined>()
 const [foulSufferedById, setFoulSufferedById] = useState<number | undefined>();
 const [previousMomentDescription, setPreviousMomentDescription] = useState("");
 const [goalPoint, setGoalPoint] = useState<Point | null>(null);
-const [assistPoint, setAssistPoint] = useState<ZoneMarker | null>(null);
-const [assistSector, setAssistSector] = useState("");
-const [shotSector, setShotSector] = useState("");
-const [finishSector, setFinishSector] = useState("");
+const [assistDrawingPoint, setAssistDrawingPoint] = useState<Point | null>(null);
 const [buildUpPhase, setBuildUpPhase] = useState("");
 const [creationPhase, setCreationPhase] = useState("");
 const [finalizationPhase, setFinalizationPhase] = useState("");
@@ -972,10 +967,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       goalCoordinates: goalPoint ?? undefined,
       videoPath: videoPath || undefined,
       fieldDrawing: fieldPoint ?? undefined,
-      assistCoordinates: assistPoint ?? undefined,
-      assistSector: assistSector || undefined,
-      shotSector: shotSector || undefined,
-      finishSector: finishSector || undefined,
+      assistDrawing: assistDrawingPoint ?? undefined,
       buildUpPhase: buildUpPhase || undefined,
       creationPhase: creationPhase || undefined,
       finalizationPhase: finalizationPhase || undefined,
@@ -1010,10 +1002,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     setThrowInProfile("");
     setGoalkeeperOutlet("");
     setGoalPoint(null);
-    setAssistPoint(null);
-    setAssistSector("");
-    setShotSector("");
-    setFinishSector("");
+    setAssistDrawingPoint(null);
     setBuildUpPhase("");
     setCreationPhase("");
     setFinalizationPhase("");
@@ -1093,10 +1082,7 @@ const updateMutation = useMutation({
       goalCoordinates: goalPoint ?? undefined,
       videoPath: videoPath || undefined,
       fieldDrawing: fieldPoint ?? undefined,
-      assistCoordinates: assistPoint ?? undefined,
-      assistSector: assistSector || undefined,
-      shotSector: shotSector || undefined,
-      finishSector: finishSector || undefined,
+      assistDrawing: assistDrawingPoint ?? undefined,
       buildUpPhase: buildUpPhase || undefined,
       creationPhase: creationPhase || undefined,
       finalizationPhase: finalizationPhase || undefined,
@@ -1232,7 +1218,7 @@ const filteredChampionships = useMemo(() => {
   const hasThrowInMarkerAction = normalizedSelectedActionNames.some(
     (name) => name.includes("marcador") && name.includes("lancamento")
   );
-  const hasReferencePlayersAction = normalizedSelectedActionNames.some((name) => name.includes("jogadores referencia"));
+  const hasReferencePlayersAction = normalizedSelectedActionNames.some((name) => name.includes("referenc"));
   const hasFoulSufferedAction = normalizedSelectedActionNames.some(
     (name) =>
       name.includes("falta sobre") ||
@@ -1368,10 +1354,7 @@ const filteredChampionships = useMemo(() => {
     setActionIds(existingActions);
     setGoalPoint(existingGoal.goalCoordinates ?? null);
     setFieldPoint(existingGoal.fieldDrawing ?? null);
-    setAssistPoint(existingGoal.assistCoordinates ?? null);
-    setAssistSector(existingGoal.assistSector ?? "");
-    setShotSector(existingGoal.shotSector ?? "");
-    setFinishSector(existingGoal.finishSector ?? "");
+    setAssistDrawingPoint(existingGoal.assistDrawing ?? toPoint(existingGoal.assistCoordinates) ?? null);
     setBuildUpPhase(existingGoal.buildUpPhase ?? "");
     setCreationPhase(existingGoal.creationPhase ?? "");
     setFinalizationPhase(existingGoal.finalizationPhase ?? "");
@@ -1469,16 +1452,22 @@ const filteredChampionships = useMemo(() => {
         return Boolean(momentId && subMomentId && actionIds.length > 0 && minute >= 0);
 
 
-      case "zone":
+      case "assist":
 
 
-        return requiresGoal ? Boolean(goalPoint) : true;
+        return requiresField ? Boolean(assistDrawingPoint) : true;
 
 
       case "field":
 
 
         return requiresField ? Boolean(fieldPoint) : true;
+
+
+      case "zone":
+
+
+        return requiresGoal ? Boolean(goalPoint) : true;
 
 
       case "review":
@@ -1556,6 +1545,9 @@ const filteredChampionships = useMemo(() => {
 
 
     (!shouldShowPreviousMomentDescription || previousMomentDescription.trim().length > 0) &&
+
+
+    canNext("assist") &&
 
 
     canNext("zone") &&
@@ -2296,7 +2288,7 @@ const filteredChampionships = useMemo(() => {
                     setCrossAuthorId(undefined);
                     setGoalPoint(null);
                     setFieldPoint(null);
-                    setAssistPoint(null);
+                    setAssistDrawingPoint(null);
 
 
                   }}
@@ -2888,6 +2880,38 @@ const filteredChampionships = useMemo(() => {
 
 
 
+          {step === "assist" && (
+
+
+            <div className="space-y-3">
+
+
+              <div className="flex items-center justify-between">
+
+
+                <label className="text-sm font-medium">Zona de Assistencia</label>
+
+
+                <span className="text-xs text-muted-foreground">
+                  {requiresField ? "Obrigatorio para esta acao." : "Opcional para referencia tatica."}
+                </span>
+
+
+              </div>
+
+
+              <PitchPinpoint value={assistDrawingPoint} onChange={setAssistDrawingPoint} />
+
+
+            </div>
+
+
+          )}
+
+
+
+
+
           {step === "zone" && (
 
 
@@ -2957,43 +2981,7 @@ const filteredChampionships = useMemo(() => {
               <PitchPinpoint value={fieldPoint} onChange={setFieldPoint} />
 
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Zona de assistência</label>
-                  <Select value={assistSector} onChange={(e) => setAssistSector(e.target.value)}>
-                    <option value="">Sem indicação</option>
-                    {zoneOptions.map((option) => (
-                      <option key={option.value} value={option.value} className="text-black">
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Zona de remate</label>
-                  <Select value={shotSector} onChange={(e) => setShotSector(e.target.value)}>
-                    <option value="">Sem indicação</option>
-                    {zoneOptions.map((option) => (
-                      <option key={option.value} value={option.value} className="text-black">
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Zona de finalização</label>
-                  <Select value={finishSector} onChange={(e) => setFinishSector(e.target.value)}>
-                    <option value="">Sem indicação</option>
-                    {zoneOptions.map((option) => (
-                      <option key={option.value} value={option.value} className="text-black">
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
+                <div className="space-y-2 rounded-xl border border-border/60 bg-card/40 p-3">
                   <label className="text-sm font-medium">Fase de construção</label>
                   <Select value={buildUpPhase} onChange={(e) => setBuildUpPhase(e.target.value)}>
                     <option value="">Sem indicação</option>
@@ -3004,7 +2992,7 @@ const filteredChampionships = useMemo(() => {
                     ))}
                   </Select>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 rounded-xl border border-border/60 bg-card/40 p-3">
                   <label className="text-sm font-medium">Fase de criação</label>
                   <Select value={creationPhase} onChange={(e) => setCreationPhase(e.target.value)}>
                     <option value="">Sem indicação</option>
@@ -3015,7 +3003,7 @@ const filteredChampionships = useMemo(() => {
                     ))}
                   </Select>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 rounded-xl border border-border/60 bg-card/40 p-3">
                   <label className="text-sm font-medium">Fase de finalização</label>
                   <Select value={finalizationPhase} onChange={(e) => setFinalizationPhase(e.target.value)}>
                     <option value="">Sem indicação</option>
@@ -3249,6 +3237,12 @@ const filteredChampionships = useMemo(() => {
                 )}
 
 
+                <span className="text-muted-foreground">Zona de assistencia</span>
+
+
+                <span>{assistDrawingPoint ? `(${assistDrawingPoint.x.toFixed(2)}, ${assistDrawingPoint.y.toFixed(2)})` : "N/A"}</span>
+
+
                 <span className="text-muted-foreground">Baliza</span>
 
 
@@ -3263,12 +3257,6 @@ const filteredChampionships = useMemo(() => {
 
 
 
-                <span className="text-muted-foreground">Zona de assistência</span>
-                <span>{assistSector || '—'}</span>
-                <span className="text-muted-foreground">Zona de remate</span>
-                <span>{shotSector || '—'}</span>
-                <span className="text-muted-foreground">Zona de finalização</span>
-                <span>{finishSector || '—'}</span>
                 <span className="text-muted-foreground">Fase de construção</span>
                 <span>{labelFromOption(buildUpPhases, buildUpPhase)}</span>
                 <span className="text-muted-foreground">Fase de criação</span>
@@ -3314,7 +3302,64 @@ const filteredChampionships = useMemo(() => {
               )}
 
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-3">
+
+
+                <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
+
+
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Assistencia</div>
+
+
+                  <div className="rounded-lg border border-border/50 bg-slate-950/60 p-2">
+
+
+                    <svg viewBox="0 0 105 68" className="w-full">
+
+
+                      <rect x="1" y="1" width="103" height="66" rx="8" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
+
+
+                      <line x1="52.5" y1="1" x2="52.5" y2="67" stroke="rgba(148,163,184,0.35)" strokeDasharray="3 3" />
+
+
+                      <circle cx="52.5" cy="34" r="9.15" stroke="rgba(148,163,184,0.35)" fill="none" />
+
+
+                      <rect x="1" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
+
+
+                      <rect x="90" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
+
+
+                      {assistDrawingPoint && (
+
+
+                        <g transform={`translate(${assistDrawingPoint.x * 105}, ${assistDrawingPoint.y * 68})`}>
+
+
+                          <circle r="3.4" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
+
+
+                          <circle r="1.8" fill="#0f172a" />
+
+
+                          <circle r="0.9" fill="#38bdf8" />
+
+
+                        </g>
+
+
+                      )}
+
+
+                    </svg>
+
+
+                  </div>
+
+
+                </div>
 
 
                 <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">

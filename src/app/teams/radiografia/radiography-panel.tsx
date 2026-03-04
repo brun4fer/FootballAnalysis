@@ -494,7 +494,7 @@ export default function RadiographyPanel({
           </div>
         )}
         <div className="flex-1 min-w-[220px]">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Radiografia da Equipa</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Momentos da Equipa</p>
           <h1 className="text-2xl font-semibold text-white">{currentTeam?.name ?? "Equipa"}</h1>
           <p className="text-xs text-muted-foreground">
             {currentTeam?.coach && `Treinador: ${currentTeam.coach}`}

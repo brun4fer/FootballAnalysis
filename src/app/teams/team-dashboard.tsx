@@ -234,7 +234,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
           </p>
         </div>
         <Button variant="secondary" size="sm">
-          <Link href="/teams/radiografia">Radiografia da Equipa</Link>
+          <Link href="/teams/radiografia">Momentos da Equipa</Link>
         </Button>
       </div>
 

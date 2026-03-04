@@ -93,7 +93,6 @@ function Pitch({ x, y }: { x: number; y: number }) {
 
 }
 
-
 const TECH_LABEL_OVERRIDES: Record<string, string> = {
   organizacao: "Organização",
   curto_para_longo: "Curto para longo",
@@ -126,12 +125,6 @@ const formatTechnicalLabel = (value?: string | null) => {
     .trim();
 };
 
-const formatSectorLabel = (value?: string | null) => {
-  const normalized = normalizeChartLabel(value);
-  return normalized ?? "—";
-};
-
-
 export default async function GoalDetail({ params }: { params: { id: string } }) {
 
   const id = Number(params.id);
@@ -149,6 +142,13 @@ export default async function GoalDetail({ params }: { params: { id: string } })
   const hasGoalPoint = Boolean(goal.goalCoordinates);
 
   const hasFieldPoint = Boolean(goal.fieldDrawing);
+  const assistDrawing =
+    goal.assistDrawing && typeof goal.assistDrawing.x === "number" && typeof goal.assistDrawing.y === "number"
+      ? goal.assistDrawing
+      : goal.assistCoordinates && typeof goal.assistCoordinates.x === "number" && typeof goal.assistCoordinates.y === "number"
+        ? { x: goal.assistCoordinates.x, y: goal.assistCoordinates.y }
+        : null;
+  const hasAssistDrawing = Boolean(assistDrawing);
 
   const involvements = goal.involvements ?? [];
   const throwInTakerDisplay = goal.throwInTakerName ?? (goal.throwInTakerId ? `#${goal.throwInTakerId}` : null);
@@ -179,21 +179,19 @@ export default async function GoalDetail({ params }: { params: { id: string } })
       <Card>
         <CardHeader title="Análise Técnica" />
         <CardContent className="space-y-3 text-sm">
-          <div className="grid grid-cols-2 gap-2">
-            <span className="text-muted-foreground">Fase de construção</span>
-            <span>{formatTechnicalLabel(goal.buildUpPhase) ?? "—"}</span>
-            <span className="text-muted-foreground">Fase de criação</span>
-            <span>{formatTechnicalLabel(goal.creationPhase) ?? "—"}</span>
-            <span className="text-muted-foreground">Fase de finalização</span>
-            <span>{formatTechnicalLabel(goal.finalizationPhase) ?? "—"}</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <span className="text-muted-foreground">Zona de assistência</span>
-            <span>{formatSectorLabel(goal.assistSector)}</span>
-            <span className="text-muted-foreground">Zona de remate</span>
-            <span>{formatSectorLabel(goal.shotSector)}</span>
-            <span className="text-muted-foreground">Zona de finalização</span>
-            <span>{formatSectorLabel(goal.finishSector)}</span>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-border/60 bg-card/40 p-3">
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Fase de construção</div>
+              <div className="mt-2 text-sm font-medium text-white">{formatTechnicalLabel(goal.buildUpPhase) ?? "—"}</div>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-card/40 p-3">
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Fase de criação</div>
+              <div className="mt-2 text-sm font-medium text-white">{formatTechnicalLabel(goal.creationPhase) ?? "—"}</div>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-card/40 p-3">
+              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Fase de finalização</div>
+              <div className="mt-2 text-sm font-medium text-white">{formatTechnicalLabel(goal.finalizationPhase) ?? "—"}</div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -308,6 +306,10 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
               <span>{goal.assistName ?? goal.assistId ?? "-"}</span>
 
+              <span className="text-muted-foreground">Ponto da assistencia</span>
+
+              <span>{assistDrawing ? `(${assistDrawing.x.toFixed(2)}, ${assistDrawing.y.toFixed(2)})` : "-"}</span>
+
               {throwInTakerDisplay && (
                 <div className="col-span-2 grid grid-cols-2">
                   <span className="text-muted-foreground">Marcador do lançamento</span>
@@ -407,7 +409,23 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
 
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
+
+        <Card>
+
+          <CardHeader title="Ponto da Assistencia no Campo" />
+
+          <CardContent>
+
+            {hasAssistDrawing && assistDrawing ? (
+              <Pitch x={assistDrawing.x} y={assistDrawing.y} />
+            ) : (
+              <div className="text-sm text-muted-foreground">Sem coordenadas de assistencia.</div>
+            )}
+
+          </CardContent>
+
+        </Card>
 
         <Card>
 

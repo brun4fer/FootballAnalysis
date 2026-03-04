@@ -120,50 +120,44 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
 
   const assistZones = db.execute<{
     assistCoordinates: any;
-    assistSector: string | null;
     scorerName: string;
     minute: number;
   }>(sql`
     SELECT
       g.assist_coordinates AS "assistCoordinates",
-      g.assist_sector AS "assistSector",
       p.name AS "scorerName",
       g.minute AS minute
     FROM ${goals} g
     JOIN ${players} p ON p.id = g.scorer_id
-    WHERE ${goalFilter} AND (g.assist_coordinates IS NOT NULL OR g.assist_sector IS NOT NULL)
+    WHERE ${goalFilter} AND g.assist_coordinates IS NOT NULL
   `);
 
   const shotZones = db.execute<{
     fieldDrawing: any;
-    shotSector: string | null;
     scorerName: string;
     minute: number;
   }>(sql`
     SELECT
       g.field_drawing AS "fieldDrawing",
-      g.shot_sector AS "shotSector",
       p.name AS "scorerName",
       g.minute AS minute
     FROM ${goals} g
     JOIN ${players} p ON p.id = g.scorer_id
-    WHERE ${goalFilter} AND (g.field_drawing IS NOT NULL OR g.shot_sector IS NOT NULL)
+    WHERE ${goalFilter} AND g.field_drawing IS NOT NULL
   `);
 
   const finishZones = db.execute<{
     goalCoordinates: any;
-    finishSector: string | null;
     scorerName: string;
     minute: number;
   }>(sql`
     SELECT
       g.goal_coordinates AS "goalCoordinates",
-      g.finish_sector AS "finishSector",
       p.name AS "scorerName",
       g.minute AS minute
     FROM ${goals} g
     JOIN ${players} p ON p.id = g.scorer_id
-    WHERE ${goalFilter} AND (g.finish_sector IS NOT NULL OR g.goal_coordinates IS NOT NULL)
+    WHERE ${goalFilter} AND g.goal_coordinates IS NOT NULL
   `);
 
   const topScorers = db.execute<{ id: number; name: string; goals: number; photoPath: string | null }>(sql`
@@ -385,9 +379,6 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
       assistCoordinates?: any;
       fieldDrawing?: any;
       goalCoordinates?: any;
-      shotSector?: string | null;
-      assistSector?: string | null;
-      finishSector?: string | null;
       scorerName?: string | null;
       minute?: number | null;
     }>
@@ -398,9 +389,6 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
         const yValue = r.assistCoordinates?.y ?? r.fieldDrawing?.y ?? r.goalCoordinates?.y ?? null;
         const hasCoordinates = typeof xValue === "number" && typeof yValue === "number";
         const sector =
-          normalizeSectorValue(r.assistSector) ??
-          normalizeSectorValue(r.shotSector) ??
-          normalizeSectorValue(r.finishSector) ??
           normalizeSectorValue(r.assistCoordinates?.sector) ??
           normalizeSectorValue(r.fieldDrawing?.sector) ??
           normalizeSectorValue(r.goalCoordinates?.sector);

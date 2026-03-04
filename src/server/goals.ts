@@ -30,6 +30,14 @@ async function hasGoalsColumn(columnName: string) {
   }
 }
 
+async function ensureGoalsAssistDrawingColumn() {
+  try {
+    await db.execute(sql`ALTER TABLE "goals" ADD COLUMN IF NOT EXISTS "assist_drawing" jsonb`);
+  } catch {
+    // Se não for possível alterar schema em runtime, o fluxo segue e o erro original será devolvido no insert/update.
+  }
+}
+
 async function normalizeGoalPayload(payload: RawGoalPayload) {
   const minuteValue = payload?.minute;
   const minute =
@@ -49,6 +57,20 @@ async function normalizeGoalPayload(payload: RawGoalPayload) {
     payload?.assistCoordinates && typeof payload.assistCoordinates === "object"
       ? JSON.parse(JSON.stringify(payload.assistCoordinates))
       : payload?.assistCoordinates ?? null;
+  const assistDrawingFromCoordinates =
+    assistCoordinates &&
+    typeof assistCoordinates === "object" &&
+    typeof (assistCoordinates as any).x === "number" &&
+    typeof (assistCoordinates as any).y === "number"
+      ? {
+          x: (assistCoordinates as any).x,
+          y: (assistCoordinates as any).y
+        }
+      : null;
+  const assistDrawing =
+    payload?.assistDrawing && typeof payload.assistDrawing === "object"
+      ? JSON.parse(JSON.stringify(payload.assistDrawing))
+      : assistDrawingFromCoordinates;
 
   const actionIdsRaw = Array.isArray(payload?.actionIds)
     ? payload.actionIds
@@ -59,10 +81,20 @@ async function normalizeGoalPayload(payload: RawGoalPayload) {
     .map((v) => Number(String(v).replace(/[^\d.-]/g, "")))
     .filter((v) => !Number.isNaN(v) && v > 0);
 
-  return { ...payload, minute, actionIds, goalCoordinates, goalZoneId: null, fieldDrawing, assistCoordinates };
+  return {
+    ...payload,
+    minute,
+    actionIds,
+    goalCoordinates,
+    goalZoneId: null,
+    fieldDrawing,
+    assistCoordinates,
+    assistDrawing
+  };
 }
 
 export async function getGoalsByTeam(teamId: number) {
+  const supportsAssistDrawing = await hasGoalsColumn("assist_drawing");
   const rows = await db
     .select({
       id: goals.id,
@@ -74,6 +106,7 @@ export async function getGoalsByTeam(teamId: number) {
       notes: goals.notes,
       fieldDrawing: goals.fieldDrawing,
       goalCoordinates: goals.goalCoordinates,
+      assistDrawing: supportsAssistDrawing ? goals.assistDrawing : sql<null>`null`,
       moment: moments.name,
       subMoment: subMoments.name,
       action: actions.name,
@@ -174,6 +207,7 @@ export async function getGoalsByTeam(teamId: number) {
 }
 
 export async function getGoalById(goalId: number) {
+  const supportsAssistDrawing = await hasGoalsColumn("assist_drawing");
   const assistPlayer = alias(players, "assist_player");
   const cornerTaker = alias(players, "corner_taker");
   const freekickTaker = alias(players, "freekick_taker");
@@ -201,9 +235,7 @@ export async function getGoalById(goalId: number) {
       fieldDrawing: goals.fieldDrawing,
       goalCoordinates: goals.goalCoordinates,
       assistCoordinates: goals.assistCoordinates,
-      assistSector: goals.assistSector,
-      shotSector: goals.shotSector,
-      finishSector: goals.finishSector,
+      assistDrawing: supportsAssistDrawing ? goals.assistDrawing : sql<null>`null`,
       buildUpPhase: goals.buildUpPhase,
       creationPhase: goals.creationPhase,
       finalizationPhase: goals.finalizationPhase,
@@ -317,10 +349,14 @@ export async function getGoalById(goalId: number) {
 }
 
 export async function createGoal(payload: unknown) {
+  await ensureGoalsAssistDrawingColumn();
   const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
   const parsed = goalInputSchema.parse(normalized);
-  const supportsReferencePlayer = await hasGoalsColumn("reference_player_id");
-  const supportsThrowInTaker = await hasGoalsColumn("throw_in_taker_id");
+  const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing] = await Promise.all([
+    hasGoalsColumn("reference_player_id"),
+    hasGoalsColumn("throw_in_taker_id"),
+    hasGoalsColumn("assist_drawing")
+  ]);
 
   const [team, scorer, opponent, subMoment] = await Promise.all([
     db.query.teams.findFirst({ where: eq(teams.id, parsed.teamId) }),
@@ -462,10 +498,7 @@ export async function createGoal(payload: unknown) {
       goalCoordinates: parsed.goalCoordinates ?? null,
       videoPath: parsed.videoPath || null,
       fieldDrawing: parsed.fieldDrawing ?? null,
-      assistCoordinates: parsed.assistCoordinates ?? null,
-      assistSector: parsed.assistSector || null,
-      shotSector: parsed.shotSector || null,
-      finishSector: parsed.finishSector || null,
+      assistCoordinates: parsed.assistDrawing ?? parsed.assistCoordinates ?? null,
       buildUpPhase: parsed.buildUpPhase || null,
       creationPhase: parsed.creationPhase || null,
       finalizationPhase: parsed.finalizationPhase || null,
@@ -486,6 +519,9 @@ export async function createGoal(payload: unknown) {
     }
     if (supportsReferencePlayer) {
       goalValues.referencePlayerId = referencePlayerId;
+    }
+    if (supportsAssistDrawing) {
+      goalValues.assistDrawing = parsed.assistDrawing ?? null;
     }
 
     const [inserted] = await tx
@@ -512,10 +548,14 @@ export async function createGoal(payload: unknown) {
 }
 
 export async function updateGoal(id: number, payload: unknown) {
+  await ensureGoalsAssistDrawingColumn();
   const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
   const parsed = goalInputSchema.parse(normalized);
-  const supportsReferencePlayer = await hasGoalsColumn("reference_player_id");
-  const supportsThrowInTaker = await hasGoalsColumn("throw_in_taker_id");
+  const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing] = await Promise.all([
+    hasGoalsColumn("reference_player_id"),
+    hasGoalsColumn("throw_in_taker_id"),
+    hasGoalsColumn("assist_drawing")
+  ]);
 
   const existing = await db.query.goals.findFirst({ where: eq(goals.id, id) });
   if (!existing) throw new Error("Goal not found");
@@ -650,10 +690,7 @@ export async function updateGoal(id: number, payload: unknown) {
       goalCoordinates: parsed.goalCoordinates ?? null,
       videoPath: parsed.videoPath || null,
       fieldDrawing: parsed.fieldDrawing ?? null,
-      assistCoordinates: parsed.assistCoordinates ?? null,
-      assistSector: parsed.assistSector || null,
-      shotSector: parsed.shotSector || null,
-      finishSector: parsed.finishSector || null,
+      assistCoordinates: parsed.assistDrawing ?? parsed.assistCoordinates ?? null,
       buildUpPhase: parsed.buildUpPhase || null,
       creationPhase: parsed.creationPhase || null,
       finalizationPhase: parsed.finalizationPhase || null,
@@ -674,6 +711,9 @@ export async function updateGoal(id: number, payload: unknown) {
     }
     if (supportsReferencePlayer) {
       goalUpdateValues.referencePlayerId = referencePlayerId;
+    }
+    if (supportsAssistDrawing) {
+      goalUpdateValues.assistDrawing = parsed.assistDrawing ?? null;
     }
 
     const [goalRow] = await tx

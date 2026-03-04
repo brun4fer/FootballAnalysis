@@ -158,6 +158,7 @@ export const goals = pgTable(
     goalCoordinates: jsonb("goal_coordinates").$type<CoordinatePoint | null>(),
     fieldDrawing: jsonb("field_drawing").$type<CoordinatePoint | null>(),
     assistCoordinates: jsonb("assist_coordinates").$type<ZoneMarker | null>(),
+    assistDrawing: jsonb("assist_drawing").$type<CoordinatePoint | null>(),
     assistSector: text("assist_sector"),
     shotSector: text("shot_sector"),
     finishSector: text("finish_sector"),

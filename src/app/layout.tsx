@@ -16,12 +16,12 @@ const font = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Football Analysis",
+  title: "G.A.P. - Adversários",
   description: "Análise de golos para equipas técnicas",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "Football Analysis",
+    title: "G.A.P. - Adversários",
     statusBarStyle: "default"
   },
   icons: {
