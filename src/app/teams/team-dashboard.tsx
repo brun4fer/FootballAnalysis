@@ -510,6 +510,8 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                           actionId: editingGoal.actionId,
                           goalCoordinates: editingGoal.goalCoordinates,
                           fieldDrawing: editingGoal.fieldDrawing,
+                          assistDrawing: editingGoal.assistDrawing,
+                          transitionDrawing: editingGoal.transitionDrawing,
                           notes: editingGoal.notes,
                           videoPath: editingGoal.videoPath,
                           involvements: editingGoal.involvements,

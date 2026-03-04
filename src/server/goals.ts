@@ -366,16 +366,18 @@ export async function createGoal(payload: unknown) {
   await ensureGoalsDrawingColumns();
   const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
   const parsed = goalInputSchema.parse(normalized);
-  const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing] = await Promise.all([
+  const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing, supportsTransitionDrawing] = await Promise.all([
     hasGoalsColumn("reference_player_id"),
     hasGoalsColumn("throw_in_taker_id"),
-    hasGoalsColumn("assist_drawing")
+    hasGoalsColumn("assist_drawing"),
+    hasGoalsColumn("transition_drawing")
   ]);
 
-  const [team, scorer, opponent, subMoment] = await Promise.all([
+  const [team, scorer, opponent, moment, subMoment] = await Promise.all([
     db.query.teams.findFirst({ where: eq(teams.id, parsed.teamId) }),
     db.query.players.findFirst({ where: eq(players.id, parsed.scorerId) }),
     db.query.teams.findFirst({ where: eq(teams.id, parsed.opponentTeamId) }),
+    db.query.moments.findFirst({ where: eq(moments.id, parsed.momentId) }),
     db.query.subMoments.findFirst({ where: eq(subMoments.id, parsed.subMomentId) })
   ]);
 
@@ -390,6 +392,7 @@ export async function createGoal(payload: unknown) {
     throw new Error("Scorer does not belong to team");
   }
 
+  if (!moment) throw new Error("Moment not found");
   if (!subMoment) throw new Error("Sub-moment not found");
   if (subMoment.momentId !== parsed.momentId) throw new Error("Sub-moment does not match moment");
 
@@ -418,6 +421,11 @@ export async function createGoal(payload: unknown) {
   }
   if (requiresGoal && !parsed.goalCoordinates) {
     throw new Error("Esta ação requer selecionar um ponto na baliza.");
+  }
+
+  const isOffensiveTransitionMoment = normalizeToken(moment.name) === "transicao ofensiva";
+  if (isOffensiveTransitionMoment && !parsed.transitionDrawing) {
+    throw new Error("Transicao Ofensiva requer ponto de recuperacao (transition drawing obrigatorio).");
   }
 
   const assistFromRoles = parsed.involvements?.filter((i) => i.role === "assist") ?? [];
@@ -537,6 +545,9 @@ export async function createGoal(payload: unknown) {
     if (supportsAssistDrawing) {
       goalValues.assistDrawing = parsed.assistDrawing ?? null;
     }
+    if (supportsTransitionDrawing) {
+      goalValues.transitionDrawing = isOffensiveTransitionMoment ? parsed.transitionDrawing ?? null : null;
+    }
 
     const [inserted] = await tx
       .insert(goals)
@@ -565,19 +576,21 @@ export async function updateGoal(id: number, payload: unknown) {
   await ensureGoalsDrawingColumns();
   const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
   const parsed = goalInputSchema.parse(normalized);
-  const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing] = await Promise.all([
+  const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing, supportsTransitionDrawing] = await Promise.all([
     hasGoalsColumn("reference_player_id"),
     hasGoalsColumn("throw_in_taker_id"),
-    hasGoalsColumn("assist_drawing")
+    hasGoalsColumn("assist_drawing"),
+    hasGoalsColumn("transition_drawing")
   ]);
 
   const existing = await db.query.goals.findFirst({ where: eq(goals.id, id) });
   if (!existing) throw new Error("Goal not found");
   if (existing.teamId !== parsed.teamId) throw new Error("Cannot move goal to another team");
 
-  const [team, opponent, subMoment] = await Promise.all([
+  const [team, opponent, moment, subMoment] = await Promise.all([
     db.query.teams.findFirst({ where: eq(teams.id, parsed.teamId) }),
     db.query.teams.findFirst({ where: eq(teams.id, parsed.opponentTeamId) }),
+    db.query.moments.findFirst({ where: eq(moments.id, parsed.momentId) }),
     db.query.subMoments.findFirst({ where: eq(subMoments.id, parsed.subMomentId) })
   ]);
   if (!team) throw new Error("Team not found");
@@ -586,6 +599,7 @@ export async function updateGoal(id: number, payload: unknown) {
   if (team.championshipId && opponent.championshipId && team.championshipId !== opponent.championshipId) {
     throw new Error("Opponent must belong to the same championship");
   }
+  if (!moment) throw new Error("Moment not found");
   if (!subMoment) throw new Error("Sub-moment not found");
   if (subMoment.momentId !== parsed.momentId) throw new Error("Sub-moment does not match moment");
 
@@ -690,6 +704,11 @@ export async function updateGoal(id: number, payload: unknown) {
     throw new Error("Esta ação requer selecionar um ponto na baliza.");
   }
 
+  const isOffensiveTransitionMoment = normalizeToken(moment.name) === "transicao ofensiva";
+  if (isOffensiveTransitionMoment && !parsed.transitionDrawing) {
+    throw new Error("Transicao Ofensiva requer ponto de recuperacao (transition drawing obrigatorio).");
+  }
+
   const [updated] = await db.transaction(async (tx) => {
     const goalUpdateValues: any = {
       opponentTeamId: parsed.opponentTeamId,
@@ -728,6 +747,9 @@ export async function updateGoal(id: number, payload: unknown) {
     }
     if (supportsAssistDrawing) {
       goalUpdateValues.assistDrawing = parsed.assistDrawing ?? null;
+    }
+    if (supportsTransitionDrawing) {
+      goalUpdateValues.transitionDrawing = isOffensiveTransitionMoment ? parsed.transitionDrawing ?? null : null;
     }
 
     const [goalRow] = await tx

@@ -162,7 +162,7 @@ const labelFromOption = (
 
 
 
-const steps = [
+const wizardStepDefinitions = [
 
 
   { id: "season", label: "Época" },
@@ -178,6 +178,9 @@ const steps = [
 
 
   { id: "context", label: "Momentos" },
+
+
+  { id: "transition", label: "Zona Recuperacao" },
 
 
   { id: "assist", label: "Zona Assistencia" },
@@ -198,7 +201,7 @@ const steps = [
 
 
 
-type StepId = (typeof steps)[number]["id"];
+type StepId = (typeof wizardStepDefinitions)[number]["id"];
 
 
 
@@ -222,7 +225,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 
 
 
-function StepIndicator({ current }: { current: StepId }) {
+function StepIndicator({ current, steps }: { current: StepId; steps: readonly { id: StepId; label: string }[] }) {
 
 
   const currentIndex = steps.findIndex((s) => s.id === current);
@@ -489,11 +492,13 @@ function GoalNetPinpoint({ value, onChange }: { value: Point | null; onChange: (
 function PitchPinpoint({
   value,
   onChange,
-  storageField
+  storageField,
+  pinColor = "#22c55e"
 }: {
   value: Point | null;
   onChange: (pt: Point) => void;
-  storageField: "assist_drawing" | "field_drawing";
+  storageField: "assist_drawing" | "field_drawing" | "transition_drawing";
+  pinColor?: string;
 }) {
 
 
@@ -548,7 +553,7 @@ function PitchPinpoint({
       <circle r="2.2" fill="#0f172a" />
 
 
-      <circle r="1" fill="#22c55e" />
+      <circle r="1" fill={pinColor} />
 
 
     </g>
@@ -856,6 +861,7 @@ type ExistingGoal = {
   previousMomentDescription?: string | null;
   goalCoordinates: Point | null;
   fieldDrawing: Point | null;
+  transitionDrawing?: Point | null;
   assistCoordinates?: { x?: number; y?: number; sector?: string | null } | null;
   assistDrawing?: Point | null;
   buildUpPhase?: string | null;
@@ -910,6 +916,7 @@ const [foulSufferedById, setFoulSufferedById] = useState<number | undefined>();
 const [previousMomentDescription, setPreviousMomentDescription] = useState("");
 const [goalPoint, setGoalPoint] = useState<Point | null>(null);
 const [assistDrawingPoint, setAssistDrawingPoint] = useState<Point | null>(null);
+const [transitionDrawingPoint, setTransitionDrawingPoint] = useState<Point | null>(null);
 const [buildUpPhase, setBuildUpPhase] = useState("");
 const [creationPhase, setCreationPhase] = useState("");
 const [finalizationPhase, setFinalizationPhase] = useState("");
@@ -958,6 +965,9 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
 
     if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
     if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
+    if (isOffensiveTransitionMoment && !transitionDrawingPoint) {
+      throw new Error("Transicao Ofensiva requer marcar a zona de recuperacao.");
+    }
     const hasFoulSufferedAction = selectedActions.some((a) => {
       const normalized = normalizeActionName(a.name);
       return (
@@ -991,6 +1001,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       assistId: assistId ?? null,
       minute,
       momentId,
+      momentName: selectedMoment?.name ?? undefined,
       subMomentId,
       actionIds,
       cornerTakerId,
@@ -1004,6 +1015,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       videoPath: videoPath || undefined,
       fieldDrawing: fieldPoint ?? undefined,
       assistDrawing: assistDrawingPoint ?? undefined,
+      transitionDrawing: transitionDrawingPoint ?? undefined,
       buildUpPhase: buildUpPhase || undefined,
       creationPhase: creationPhase || undefined,
       finalizationPhase: finalizationPhase || undefined,
@@ -1039,6 +1051,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     setGoalkeeperOutlet("");
     setGoalPoint(null);
     setAssistDrawingPoint(null);
+    setTransitionDrawingPoint(null);
     setBuildUpPhase("");
     setCreationPhase("");
     setFinalizationPhase("");
@@ -1073,6 +1086,9 @@ const updateMutation = useMutation({
     const resolvedFreekickProfile = derivedFreekickProfile || freekickProfile;
     if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
     if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
+    if (isOffensiveTransitionMoment && !transitionDrawingPoint) {
+      throw new Error("Transicao Ofensiva requer marcar a zona de recuperacao.");
+    }
     const hasFoulSufferedAction = selectedActions.some((a) => {
       const normalized = normalizeActionName(a.name);
       return (
@@ -1106,6 +1122,7 @@ const updateMutation = useMutation({
       assistId: assistId ?? null,
       minute,
       momentId,
+      momentName: selectedMoment?.name ?? undefined,
       subMomentId,
       actionIds,
       cornerTakerId,
@@ -1119,6 +1136,7 @@ const updateMutation = useMutation({
       videoPath: videoPath || undefined,
       fieldDrawing: fieldPoint ?? undefined,
       assistDrawing: assistDrawingPoint ?? undefined,
+      transitionDrawing: transitionDrawingPoint ?? undefined,
       buildUpPhase: buildUpPhase || undefined,
       creationPhase: creationPhase || undefined,
       finalizationPhase: finalizationPhase || undefined,
@@ -1214,13 +1232,32 @@ const filteredChampionships = useMemo(() => {
   const selectedSubMoment = subMomentId ? lookupsQuery.data?.subMoments.find((s) => s.id === subMomentId) : undefined;
   const normalizedMomentName = normalizeActionName(selectedMoment?.name ?? "");
   const normalizedSubMomentName = normalizeActionName(selectedSubMoment?.name ?? "");
+  const isOffensiveTransitionMoment = normalizedMomentName === "transicao ofensiva";
   const isTransitionRecoverySubMoment =
     (normalizedSubMomentName.includes("recuperacao") &&
       normalizedSubMomentName.includes("meio campo defensivo")) ||
     (normalizedSubMomentName.includes("recuperacao") &&
       normalizedSubMomentName.includes("meio campo ofensivo"));
-  const isOffensiveTransitionRecovery =
-    normalizedMomentName === "transicao ofensiva" && isTransitionRecoverySubMoment;
+  const isOffensiveTransitionRecovery = isOffensiveTransitionMoment && isTransitionRecoverySubMoment;
+  const transitionRecoveryZoneLabel = normalizedSubMomentName.includes("defensivo")
+    ? "Recuperacao no Meio Defensivo"
+    : normalizedSubMomentName.includes("ofensivo")
+      ? "Recuperacao no Meio Ofensivo"
+      : "Seleciona o sub-momento de recuperacao";
+  const shouldShowTransitionStep = isOffensiveTransitionMoment;
+  const visibleSteps = useMemo(
+    () => wizardStepDefinitions.filter((wizardStep) => shouldShowTransitionStep || wizardStep.id !== "transition"),
+    [shouldShowTransitionStep]
+  );
+
+  useEffect(() => {
+    if (!shouldShowTransitionStep) {
+      setTransitionDrawingPoint(null);
+      if (step === "transition") {
+        setStep("assist");
+      }
+    }
+  }, [shouldShowTransitionStep, step]);
 
   const filteredActions = useMemo(() => {
     if (!subMomentId || !lookupsQuery.data) return [];
@@ -1391,6 +1428,7 @@ const filteredChampionships = useMemo(() => {
     setGoalPoint(existingGoal.goalCoordinates ?? null);
     setFieldPoint(existingGoal.fieldDrawing ?? null);
     setAssistDrawingPoint(existingGoal.assistDrawing ?? toPoint(existingGoal.assistCoordinates) ?? null);
+    setTransitionDrawingPoint(existingGoal.transitionDrawing ?? null);
     setBuildUpPhase(existingGoal.buildUpPhase ?? "");
     setCreationPhase(existingGoal.creationPhase ?? "");
     setFinalizationPhase(existingGoal.finalizationPhase ?? "");
@@ -1487,6 +1525,9 @@ const filteredChampionships = useMemo(() => {
 
         return Boolean(momentId && subMomentId && actionIds.length > 0 && minute >= 0);
 
+      case "transition":
+        return shouldShowTransitionStep ? Boolean(transitionDrawingPoint) : true;
+
 
       case "assist":
 
@@ -1527,13 +1568,16 @@ const filteredChampionships = useMemo(() => {
 
 
 
-  const currentIndex = steps.findIndex((s) => s.id === step);
+  const currentIndex = Math.max(
+    0,
+    visibleSteps.findIndex((s) => s.id === step)
+  );
 
 
-  const movePrev = () => setStep(steps[Math.max(0, currentIndex - 1)].id);
+  const movePrev = () => setStep(visibleSteps[Math.max(0, currentIndex - 1)].id);
 
 
-  const moveNext = () => setStep(steps[Math.min(steps.length - 1, currentIndex + 1)].id);
+  const moveNext = () => setStep(visibleSteps[Math.min(visibleSteps.length - 1, currentIndex + 1)].id);
 
 
   const readyToSave = Boolean(
@@ -1581,6 +1625,8 @@ const filteredChampionships = useMemo(() => {
 
 
     (!shouldShowPreviousMomentDescription || previousMomentDescription.trim().length > 0) &&
+
+    canNext("transition") &&
 
 
     canNext("assist") &&
@@ -1673,7 +1719,7 @@ const filteredChampionships = useMemo(() => {
         <CardContent className="space-y-6">
 
 
-          <StepIndicator current={step} />
+          <StepIndicator current={step} steps={visibleSteps} />
 
 
 
@@ -2325,6 +2371,7 @@ const filteredChampionships = useMemo(() => {
                     setGoalPoint(null);
                     setFieldPoint(null);
                     setAssistDrawingPoint(null);
+                    setTransitionDrawingPoint(null);
 
 
                   }}
@@ -2406,6 +2453,7 @@ const filteredChampionships = useMemo(() => {
 
 
                     setCrossAuthorId(undefined);
+                    setTransitionDrawingPoint(null);
 
 
                   }}
@@ -2916,6 +2964,41 @@ const filteredChampionships = useMemo(() => {
 
 
 
+          {step === "transition" && shouldShowTransitionStep && (
+
+
+            <div className={mapStepContainerClass}>
+
+
+              <div className="flex items-center justify-between">
+
+
+                <label className="text-sm font-medium">Zona de Recuperacao</label>
+
+
+                <span className="text-xs text-muted-foreground">{transitionRecoveryZoneLabel}</span>
+
+
+              </div>
+
+
+              <PitchPinpoint
+                value={transitionDrawingPoint}
+                onChange={setTransitionDrawingPoint}
+                storageField="transition_drawing"
+                pinColor="#eab308"
+              />
+
+
+            </div>
+
+
+          )}
+
+
+
+
+
           {step === "assist" && (
 
 
@@ -2936,7 +3019,7 @@ const filteredChampionships = useMemo(() => {
               </div>
 
 
-              <PitchPinpoint value={assistDrawingPoint} onChange={setAssistDrawingPoint} storageField="assist_drawing" />
+              <PitchPinpoint value={assistDrawingPoint} onChange={setAssistDrawingPoint} storageField="assist_drawing" pinColor="#38bdf8" />
 
 
             </div>
@@ -3014,7 +3097,7 @@ const filteredChampionships = useMemo(() => {
               </div>
 
 
-              <PitchPinpoint value={fieldPoint} onChange={setFieldPoint} storageField="field_drawing" />
+              <PitchPinpoint value={fieldPoint} onChange={setFieldPoint} storageField="field_drawing" pinColor="#22c55e" />
 
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2 rounded-xl border border-border/60 bg-card/40 p-3">
@@ -3278,6 +3361,13 @@ const filteredChampionships = useMemo(() => {
 
                 <span>{assistDrawingPoint ? `(${assistDrawingPoint.x.toFixed(2)}, ${assistDrawingPoint.y.toFixed(2)})` : "N/A"}</span>
 
+                {shouldShowTransitionStep && (
+                  <>
+                    <span className="text-muted-foreground">Zona de recuperacao</span>
+                    <span>{transitionDrawingPoint ? `(${transitionDrawingPoint.x.toFixed(2)}, ${transitionDrawingPoint.y.toFixed(2)})` : "N/A"}</span>
+                  </>
+                )}
+
 
                 <span className="text-muted-foreground">Baliza</span>
 
@@ -3338,7 +3428,7 @@ const filteredChampionships = useMemo(() => {
               )}
 
 
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className={`grid gap-3 ${shouldShowTransitionStep ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
 
 
                 <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
@@ -3396,6 +3486,29 @@ const filteredChampionships = useMemo(() => {
 
 
                 </div>
+
+
+                {shouldShowTransitionStep && (
+                  <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Recuperacao</div>
+                    <div className="rounded-lg border border-border/50 bg-slate-950/60 p-2">
+                      <svg viewBox="0 0 105 68" className="w-full">
+                        <rect x="1" y="1" width="103" height="66" rx="8" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
+                        <line x1="52.5" y1="1" x2="52.5" y2="67" stroke="rgba(148,163,184,0.35)" strokeDasharray="3 3" />
+                        <circle cx="52.5" cy="34" r="9.15" stroke="rgba(148,163,184,0.35)" fill="none" />
+                        <rect x="1" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
+                        <rect x="90" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
+                        {transitionDrawingPoint && (
+                          <g transform={`translate(${transitionDrawingPoint.x * 105}, ${transitionDrawingPoint.y * 68})`}>
+                            <circle r="3.4" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
+                            <circle r="1.8" fill="#0f172a" />
+                            <circle r="0.9" fill="#eab308" />
+                          </g>
+                        )}
+                      </svg>
+                    </div>
+                  </div>
+                )}
 
 
                 <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
@@ -3542,7 +3655,7 @@ const filteredChampionships = useMemo(() => {
             <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
 
 
-              Step {currentIndex + 1} / {steps.length}
+              Step {currentIndex + 1} / {visibleSteps.length}
 
 
             </div>
@@ -3560,7 +3673,7 @@ const filteredChampionships = useMemo(() => {
               </Button>
 
 
-              {currentIndex < steps.length - 1 && (
+              {currentIndex < visibleSteps.length - 1 && (
 
 
                 <Button type="button" onClick={moveNext} disabled={!canNext(step)}>

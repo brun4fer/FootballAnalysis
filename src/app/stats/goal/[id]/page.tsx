@@ -61,7 +61,7 @@ function GoalNet({ x, y }: { x: number; y: number }) {
 
 
 
-function Pitch({ x, y }: { x: number; y: number }) {
+function Pitch({ x, y, pinColor = "#22c55e" }: { x: number; y: number; pinColor?: string }) {
 
   return (
 
@@ -83,7 +83,7 @@ function Pitch({ x, y }: { x: number; y: number }) {
 
         <circle r="2.1" fill="#0f172a" />
 
-        <circle r="1" fill="#22c55e" />
+        <circle r="1" fill={pinColor} />
 
       </g>
 
@@ -125,6 +125,13 @@ const formatTechnicalLabel = (value?: string | null) => {
     .trim();
 };
 
+const normalizeToken = (value?: string | null) =>
+  (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
 export default async function GoalDetail({ params }: { params: { id: string } }) {
 
   const id = Number(params.id);
@@ -149,6 +156,12 @@ export default async function GoalDetail({ params }: { params: { id: string } })
         ? { x: goal.assistCoordinates.x, y: goal.assistCoordinates.y }
         : null;
   const hasAssistDrawing = Boolean(assistDrawing);
+  const transitionDrawing =
+    goal.transitionDrawing && typeof goal.transitionDrawing.x === "number" && typeof goal.transitionDrawing.y === "number"
+      ? goal.transitionDrawing
+      : null;
+  const isTransitionGoal = normalizeToken(goal.momentName).includes("transicao ofensiva");
+  const hasTransitionDrawing = Boolean(transitionDrawing);
 
   const involvements = goal.involvements ?? [];
   const throwInTakerDisplay = goal.throwInTakerName ?? (goal.throwInTakerId ? `#${goal.throwInTakerId}` : null);
@@ -310,6 +323,13 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
               <span>{assistDrawing ? `(${assistDrawing.x.toFixed(2)}, ${assistDrawing.y.toFixed(2)})` : "-"}</span>
 
+              {isTransitionGoal && (
+                <>
+                  <span className="text-muted-foreground">Ponto de recuperacao</span>
+                  <span>{transitionDrawing ? `(${transitionDrawing.x.toFixed(2)}, ${transitionDrawing.y.toFixed(2)})` : "-"}</span>
+                </>
+              )}
+
               {throwInTakerDisplay && (
                 <div className="col-span-2 grid grid-cols-2">
                   <span className="text-muted-foreground">Marcador do lançamento</span>
@@ -409,7 +429,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
 
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className={`grid gap-4 ${isTransitionGoal ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
 
         <Card>
 
@@ -418,7 +438,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
           <CardContent>
 
             {hasAssistDrawing && assistDrawing ? (
-              <Pitch x={assistDrawing.x} y={assistDrawing.y} />
+              <Pitch x={assistDrawing.x} y={assistDrawing.y} pinColor="#38bdf8" />
             ) : (
               <div className="text-sm text-muted-foreground">Sem coordenadas de assistencia.</div>
             )}
@@ -426,6 +446,19 @@ export default async function GoalDetail({ params }: { params: { id: string } })
           </CardContent>
 
         </Card>
+
+        {isTransitionGoal && (
+          <Card>
+            <CardHeader title="Ponto de Recuperacao" />
+            <CardContent>
+              {hasTransitionDrawing && transitionDrawing ? (
+                <Pitch x={transitionDrawing.x} y={transitionDrawing.y} pinColor="#eab308" />
+              ) : (
+                <div className="text-sm text-muted-foreground">Sem coordenadas de recuperacao.</div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
 
