@@ -228,7 +228,7 @@ export default function ManagePlayersPage() {
               accept="image/*"
               value={form.photoPath}
               onChange={(path) => setForm({ ...form, photoPath: path })}
-              helperText="Use JPG/PNG; guardado em /uploads."
+              helperText="Use JPG/PNG; guardado no Vercel Blob com URL pública."
             />
           </div>
           <div className="space-y-1">

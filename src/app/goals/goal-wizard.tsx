@@ -2946,7 +2946,7 @@ const filteredChampionships = useMemo(() => {
                   onChange={(path) => setVideoPath(path)}
 
 
-                  helperText="O ficheiro será guardado em /uploads e pode ser reproduzido localmente."
+                  helperText="O ficheiro será guardado no Vercel Blob com URL pública."
 
 
                 />

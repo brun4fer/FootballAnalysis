@@ -192,7 +192,7 @@ export default function ManageTeamsPage() {
               accept="application/pdf"
               value={form.radiographyPdfUrl}
               onChange={(path) => setForm({ ...form, radiographyPdfUrl: path })}
-              helperText="Ficheiro ficará em /uploads/."
+              helperText="Ficheiro guardado no Vercel Blob com URL pública."
             />
           </div>
           <div className="space-y-1">
