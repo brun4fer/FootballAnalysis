@@ -7,15 +7,15 @@ const seeds = [
   {
     name: "Organização Ofensiva",
     sub: [
-      { name: "Saída do GR", actions: ["Em organização", "Curto para longo", "Bola longa"] },
+      { name: "Saída do GR", actions: ["Em organização", "Curto para longo", "Bola longa", "Jogador Referência"] },
       {
         name: "Construção",
-        actions: ["Ligação por dentro", "Ligação na largura", "Bola longa no corredor central", "Bola longa na largura"]
+        actions: ["Ligação por dentro", "Ligação na largura", "Bola longa no corredor central", "Bola longa na largura", "Jogador Referência"]
       },
-      { name: "Criação", actions: ["Ligação no corredor central", "Ligação na largura", "Bola longa", "Profundidade"] },
+      { name: "Criação", actions: ["Ligação no corredor central", "Ligação na largura", "Bola longa", "Profundidade", "Jogador Referência"] },
       {
         name: "Finalização",
-        actions: ["Cruzamento Direita", "Cruzamento Esquerda", "Remate de fora da área", "Profundidade", "Segunda bola"]
+        actions: ["Cruzamento Direita", "Cruzamento Esquerda", "Remate de fora da área", "Profundidade", "Segunda bola", "Jogador Referência"]
       }
     ]
   },
@@ -23,7 +23,7 @@ const seeds = [
     name: "Transição Ofensiva",
     sub: ["Recuperação meio campo defensivo", "Recuperação meio campo ofensivo"].map((subName) => ({
       name: subName,
-      actions: ["Cruzamento Direita", "Cruzamento Esquerda", "Remate Fora de Área", "Profundidade"]
+      actions: ["Cruzamento Direita", "Cruzamento Esquerda", "Remate Fora de Área", "Profundidade", "Jogador Referência"]
     }))
   },
   {
@@ -32,16 +32,16 @@ const seeds = [
       { name: "Penalty", actions: ["Falta sobre", "Momento anterior"] },
       {
         name: "Livre",
-        actions: ["Aberto", "Fechado", "Combinado", "Marcador da falta"]
+        actions: ["Aberto", "Fechado", "Combinado", "Marcador da falta", "Jogador Referência"]
       },
       {
         name: "Canto",
-        actions: ["Aberto", "Fechado", "Combinado", "Marcador do canto"]
+        actions: ["Aberto", "Fechado", "Combinado", "Marcador do canto", "Jogador Referência"]
       },
-      { name: "Livre Direto", actions: ["Falta sobre", "Momento anterior", "Marcador da falta"] },
+      { name: "Livre Direto", actions: ["Falta sobre", "Momento anterior", "Marcador da falta", "Jogador Referência"] },
       {
         name: "Lançamento Lateral",
-        actions: ["Lançamento para a área", "Passagem para organização", "Marcador do lançamento"]
+        actions: ["Lançamento para a área", "Passagem para organização", "Marcador do lançamento", "Jogador Referência"]
       }
     ]
   }

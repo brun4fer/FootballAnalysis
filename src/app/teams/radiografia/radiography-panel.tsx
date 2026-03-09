@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { SimplePie } from "@/components/ui/charts";
+import { cn } from "@/lib/utils";
 
 type TeamOption = {
   id: number;
@@ -36,6 +37,7 @@ type PlayerRow = {
   goals?: number;
   assists?: number;
   involvement?: number;
+  references?: number;
 };
 
 type MapPoint = {
@@ -68,6 +70,7 @@ type RadiographyResponse = {
   topScorers: PlayerRow[];
   topAssists: PlayerRow[];
   topParticipation: PlayerRow[];
+  referencePlayers: PlayerRow[];
   goalkeeperOutlets: Array<{ outlet: string; goals: number }>;
   cornerProfiles: Array<{ profile: string; goals: number }>;
   freekickProfiles: Array<{ profile: string; goals: number }>;
@@ -122,6 +125,23 @@ const MAP_WRAPPER_CLASS =
   "relative overflow-hidden rounded-2xl border border-border/70 bg-[#0c1322] p-4 shadow-[0_20px_80px_rgba(0,0,0,0.35)]";
 const MAP_SVG_CLASS = "w-full aspect-[3/2]";
 const ACTION_BAR_COLOR = "rgba(34,211,238,0.72)";
+const ZERO_ACTION_BAR_BG_CLASS = "bg-muted/20";
+const SUB_MOMENT_ACTIONS: Record<string, string[]> = {
+  "saida do gr": ["Em organização", "Curto para longo", "Bola longa"],
+  construcao: [
+    "Bola longa na largura",
+    "Bola longa no corredor central",
+    "Ligação na largura",
+    "Ligação por dentro"
+  ],
+  criacao: ["Ligação no corredor central", "Ligação na largura", "Bola longa", "Profundidade"],
+  finalizacao: ["Cruzamento Direita", "Cruzamento Esquerda", "Remate de fora da área", "Profundidade", "Segunda bola"],
+  "recuperacao meio campo defensivo": ["Cruzamento Direita", "Cruzamento Esquerda", "Remate Fora de Área", "Profundidade"],
+  "recuperacao meio campo ofensivo": ["Cruzamento Direita", "Cruzamento Esquerda", "Remate Fora de Área", "Profundidade"],
+  "lancamento lateral": ["Lançamento para a área", "Passagem para organização"],
+  canto: ["Canto aberto", "Canto fechado", "Canto combinado"],
+  livre: ["Livre aberto", "Livre fechado", "Livre combinado"]
+};
 
 type RecoveryGridVariant = "defensive" | "offensive";
 type TacticalZone = { id: number; x: number; y: number; width: number; height: number };
@@ -158,6 +178,8 @@ const normalizeToken = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+
+const getConfiguredSubMomentActions = (subMomentName: string) => SUB_MOMENT_ACTIONS[normalizeToken(subMomentName)] ?? [];
 
 const isTransitionOffensiveMoment = (momentName?: string) =>
   normalizeToken(momentName ?? "").includes("transicao ofensiva");
@@ -208,11 +230,11 @@ function TopPlayersCard({
             {rows.slice(0, 3).map((row, idx) => (
               <div
                 key={`${row.id}-${idx}`}
-                className="flex items-center justify-between rounded-lg border border-border/50 bg-white/5 px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-white/5 px-3 py-2"
               >
-                <div className="flex items-center gap-3">
-                  <span className="w-6 text-center text-xs text-muted-foreground">{idx + 1}º</span>
-                  <div className="relative h-10 w-10 overflow-hidden rounded-full bg-slate-800">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="w-6 shrink-0 text-center text-xs text-muted-foreground">{idx + 1}º</span>
+                  <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-800">
                     <Image
                       src={row.photoPath || defaultImage}
                       alt={row.name}
@@ -222,14 +244,11 @@ function TopPlayersCard({
                       priority={idx === 0}
                     />
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-white">{row.name}</span>
-                    <span className="text-xs text-muted-foreground">{valueLabel}</span>
-                  </div>
+                  <span className="truncate text-sm font-medium text-white">{row.name}</span>
                 </div>
-                <div className="flex items-baseline gap-1 text-sm font-semibold text-emerald-200">
+                <div className="min-w-[56px] shrink-0 text-right text-sm font-semibold text-emerald-200">
                   <span>{row[valueKey] ?? 0}</span>
-                  <span className="text-[11px] font-normal text-muted-foreground">{valueLabel}</span>
+                  <span className="ml-1 text-[11px] font-normal text-muted-foreground">{valueLabel}</span>
                 </div>
               </div>
             ))}
@@ -247,6 +266,48 @@ function TopMetricCard({ title, value, subtitle }: { title: string; value: strin
       <CardContent className="space-y-1">
         <div className="text-xl font-semibold text-white">{value}</div>
         <div className="text-xs text-muted-foreground">{subtitle}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReferencePlayersCard({ rows }: { rows: PlayerRow[] }) {
+  if (rows.length === 0) return null;
+
+  return (
+    <Card className="bg-[#0c1420]/70 border border-border/60">
+      <CardHeader title="Jogadores Referência" />
+      <CardContent className="space-y-3">
+        <div className="space-y-2">
+          {rows.slice(0, 3).map((row, idx) => (
+            <div
+              key={`${row.id}-${idx}`}
+              className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-white/5 px-3 py-2"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="w-6 shrink-0 text-center text-xs text-muted-foreground">{idx + 1}º</span>
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/70 bg-white">
+                  {row.photoPath ? (
+                    <Image
+                      src={row.photoPath}
+                      alt={row.name}
+                      fill
+                      sizes="40px"
+                      className="object-cover"
+                      priority={idx === 0}
+                    />
+                  ) : (
+                    <div className="h-full w-full rounded-full bg-white" />
+                  )}
+                </div>
+                <span className="truncate text-sm font-medium text-white">{row.name}</span>
+              </div>
+              <div className="min-w-[56px] shrink-0 text-right text-sm font-semibold text-cyan-200">
+                {row.references ?? 0} R
+              </div>
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
@@ -373,6 +434,8 @@ function FieldPinMap({
 }
 
 function SubMomentActionCard({ row }: { row: SubMomentActionBreakdown }) {
+  const hasActions = row.actions.length > 0;
+
   return (
     <Card className="bg-[#0c1420]/70 border border-border/60">
       <CardHeader
@@ -380,7 +443,7 @@ function SubMomentActionCard({ row }: { row: SubMomentActionBreakdown }) {
         description={`${row.totalGoals.toLocaleString("pt-PT")} golos neste sub-momento`}
       />
       <CardContent>
-        {row.actions.length === 0 ? (
+        {!hasActions ? (
           <div className="rounded-xl border border-border/60 bg-slate-900/40 px-3 py-4 text-xs text-muted-foreground">
             Sem ações registadas neste sub-momento.
           </div>
@@ -388,6 +451,7 @@ function SubMomentActionCard({ row }: { row: SubMomentActionBreakdown }) {
           <div className="space-y-3">
             {row.actions.map((entry) => {
               const width = Math.min(100, Math.max(0, entry.percent));
+              const isEmptyAction = entry.goals <= 0;
               return (
                 <div
                   key={`${row.subMomentId}-${entry.action}`}
@@ -396,7 +460,12 @@ function SubMomentActionCard({ row }: { row: SubMomentActionBreakdown }) {
                   <div className="text-xs leading-5 text-slate-100 break-words whitespace-normal">
                     {entry.action}
                   </div>
-                  <div className="relative h-7 overflow-hidden rounded-md border border-slate-700/80 bg-slate-900/75">
+                  <div
+                    className={cn(
+                      "relative h-7 overflow-hidden rounded-md border border-slate-700/80",
+                      isEmptyAction ? ZERO_ACTION_BAR_BG_CLASS : "bg-slate-900/75"
+                    )}
+                  >
                     <div
                       className="absolute inset-y-0 left-0 rounded-md"
                       style={{ width: `${width}%`, backgroundColor: ACTION_BAR_COLOR }}
@@ -640,9 +709,12 @@ export default function RadiographyPanel({
   );
   const currentTeam = teams.find((team) => team.id === teamId) ?? radiography?.team;
   const isSpecificFilterActive = Boolean(momentId || bpoCategory);
+  const isAllMomentsFilter = !momentId && !bpoCategory;
   const selectedMoment = momentId ? momentOptions.find((moment) => moment.id === momentId) : undefined;
   const selectedBpoFilter = bpoCategory ? BPO_FILTER_OPTIONS.find((option) => option.value === bpoCategory) : undefined;
   const isTransitionMomentFilter = Boolean(selectedMoment && isTransitionOffensiveMoment(selectedMoment.name));
+  const shouldShowTopPlayerRankings = isAllMomentsFilter;
+  const shouldShowReferenceRanking = isTransitionMomentFilter;
   const selectedFilterLabel = selectedMoment?.name ?? selectedBpoFilter?.label ?? "Filtro";
   const momentGoalsValue = radiography?.momentGoals ?? 0;
   const teamGoalsValue = radiography?.teamGoals ?? 0;
@@ -667,10 +739,25 @@ export default function RadiographyPanel({
     () =>
       (radiography?.subMomentActionBreakdown ?? []).map((entry) => ({
         ...entry,
-        actions: entry.actions.map((actionEntry) => ({
-          ...actionEntry,
-          action: formatTechnicalLabel(actionEntry.action) || actionEntry.action
-        }))
+        actions: (() => {
+          const rawActions = entry.actions.map((actionEntry) => ({
+            ...actionEntry,
+            action: formatTechnicalLabel(actionEntry.action) || actionEntry.action
+          }));
+          const configuredActions = getConfiguredSubMomentActions(entry.subMoment);
+          if (configuredActions.length === 0) return rawActions;
+
+          const configuredActionKeys = new Set(configuredActions.map((action) => normalizeToken(action)));
+          const actionByName = new Map(rawActions.map((actionEntry) => [normalizeToken(actionEntry.action), actionEntry]));
+          const configuredList = configuredActions.map((actionName) => {
+            const actionKey = normalizeToken(actionName);
+            const existingAction = actionByName.get(actionKey);
+            if (existingAction) return existingAction;
+            return { action: actionName, goals: 0, percent: 0 };
+          });
+          const extraActions = rawActions.filter((actionEntry) => !configuredActionKeys.has(normalizeToken(actionEntry.action)));
+          return [...configuredList, ...extraActions];
+        })()
       })),
     [radiography?.subMomentActionBreakdown]
   );
@@ -870,6 +957,13 @@ export default function RadiographyPanel({
                   )}
                 </div>
               )}
+              {shouldShowReferenceRanking && (
+                <div className="flex justify-center">
+                  <div className="w-full max-w-xl">
+                    <ReferencePlayersCard rows={radiography.referencePlayers} />
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -894,41 +988,43 @@ export default function RadiographyPanel({
                 </Card>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-3">
-                <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Top Marcadores" />
-                  <CardContent>
-                    <TopPlayersCard
-                      title=""
-                      rows={radiography.topScorers}
-                      valueKey="goals"
-                      valueLabel="G"
-                    />
-                  </CardContent>
-                </Card>
-                <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Top Assistências" />
-                  <CardContent>
-                    <TopPlayersCard
-                      title=""
-                      rows={radiography.topAssists}
-                      valueKey="assists"
-                      valueLabel="A"
-                    />
-                  </CardContent>
-                </Card>
-                <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Top Participações" />
-                  <CardContent>
-                    <TopPlayersCard
-                      title=""
-                      rows={radiography.topParticipation}
-                      valueKey="involvement"
-                      valueLabel="Part."
-                    />
-                  </CardContent>
-                </Card>
-              </div>
+              {shouldShowTopPlayerRankings && (
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <Card className="bg-[#0c1420]/70 border border-border/60">
+                    <CardHeader title="Top Marcadores" />
+                    <CardContent>
+                      <TopPlayersCard
+                        title=""
+                        rows={radiography.topScorers}
+                        valueKey="goals"
+                        valueLabel="G"
+                      />
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-[#0c1420]/70 border border-border/60">
+                    <CardHeader title="Top Assistências" />
+                    <CardContent>
+                      <TopPlayersCard
+                        title=""
+                        rows={radiography.topAssists}
+                        valueKey="assists"
+                        valueLabel="A"
+                      />
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-[#0c1420]/70 border border-border/60">
+                    <CardHeader title="Top Participações" />
+                    <CardContent>
+                      <TopPlayersCard
+                        title=""
+                        rows={radiography.topParticipation}
+                        valueKey="involvement"
+                        valueLabel="Part."
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </>
           )}
 

@@ -119,8 +119,17 @@ const recoveryActionWhitelist = new Set([
   "cruzamento esquerda",
   "remate fora de area",
   "remate de fora da area",
-  "profundidade"
+  "profundidade",
+  "jogador referencia"
 ]);
+
+const recoveryActionOrder = [
+  "cruzamento direita",
+  "cruzamento esquerda",
+  "profundidade",
+  "remate fora de area",
+  "jogador referencia"
+] as const;
 
 const normalizeRecoveryAction = (name: string) => {
   const normalized = normalizeActionName(name);
@@ -1390,22 +1399,28 @@ const filteredChampionships = useMemo(() => {
 
     if (!isOffensiveTransitionRecovery) return bySubMoment;
 
-    const whitelistedFromSubMoment = bySubMoment.filter((action) =>
-      recoveryActionWhitelist.has(normalizeRecoveryAction(action.name))
-    );
-    if (whitelistedFromSubMoment.length > 0) return whitelistedFromSubMoment;
+    const actionByCanonical = new Map<string, LookupAction>();
+    bySubMoment.forEach((action) => {
+      const canonical = normalizeRecoveryAction(action.name);
+      if (!recoveryActionWhitelist.has(canonical)) return;
+      if (!actionByCanonical.has(canonical)) {
+        actionByCanonical.set(canonical, action);
+      }
+    });
 
-    const fallbackByName = new Map<string, LookupAction>();
     lookupsQuery.data.actions.forEach((action) => {
       const normalized = normalizeActionName(action.name);
       if (hiddenActionNames.has(normalized)) return;
       const canonical = normalizeRecoveryAction(action.name);
       if (!recoveryActionWhitelist.has(canonical)) return;
-      if (!fallbackByName.has(canonical)) {
-        fallbackByName.set(canonical, action);
+      if (!actionByCanonical.has(canonical)) {
+        actionByCanonical.set(canonical, action);
       }
     });
-    return Array.from(fallbackByName.values());
+
+    return recoveryActionOrder
+      .map((canonical) => actionByCanonical.get(canonical))
+      .filter((action): action is LookupAction => Boolean(action));
   }, [lookupsQuery.data, subMomentId, isOffensiveTransitionRecovery]);
 
   useEffect(() => {

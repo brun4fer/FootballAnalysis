@@ -25,7 +25,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
         actions: [
           { name: "Em organiza\u00e7\u00e3o", context: "field" },
           { name: "Curto para longo", context: "field" },
-          { name: "Bola longa", context: "field" }
+          { name: "Bola longa", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       },
       {
@@ -34,7 +35,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
           { name: "Liga\u00e7\u00e3o por dentro", context: "field" },
           { name: "Liga\u00e7\u00e3o na largura", context: "field" },
           { name: "Bola longa no corredor central", context: "field" },
-          { name: "Bola longa na largura", context: "field" }
+          { name: "Bola longa na largura", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       },
       {
@@ -43,7 +45,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
           { name: "Liga\u00e7\u00e3o no corredor central", context: "field" },
           { name: "Liga\u00e7\u00e3o na largura", context: "field" },
           { name: "Bola longa", context: "field" },
-          { name: "Profundidade", context: "field" }
+          { name: "Profundidade", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       },
       {
@@ -53,7 +56,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
           { name: "Cruzamento Esquerda", context: "field" },
           { name: "Remate de fora da \u00e1rea", context: "field_goal" },
           { name: "Profundidade", context: "field" },
-          { name: "Segunda bola", context: "field" }
+          { name: "Segunda bola", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       }
     ]
@@ -67,7 +71,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
           { name: "Cruzamento Direita", context: "field" },
           { name: "Cruzamento Esquerda", context: "field" },
           { name: "Remate Fora de \u00c1rea", context: "field_goal" },
-          { name: "Profundidade", context: "field" }
+          { name: "Profundidade", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       },
       {
@@ -76,7 +81,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
           { name: "Cruzamento Direita", context: "field" },
           { name: "Cruzamento Esquerda", context: "field" },
           { name: "Remate Fora de \u00c1rea", context: "field_goal" },
-          { name: "Profundidade", context: "field" }
+          { name: "Profundidade", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       }
     ]
@@ -89,7 +95,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
         actions: [
           { name: "Marcador do lan\u00e7amento", context: "field_goal" },
           { name: "Lan\u00e7amento para a \u00e1rea", context: "field" },
-          { name: "Passagem para organiza\u00e7\u00e3o", context: "field" }
+          { name: "Passagem para organiza\u00e7\u00e3o", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       },
       {
@@ -98,7 +105,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
           { name: "Marcador do canto", context: "field_goal" },
           { name: "Canto aberto", context: "field" },
           { name: "Canto fechado", context: "field" },
-          { name: "Canto combinado", context: "field" }
+          { name: "Canto combinado", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       },
       {
@@ -109,7 +117,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
           { name: "Livre fechado", context: "field" },
           { name: "Livre combinado", context: "field" },
           { name: "Falta sobre", context: "field" },
-          { name: "Momento anterior", context: "field" }
+          { name: "Momento anterior", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       },
       {
@@ -117,7 +126,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
         actions: [
           { name: "Marcador da falta", context: "field_goal" },
           { name: "Falta sobre", context: "field" },
-          { name: "Momento anterior", context: "field" }
+          { name: "Momento anterior", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       },
       {
@@ -125,7 +135,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
         actions: [
           { name: "Marcador do pen\u00e1lti", context: "field_goal" },
           { name: "Falta sobre", context: "field" },
-          { name: "Momento anterior", context: "field" }
+          { name: "Momento anterior", context: "field" },
+          { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       }
     ]

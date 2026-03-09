@@ -248,6 +248,47 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     LIMIT 3
   `);
 
+  const topReferencePlayers = db.execute<{ id: number; name: string; referenceCount: number; photoPath: string | null }>(sql`
+    WITH filtered_goals AS (
+      SELECT g.id, g.reference_player_id, g.action_id
+      FROM ${goals} g
+      WHERE ${goalFilter}
+        AND g.reference_player_id IS NOT NULL
+    ),
+    goal_action_links AS (
+      SELECT fg.id AS goal_id, fg.reference_player_id, link.action_id
+      FROM filtered_goals fg
+      JOIN LATERAL (
+        SELECT DISTINCT action_id
+        FROM (
+          SELECT fg.action_id AS action_id
+          UNION ALL
+          SELECT ga.action_id
+          FROM ${goalActions} ga
+          WHERE ga.goal_id = fg.id
+        ) raw_actions
+        WHERE action_id IS NOT NULL
+      ) link ON TRUE
+    ),
+    reference_goals AS (
+      SELECT DISTINCT gal.goal_id, gal.reference_player_id
+      FROM goal_action_links gal
+      JOIN ${actions} a_ref ON a_ref.id = gal.action_id
+      WHERE translate(
+        lower(coalesce(a_ref.name, '')),
+        'áàâãäéèêëíìîïóòôõöúùûüç',
+        'aaaaaeeeeiiiiooooouuuuc'
+      ) LIKE '%referenc%'
+    )
+    SELECT p.id, p.name, COUNT(*)::int AS "referenceCount", COALESCE(p.photo_path, '') AS "photoPath"
+    FROM reference_goals rg
+    JOIN ${players} p ON p.id = rg.reference_player_id
+    WHERE p.team_id = ${teamId}
+    GROUP BY p.id, p.name, p.photo_path
+    ORDER BY "referenceCount" DESC, p.name
+    LIMIT 3
+  `);
+
   const goalkeeperOutlets = db.execute<{ outlet: string; goals: number }>(sql`
     SELECT g.goalkeeper_outlet AS outlet, COUNT(*)::int AS goals
     FROM ${goals} g
@@ -425,6 +466,7 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     scorerRows,
     assistTopRows,
     participationRows,
+    referencePlayersRows,
     goalkeeperOutletRows,
     cornerProfileRows,
     freekickProfileRows,
@@ -442,6 +484,7 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     topScorers,
     topAssists,
     topParticipation,
+    topReferencePlayers,
     goalkeeperOutlets,
     cornerProfiles,
     freekickProfiles,
@@ -589,6 +632,12 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     topScorers: scorerRows.rows.map((r) => ({ ...r, photoPath: onlyLocal(r.photoPath) })),
     topAssists: assistTopRows.rows.map((r) => ({ ...r, photoPath: onlyLocal(r.photoPath) })),
     topParticipation: participationRows.rows.map((r) => ({ ...r, photoPath: onlyLocal(r.photoPath) })),
+    referencePlayers: referencePlayersRows.rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      references: r.referenceCount,
+      photoPath: onlyLocal(r.photoPath)
+    })),
     goalkeeperOutlets: goalkeeperOutletRows.rows,
     cornerProfiles: cornerProfileRows.rows,
     freekickProfiles: freekickProfileRows.rows,
