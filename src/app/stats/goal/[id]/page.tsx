@@ -93,38 +93,6 @@ function Pitch({ x, y, pinColor = "#22c55e" }: { x: number; y: number; pinColor?
 
 }
 
-const TECH_LABEL_OVERRIDES: Record<string, string> = {
-  organizacao: "Organização",
-  curto_para_longo: "Curto para longo",
-  bola_longa: "Bola longa",
-  area: "Área",
-  aberto: "Aberto",
-  fechado: "Fechado",
-  combinado: "Combinado",
-  cruzamento: "Cruzamento",
-  "canto aberto": "Canto Aberto",
-  "canto fechado": "Canto Fechado"
-};
-
-const normalizeChartLabel = (value?: string | null) => {
-  const raw = value?.toString().trim();
-  if (!raw) return null;
-  if (raw.toLowerCase() === "indefinido") return null;
-  return raw;
-};
-
-const formatTechnicalLabel = (value?: string | null) => {
-  const normalized = normalizeChartLabel(value);
-  if (!normalized) return null;
-  const lower = normalized.toLowerCase();
-  if (TECH_LABEL_OVERRIDES[lower]) return TECH_LABEL_OVERRIDES[lower];
-  const words = normalized.replace(/_/g, " ").split(" ");
-  return words
-    .map((word) => (word ? `${word[0].toUpperCase()}${word.slice(1).toLowerCase()}` : ""))
-    .join(" ")
-    .trim();
-};
-
 const normalizeToken = (value?: string | null) =>
   (value ?? "")
     .normalize("NFD")
@@ -187,30 +155,6 @@ export default async function GoalDetail({ params }: { params: { id: string } })
         </div>
 
       </div>
-
-
-      <Card>
-        <CardHeader title="Análise Técnica" />
-        <CardContent className="space-y-3 text-sm">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-border/60 bg-card/40 p-3">
-              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Fase de construção</div>
-              <div className="mt-2 text-sm font-medium text-white">{formatTechnicalLabel(goal.buildUpPhase) ?? "—"}</div>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-card/40 p-3">
-              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Fase de criação</div>
-              <div className="mt-2 text-sm font-medium text-white">{formatTechnicalLabel(goal.creationPhase) ?? "—"}</div>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-card/40 p-3">
-              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Fase de finalização</div>
-              <div className="mt-2 text-sm font-medium text-white">{formatTechnicalLabel(goal.finalizationPhase) ?? "—"}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-
-
       <div className="grid gap-4 lg:grid-cols-2">
 
         <Card>
@@ -462,7 +406,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
         <Card>
 
-          <CardHeader title="Ponto do Remate no Campo" />
+          <CardHeader title="Zona de Remate" />
 
           <CardContent>
 
@@ -507,6 +451,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
   );
 
 }
+
 
 
 

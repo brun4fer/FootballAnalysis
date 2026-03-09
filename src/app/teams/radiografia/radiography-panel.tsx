@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
-import { SimpleBar, SimplePie } from "@/components/ui/charts";
+import { SimplePie } from "@/components/ui/charts";
 
 type TeamOption = {
   id: number;
@@ -46,6 +46,20 @@ type MapPoint = {
   minute?: number | null;
 };
 
+type SubMomentActionBreakdown = {
+  subMomentId: number;
+  subMoment: string;
+  totalGoals: number;
+  actions: Array<{ action: string; goals: number; percent: number }>;
+};
+
+type RecoverySpaceBreakdown = {
+  subMomentId: number;
+  subMoment: string;
+  totalGoals: number;
+  zones: Array<{ zoneId: number; goals: number; percent: number }>;
+};
+
 type RadiographyResponse = {
   distribution: { category: string; goals: number }[];
   assistZones: MapPoint[];
@@ -54,13 +68,12 @@ type RadiographyResponse = {
   topScorers: PlayerRow[];
   topAssists: PlayerRow[];
   topParticipation: PlayerRow[];
-  buildUpPhases: Array<{ phase: string; goals: number }>;
-  creationPhases: Array<{ phase: string; goals: number }>;
-  finalizationPhases: Array<{ phase: string; goals: number }>;
   goalkeeperOutlets: Array<{ outlet: string; goals: number }>;
   cornerProfiles: Array<{ profile: string; goals: number }>;
   freekickProfiles: Array<{ profile: string; goals: number }>;
   throwInProfiles: Array<{ profile: string; goals: number }>;
+  subMomentActionBreakdown: SubMomentActionBreakdown[];
+  recoverySpaces: RecoverySpaceBreakdown[];
   momentGoals: number;
   teamGoals: number;
   team: TeamOption | null;
@@ -108,6 +121,62 @@ const MAP_CARD_CONTENT_CLASS = "min-h-[300px] w-full px-0 py-0";
 const MAP_WRAPPER_CLASS =
   "relative overflow-hidden rounded-2xl border border-border/70 bg-[#0c1322] p-4 shadow-[0_20px_80px_rgba(0,0,0,0.35)]";
 const MAP_SVG_CLASS = "w-full aspect-[3/2]";
+const ACTION_BAR_COLOR = "rgba(34,211,238,0.72)";
+
+type RecoveryGridVariant = "defensive" | "offensive";
+type TacticalZone = { id: number; x: number; y: number; width: number; height: number };
+
+const DEFENSIVE_RECOVERY_ZONES: TacticalZone[] = [
+  { id: 1, x: 8, y: 10, width: 26, height: 12 },
+  { id: 2, x: 34, y: 10, width: 26, height: 12 },
+  { id: 3, x: 8, y: 22, width: 26, height: 7 },
+  { id: 4, x: 34, y: 22, width: 26, height: 7 },
+  { id: 5, x: 8, y: 29, width: 26, height: 22 },
+  { id: 6, x: 34, y: 29, width: 26, height: 22 },
+  { id: 7, x: 8, y: 51, width: 26, height: 7 },
+  { id: 8, x: 34, y: 51, width: 26, height: 7 },
+  { id: 9, x: 8, y: 58, width: 26, height: 12 },
+  { id: 10, x: 34, y: 58, width: 26, height: 12 }
+];
+
+const OFFENSIVE_RECOVERY_ZONES: TacticalZone[] = [
+  { id: 1, x: 60, y: 10, width: 26, height: 12 },
+  { id: 2, x: 86, y: 10, width: 26, height: 12 },
+  { id: 3, x: 60, y: 22, width: 26, height: 7 },
+  { id: 4, x: 86, y: 22, width: 26, height: 7 },
+  { id: 5, x: 60, y: 29, width: 26, height: 16 },
+  { id: 6, x: 86, y: 29, width: 26, height: 16 },
+  { id: 7, x: 60, y: 45, width: 26, height: 13 },
+  { id: 8, x: 86, y: 45, width: 26, height: 13 },
+  { id: 9, x: 60, y: 58, width: 26, height: 12 },
+  { id: 10, x: 86, y: 58, width: 26, height: 12 }
+];
+
+const normalizeToken = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const isTransitionOffensiveMoment = (momentName?: string) =>
+  normalizeToken(momentName ?? "").includes("transicao ofensiva");
+
+const getRecoveryVariant = (subMomentName: string): RecoveryGridVariant | null => {
+  const normalized = normalizeToken(subMomentName);
+  if (normalized.includes("meio campo defensivo")) return "defensive";
+  if (normalized.includes("meio campo ofensivo")) return "offensive";
+  return null;
+};
+
+const getRecoveryZones = (variant: RecoveryGridVariant) =>
+  variant === "defensive" ? DEFENSIVE_RECOVERY_ZONES : OFFENSIVE_RECOVERY_ZONES;
+
+const formatPercent = (value: number) => {
+  if (!Number.isFinite(value)) return "0%";
+  if (Math.abs(value - Math.round(value)) < 0.05) return `${Math.round(value)}%`;
+  return `${value.toFixed(1)}%`;
+};
 
 function EmptyGraphState() {
   return (
@@ -303,6 +372,153 @@ function FieldPinMap({
   );
 }
 
+function SubMomentActionCard({ row }: { row: SubMomentActionBreakdown }) {
+  return (
+    <Card className="bg-[#0c1420]/70 border border-border/60">
+      <CardHeader
+        title={row.subMoment}
+        description={`${row.totalGoals.toLocaleString("pt-PT")} golos neste sub-momento`}
+      />
+      <CardContent>
+        {row.actions.length === 0 ? (
+          <div className="rounded-xl border border-border/60 bg-slate-900/40 px-3 py-4 text-xs text-muted-foreground">
+            Sem ações registadas neste sub-momento.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {row.actions.map((entry) => {
+              const width = Math.min(100, Math.max(0, entry.percent));
+              return (
+                <div
+                  key={`${row.subMomentId}-${entry.action}`}
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] sm:items-center sm:gap-3"
+                >
+                  <div className="text-xs leading-5 text-slate-100 break-words whitespace-normal">
+                    {entry.action}
+                  </div>
+                  <div className="relative h-7 overflow-hidden rounded-md border border-slate-700/80 bg-slate-900/75">
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-md"
+                      style={{ width: `${width}%`, backgroundColor: ACTION_BAR_COLOR }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-between px-2 text-[11px] font-medium text-white">
+                      <span>{entry.goals} golos</span>
+                      <span>{formatPercent(entry.percent)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TransitionRecoveryCard({ row }: { row: RecoverySpaceBreakdown }) {
+  const variant = getRecoveryVariant(row.subMoment);
+  if (!variant) return null;
+  const tacticalZones = getRecoveryZones(variant);
+  const zoneById = new Map(row.zones.map((zone) => [zone.zoneId, zone]));
+  const maxZoneGoals = row.zones.reduce((max, zone) => Math.max(max, zone.goals), 0);
+  const activeZones = row.zones
+    .filter((zone) => zone.goals > 0)
+    .sort((a, b) => (b.goals === a.goals ? a.zoneId - b.zoneId : b.goals - a.goals));
+  const inertOverlay =
+    variant === "defensive" ? (
+      <rect x="60" y="10" width="52" height="60" fill="rgba(2,6,23,0.68)" />
+    ) : (
+      <rect x="8" y="10" width="52" height="60" fill="rgba(2,6,23,0.68)" />
+    );
+
+  return (
+    <Card className="bg-[#0c1420]/70 border border-border/60">
+      <CardHeader
+        title={row.subMoment}
+        description={`${row.totalGoals.toLocaleString("pt-PT")} golos com recuperação`}
+      />
+      <CardContent className="space-y-3">
+        <div className={MAP_WRAPPER_CLASS}>
+          <svg viewBox="0 0 120 80" className={MAP_SVG_CLASS} preserveAspectRatio="xMidYMid meet">
+            <rect x="4" y="6" width="112" height="68" rx="6" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
+            <rect
+              x="8"
+              y="10"
+              width="104"
+              height="60"
+              rx="4"
+              fill="rgba(6,24,40,0.72)"
+              stroke="rgba(34,211,238,0.25)"
+              strokeWidth="0.8"
+            />
+            <line
+              x1="60"
+              y1="10"
+              x2="60"
+              y2="70"
+              stroke="rgba(226,232,240,0.35)"
+              strokeWidth="0.8"
+              strokeDasharray="3 3"
+            />
+            <rect x="8" y="22" width="16" height="36" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
+            <rect x="8" y="29" width="7" height="22" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
+            <rect x="96" y="22" width="16" height="36" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
+            <rect x="105" y="29" width="7" height="22" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
+            {inertOverlay}
+            {tacticalZones.map((zone) => {
+              const zoneStats = zoneById.get(zone.id);
+              const goalsInZone = zoneStats?.goals ?? 0;
+              const intensity = maxZoneGoals > 0 ? goalsInZone / maxZoneGoals : 0;
+              const fillAlpha = goalsInZone > 0 ? 0.16 + intensity * 0.5 : 0.03;
+              const fillColor = `rgba(34,211,238,${fillAlpha.toFixed(2)})`;
+              const strokeColor =
+                goalsInZone > 0 ? "rgba(34,211,238,0.95)" : "rgba(226,232,240,0.45)";
+              return (
+                <g key={`${row.subMomentId}-${zone.id}`}>
+                  <rect
+                    x={zone.x}
+                    y={zone.y}
+                    width={zone.width}
+                    height={zone.height}
+                    fill={fillColor}
+                    stroke={strokeColor}
+                    strokeWidth={goalsInZone > 0 ? 1 : 0.7}
+                  />
+                  <text
+                    x={zone.x + zone.width / 2}
+                    y={zone.y + zone.height / 2 + 1.5}
+                    textAnchor="middle"
+                    className="fill-white text-[4px] font-semibold"
+                  >
+                    {zone.id}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        {activeZones.length > 0 ? (
+          <div className="grid grid-cols-1 gap-1 text-[11px] text-slate-200 sm:grid-cols-2">
+            {activeZones.map((zone) => (
+              <div
+                key={`${row.subMomentId}-legend-${zone.zoneId}`}
+                className="rounded-md border border-border/60 bg-slate-900/50 px-2 py-1"
+              >
+                Zona {zone.zoneId}: {zone.goals} golos ({formatPercent(zone.percent)})
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border/60 bg-slate-900/40 px-3 py-3 text-xs text-muted-foreground">
+            Sem registos em zonas de recuperação.
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function RadiographyPanel({
   teams,
   initialTeamId
@@ -422,34 +638,11 @@ export default function RadiographyPanel({
     () => cleanDataset(radiography?.distribution ?? [], "category", "goals"),
     [radiography?.distribution]
   );
-  const buildUpPhases = useMemo(
-    () => cleanDataset(radiography?.buildUpPhases ?? [], "phase", "goals"),
-    [radiography?.buildUpPhases]
-  );
-  const creationPhases = useMemo(
-    () => cleanDataset(radiography?.creationPhases ?? [], "phase", "goals"),
-    [radiography?.creationPhases]
-  );
-  const finalizationPhases = useMemo(
-    () => cleanDataset(radiography?.finalizationPhases ?? [], "phase", "goals"),
-    [radiography?.finalizationPhases]
-  );
-  const cornerProfiles = useMemo(
-    () => cleanDataset(radiography?.cornerProfiles ?? [], "profile", "goals"),
-    [radiography?.cornerProfiles]
-  );
-  const freekickProfiles = useMemo(
-    () => cleanDataset(radiography?.freekickProfiles ?? [], "profile", "goals"),
-    [radiography?.freekickProfiles]
-  );
-  const throwInProfiles = useMemo(
-    () => cleanDataset(radiography?.throwInProfiles ?? [], "profile", "goals"),
-    [radiography?.throwInProfiles]
-  );
   const currentTeam = teams.find((team) => team.id === teamId) ?? radiography?.team;
   const isSpecificFilterActive = Boolean(momentId || bpoCategory);
   const selectedMoment = momentId ? momentOptions.find((moment) => moment.id === momentId) : undefined;
   const selectedBpoFilter = bpoCategory ? BPO_FILTER_OPTIONS.find((option) => option.value === bpoCategory) : undefined;
+  const isTransitionMomentFilter = Boolean(selectedMoment && isTransitionOffensiveMoment(selectedMoment.name));
   const selectedFilterLabel = selectedMoment?.name ?? selectedBpoFilter?.label ?? "Filtro";
   const momentGoalsValue = radiography?.momentGoals ?? 0;
   const teamGoalsValue = radiography?.teamGoals ?? 0;
@@ -469,6 +662,24 @@ export default function RadiographyPanel({
   const goalEntryPoints = useMemo(
     () => (radiography?.finishZones ?? []).filter((point) => typeof point.x === "number" && typeof point.y === "number"),
     [radiography?.finishZones]
+  );
+  const subMomentActionBreakdown = useMemo(
+    () =>
+      (radiography?.subMomentActionBreakdown ?? []).map((entry) => ({
+        ...entry,
+        actions: entry.actions.map((actionEntry) => ({
+          ...actionEntry,
+          action: formatTechnicalLabel(actionEntry.action) || actionEntry.action
+        }))
+      })),
+    [radiography?.subMomentActionBreakdown]
+  );
+  const transitionRecoveryBreakdown = useMemo(
+    () =>
+      (radiography?.recoverySpaces ?? []).filter((entry) => {
+        return getRecoveryVariant(entry.subMoment) !== null;
+      }),
+    [radiography?.recoverySpaces]
   );
 
   if (!teams.length) {
@@ -614,6 +825,51 @@ export default function RadiographyPanel({
                   </CardContent>
                 </Card>
               </div>
+              {isTransitionMomentFilter ? (
+                <div className="space-y-3">
+                  <div className="text-xs uppercase tracking-[0.2em] text-cyan-200/80">
+                    Zonas de Recuperação
+                  </div>
+                  {transitionRecoveryBreakdown.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {transitionRecoveryBreakdown.map((entry) => (
+                        <TransitionRecoveryCard key={entry.subMomentId} row={entry} />
+                      ))}
+                    </div>
+                  ) : (
+                    <Card className="bg-[#0c1420]/70 border border-border/60">
+                      <CardHeader title="Zonas de Recuperação" />
+                      <CardContent>
+                        <div className="rounded-xl border border-border/60 bg-slate-900/40 px-3 py-4 text-sm text-muted-foreground">
+                          Sem dados de recuperação para este filtro.
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="text-xs uppercase tracking-[0.2em] text-cyan-200/80">
+                    Ações por Sub-momento
+                  </div>
+                  {subMomentActionBreakdown.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {subMomentActionBreakdown.map((entry) => (
+                        <SubMomentActionCard key={entry.subMomentId} row={entry} />
+                      ))}
+                    </div>
+                  ) : (
+                    <Card className="bg-[#0c1420]/70 border border-border/60">
+                      <CardHeader title="Ações por Sub-momento" />
+                      <CardContent>
+                        <div className="rounded-xl border border-border/60 bg-slate-900/40 px-3 py-4 text-sm text-muted-foreground">
+                          Sem dados de ações para este filtro.
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -676,40 +932,6 @@ export default function RadiographyPanel({
             </>
           )}
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="bg-[#0c1420]/70 border border-border/60">
-              <CardHeader title="Fase de construção" />
-              <CardContent className="min-h-[260px] w-full px-0 py-0">
-                {buildUpPhases.length > 0 ? (
-                  <SimpleBar data={buildUpPhases} xKey="phase" yKey="goals" />
-                ) : (
-                  <EmptyGraphState />
-                )}
-              </CardContent>
-            </Card>
-            <Card className="bg-[#0c1420]/70 border border-border/60">
-              <CardHeader title="Fase de criação" />
-              <CardContent className="min-h-[260px] w-full px-0 py-0">
-                {creationPhases.length > 0 ? (
-                  <SimpleBar data={creationPhases} xKey="phase" yKey="goals" />
-                ) : (
-                  <EmptyGraphState />
-                )}
-              </CardContent>
-            </Card>
-            <Card className="bg-[#0c1420]/70 border border-border/60">
-              <CardHeader title="Fase de finalização" />
-              <CardContent className="min-h-[260px] w-full px-0 py-0">
-                {finalizationPhases.length > 0 ? (
-                  <SimpleBar data={finalizationPhases} xKey="phase" yKey="goals" />
-                ) : (
-                  <EmptyGraphState />
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          
         </div>
       )}
     </div>

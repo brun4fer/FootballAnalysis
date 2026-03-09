@@ -13,6 +13,28 @@ function normalizeToken(value: string) {
     .toLowerCase();
 }
 
+function isTransitionRecoverySubMomentName(value: string) {
+  const normalized = normalizeToken(value);
+  return (
+    normalized.includes("recuperacao") &&
+    (normalized.includes("meio campo defensivo") || normalized.includes("meio campo ofensivo"))
+  );
+}
+
+const recoveryActionWhitelist = new Set([
+  "cruzamento direita",
+  "cruzamento esquerda",
+  "remate fora de area",
+  "remate de fora da area",
+  "profundidade"
+]);
+
+function normalizeRecoveryActionName(value: string) {
+  const normalized = normalizeToken(value);
+  if (normalized === "remate de fora da area") return "remate fora de area";
+  return normalized;
+}
+
 async function hasGoalsColumn(columnName: string) {
   try {
     const res = await db.execute<{ exists: boolean }>(sql`
@@ -34,6 +56,7 @@ async function ensureGoalsDrawingColumns() {
   try {
     await db.execute(sql`ALTER TABLE "goals" ADD COLUMN IF NOT EXISTS "assist_drawing" jsonb`);
     await db.execute(sql`ALTER TABLE "goals" ADD COLUMN IF NOT EXISTS "transition_drawing" jsonb`);
+    await db.execute(sql`ALTER TABLE "goals" ADD COLUMN IF NOT EXISTS "attacking_space_id" integer`);
   } catch {
     // Se não for possível alterar schema em runtime, o fluxo segue e o erro original será devolvido no insert/update.
   }
@@ -76,6 +99,11 @@ async function normalizeGoalPayload(payload: RawGoalPayload) {
     payload?.transitionDrawing && typeof payload.transitionDrawing === "object"
       ? JSON.parse(JSON.stringify(payload.transitionDrawing))
       : payload?.transitionDrawing ?? null;
+  const attackingSpaceIdRaw = payload?.attackingSpaceId;
+  const attackingSpaceId =
+    attackingSpaceIdRaw === undefined || attackingSpaceIdRaw === null || attackingSpaceIdRaw === ""
+      ? null
+      : Number(String(attackingSpaceIdRaw).replace(/[^\d.-]/g, ""));
 
   const actionIdsRaw = Array.isArray(payload?.actionIds)
     ? payload.actionIds
@@ -95,14 +123,16 @@ async function normalizeGoalPayload(payload: RawGoalPayload) {
     fieldDrawing,
     assistCoordinates,
     assistDrawing,
-    transitionDrawing
+    transitionDrawing,
+    attackingSpaceId: Number.isNaN(attackingSpaceId) ? null : attackingSpaceId
   };
 }
 
 export async function getGoalsByTeam(teamId: number) {
-  const [supportsAssistDrawing, supportsTransitionDrawing] = await Promise.all([
+  const [supportsAssistDrawing, supportsTransitionDrawing, supportsAttackingSpace] = await Promise.all([
     hasGoalsColumn("assist_drawing"),
-    hasGoalsColumn("transition_drawing")
+    hasGoalsColumn("transition_drawing"),
+    hasGoalsColumn("attacking_space_id")
   ]);
   const rows = await db
     .select({
@@ -117,6 +147,7 @@ export async function getGoalsByTeam(teamId: number) {
       goalCoordinates: goals.goalCoordinates,
       assistDrawing: supportsAssistDrawing ? goals.assistDrawing : sql<null>`null`,
       transitionDrawing: supportsTransitionDrawing ? goals.transitionDrawing : sql<null>`null`,
+      attackingSpaceId: supportsAttackingSpace ? goals.attackingSpaceId : sql<null>`null`,
       moment: moments.name,
       subMoment: subMoments.name,
       action: actions.name,
@@ -217,9 +248,10 @@ export async function getGoalsByTeam(teamId: number) {
 }
 
 export async function getGoalById(goalId: number) {
-  const [supportsAssistDrawing, supportsTransitionDrawing] = await Promise.all([
+  const [supportsAssistDrawing, supportsTransitionDrawing, supportsAttackingSpace] = await Promise.all([
     hasGoalsColumn("assist_drawing"),
-    hasGoalsColumn("transition_drawing")
+    hasGoalsColumn("transition_drawing"),
+    hasGoalsColumn("attacking_space_id")
   ]);
   const assistPlayer = alias(players, "assist_player");
   const cornerTaker = alias(players, "corner_taker");
@@ -250,9 +282,7 @@ export async function getGoalById(goalId: number) {
       assistCoordinates: goals.assistCoordinates,
       assistDrawing: supportsAssistDrawing ? goals.assistDrawing : sql<null>`null`,
       transitionDrawing: supportsTransitionDrawing ? goals.transitionDrawing : sql<null>`null`,
-      buildUpPhase: goals.buildUpPhase,
-      creationPhase: goals.creationPhase,
-      finalizationPhase: goals.finalizationPhase,
+      attackingSpaceId: supportsAttackingSpace ? goals.attackingSpaceId : sql<null>`null`,
       cornerProfile: goals.cornerProfile,
       freekickProfile: goals.freekickProfile,
       throwInProfile: goals.throwInProfile,
@@ -366,11 +396,12 @@ export async function createGoal(payload: unknown) {
   await ensureGoalsDrawingColumns();
   const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
   const parsed = goalInputSchema.parse(normalized);
-  const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing, supportsTransitionDrawing] = await Promise.all([
+  const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing, supportsTransitionDrawing, supportsAttackingSpace] = await Promise.all([
     hasGoalsColumn("reference_player_id"),
     hasGoalsColumn("throw_in_taker_id"),
     hasGoalsColumn("assist_drawing"),
-    hasGoalsColumn("transition_drawing")
+    hasGoalsColumn("transition_drawing"),
+    hasGoalsColumn("attacking_space_id")
   ]);
 
   const [team, scorer, opponent, moment, subMoment] = await Promise.all([
@@ -410,8 +441,6 @@ export async function createGoal(payload: unknown) {
           .where(inArray(actions.id, parsed.actionIds));
 
   if (actionRows.length !== parsed.actionIds.length) throw new Error("Action not found");
-  if (actionRows.some((a) => a.subMomentId !== parsed.subMomentId))
-    throw new Error("All actions must belong to the selected sub-moment");
 
   const requiresGoal = actionRows.some((a) => a.context === "field_goal" || a.name.toLowerCase().includes("marcador"));
   const requiresField = actionRows.length > 0; // todas as ações pedem registo em campo
@@ -424,8 +453,17 @@ export async function createGoal(payload: unknown) {
   }
 
   const isOffensiveTransitionMoment = normalizeToken(moment.name) === "transicao ofensiva";
-  if (isOffensiveTransitionMoment && !parsed.transitionDrawing) {
-    throw new Error("Transicao Ofensiva requer ponto de recuperacao (transition drawing obrigatorio).");
+  const isOffensiveTransitionRecovery = isOffensiveTransitionMoment && isTransitionRecoverySubMomentName(subMoment.name);
+  const invalidActionRows = actionRows.filter((a) => a.subMomentId !== parsed.subMomentId);
+  const canUseFallbackActions =
+    isOffensiveTransitionRecovery &&
+    invalidActionRows.length > 0 &&
+    invalidActionRows.every((a) => recoveryActionWhitelist.has(normalizeRecoveryActionName(a.name)));
+  if (invalidActionRows.length > 0 && !canUseFallbackActions) {
+    throw new Error("All actions must belong to the selected sub-moment");
+  }
+  if (isOffensiveTransitionRecovery && !parsed.attackingSpaceId) {
+    throw new Error("Transicao Ofensiva de recuperacao requer attackingSpaceId.");
   }
 
   const assistFromRoles = parsed.involvements?.filter((i) => i.role === "assist") ?? [];
@@ -521,9 +559,6 @@ export async function createGoal(payload: unknown) {
       videoPath: parsed.videoPath || null,
       fieldDrawing: parsed.fieldDrawing ?? null,
       assistCoordinates: parsed.assistDrawing ?? parsed.assistCoordinates ?? null,
-      buildUpPhase: parsed.buildUpPhase || null,
-      creationPhase: parsed.creationPhase || null,
-      finalizationPhase: parsed.finalizationPhase || null,
       cornerProfile: isCorner ? parsed.cornerProfile ?? null : null,
       freekickProfile: isFreeKick ? parsed.freekickProfile ?? null : null,
       throwInProfile: isThrowIn ? parsed.throwInProfile ?? null : null,
@@ -547,6 +582,9 @@ export async function createGoal(payload: unknown) {
     }
     if (supportsTransitionDrawing) {
       goalValues.transitionDrawing = isOffensiveTransitionMoment ? parsed.transitionDrawing ?? null : null;
+    }
+    if (supportsAttackingSpace) {
+      goalValues.attackingSpaceId = isOffensiveTransitionRecovery ? parsed.attackingSpaceId ?? null : null;
     }
 
     const [inserted] = await tx
@@ -576,11 +614,12 @@ export async function updateGoal(id: number, payload: unknown) {
   await ensureGoalsDrawingColumns();
   const normalized = await normalizeGoalPayload((payload ?? {}) as RawGoalPayload);
   const parsed = goalInputSchema.parse(normalized);
-  const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing, supportsTransitionDrawing] = await Promise.all([
+  const [supportsReferencePlayer, supportsThrowInTaker, supportsAssistDrawing, supportsTransitionDrawing, supportsAttackingSpace] = await Promise.all([
     hasGoalsColumn("reference_player_id"),
     hasGoalsColumn("throw_in_taker_id"),
     hasGoalsColumn("assist_drawing"),
-    hasGoalsColumn("transition_drawing")
+    hasGoalsColumn("transition_drawing"),
+    hasGoalsColumn("attacking_space_id")
   ]);
 
   const existing = await db.query.goals.findFirst({ where: eq(goals.id, id) });
@@ -617,8 +656,6 @@ export async function updateGoal(id: number, payload: unknown) {
           .where(inArray(actions.id, parsed.actionIds));
 
   if (actionRows.length !== parsed.actionIds.length) throw new Error("Action not found");
-  if (actionRows.some((a) => a.subMomentId !== parsed.subMomentId))
-    throw new Error("All actions must belong to the selected sub-moment");
 
   const assistFromRoles = parsed.involvements?.filter((i) => i.role === "assist") ?? [];
   if (assistFromRoles.length > 1) throw new Error("Only one assist is allowed per goal");
@@ -705,8 +742,17 @@ export async function updateGoal(id: number, payload: unknown) {
   }
 
   const isOffensiveTransitionMoment = normalizeToken(moment.name) === "transicao ofensiva";
-  if (isOffensiveTransitionMoment && !parsed.transitionDrawing) {
-    throw new Error("Transicao Ofensiva requer ponto de recuperacao (transition drawing obrigatorio).");
+  const isOffensiveTransitionRecovery = isOffensiveTransitionMoment && isTransitionRecoverySubMomentName(subMoment.name);
+  const invalidActionRows = actionRows.filter((a) => a.subMomentId !== parsed.subMomentId);
+  const canUseFallbackActions =
+    isOffensiveTransitionRecovery &&
+    invalidActionRows.length > 0 &&
+    invalidActionRows.every((a) => recoveryActionWhitelist.has(normalizeRecoveryActionName(a.name)));
+  if (invalidActionRows.length > 0 && !canUseFallbackActions) {
+    throw new Error("All actions must belong to the selected sub-moment");
+  }
+  if (isOffensiveTransitionRecovery && !parsed.attackingSpaceId) {
+    throw new Error("Transicao Ofensiva de recuperacao requer attackingSpaceId.");
   }
 
   const [updated] = await db.transaction(async (tx) => {
@@ -724,9 +770,6 @@ export async function updateGoal(id: number, payload: unknown) {
       videoPath: parsed.videoPath || null,
       fieldDrawing: parsed.fieldDrawing ?? null,
       assistCoordinates: parsed.assistDrawing ?? parsed.assistCoordinates ?? null,
-      buildUpPhase: parsed.buildUpPhase || null,
-      creationPhase: parsed.creationPhase || null,
-      finalizationPhase: parsed.finalizationPhase || null,
       cornerProfile: isCorner ? parsed.cornerProfile ?? null : null,
       freekickProfile: isFreeKick ? parsed.freekickProfile ?? null : null,
       throwInProfile: isThrowIn ? parsed.throwInProfile ?? null : null,
@@ -750,6 +793,9 @@ export async function updateGoal(id: number, payload: unknown) {
     }
     if (supportsTransitionDrawing) {
       goalUpdateValues.transitionDrawing = isOffensiveTransitionMoment ? parsed.transitionDrawing ?? null : null;
+    }
+    if (supportsAttackingSpace) {
+      goalUpdateValues.attackingSpaceId = isOffensiveTransitionRecovery ? parsed.attackingSpaceId ?? null : null;
     }
 
     const [goalRow] = await tx

@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, serial, smallint, text, date, jsonb, index, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, serial, smallint, integer, text, date, jsonb, index, uniqueIndex, check } from "drizzle-orm/pg-core";
 import { desc, sql } from "drizzle-orm";
 
 export type CoordinatePoint = { x: number; y: number };
@@ -160,12 +160,10 @@ export const goals = pgTable(
     assistCoordinates: jsonb("assist_coordinates").$type<ZoneMarker | null>(),
     assistDrawing: jsonb("assist_drawing").$type<CoordinatePoint | null>(),
     transitionDrawing: jsonb("transition_drawing").$type<CoordinatePoint | null>(),
+    attackingSpaceId: integer("attacking_space_id"),
     assistSector: text("assist_sector"),
     shotSector: text("shot_sector"),
     finishSector: text("finish_sector"),
-    buildUpPhase: text("build_up_phase"),
-    creationPhase: text("creation_phase"),
-    finalizationPhase: text("finalization_phase"),
     cornerProfile: text("corner_profile").$type<"fechado" | "aberto" | "combinado" | null>(),
     freekickProfile: text("freekick_profile").$type<"fechado" | "aberto" | "combinado" | null>(),
     throwInProfile: text("throw_in_profile").$type<"area" | "organizacao" | null>(),

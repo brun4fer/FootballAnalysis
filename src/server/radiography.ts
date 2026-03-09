@@ -14,6 +14,40 @@ import {
 const lowerSm = sql`lower(coalesce(sm.name, ''))`;
 const lowerM = sql`lower(coalesce(m.name, ''))`;
 
+const normalizeToken = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const hiddenActionPatterns = [
+  "jogador referencia",
+  "jogadores referencia",
+  "espacos que atacam",
+  "falta sobre",
+  "falta sofrida",
+  "sofreu a falta",
+  "momento anterior",
+  "marcador",
+  "assistencia",
+  "assistencia e marcador",
+  "marcador e assistencia"
+];
+
+const shouldHideFromSubMomentActionBreakdown = (actionName: string) => {
+  const normalized = normalizeToken(actionName);
+  return hiddenActionPatterns.some((pattern) => normalized.includes(pattern));
+};
+
+const isTransitionRecoverySubMoment = (subMomentName: string) => {
+  const normalized = normalizeToken(subMomentName);
+  return (
+    normalized.includes("recuperacao") &&
+    (normalized.includes("meio campo defensivo") || normalized.includes("meio campo ofensivo"))
+  );
+};
+
 const setPieceCase = sql`
   CASE
     WHEN ${lowerSm} LIKE '%canto%' THEN 'Bola Parada'
@@ -37,6 +71,7 @@ type RadiographyFilters = {
 export async function getRadiography(teamId: number, filters?: RadiographyFilters) {
   const momentId = filters?.momentId;
   const bpoCategory = filters?.bpoCategory;
+  const shouldComputeSubMomentBreakdown = Boolean(momentId || bpoCategory);
   const teamCondition = sql`g.team_id = ${teamId}`;
   const momentCondition = momentId ? sql` AND g.moment_id = ${momentId}` : sql``;
   const isCornerGoal = sql`EXISTS (
@@ -213,39 +248,6 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     LIMIT 3
   `);
 
-  const buildUpPhases = db.execute<{ phase: string; goals: number }>(sql`
-    SELECT g.build_up_phase AS phase, COUNT(*)::int AS goals
-    FROM ${goals} g
-    WHERE ${goalFilter}
-      AND g.build_up_phase IS NOT NULL
-      AND TRIM(g.build_up_phase) <> ''
-      AND lower(g.build_up_phase) <> 'indefinido'
-    GROUP BY g.build_up_phase
-    ORDER BY goals DESC, g.build_up_phase
-  `);
-
-  const creationPhases = db.execute<{ phase: string; goals: number }>(sql`
-    SELECT g.creation_phase AS phase, COUNT(*)::int AS goals
-    FROM ${goals} g
-    WHERE ${goalFilter}
-      AND g.creation_phase IS NOT NULL
-      AND TRIM(g.creation_phase) <> ''
-      AND lower(g.creation_phase) <> 'indefinido'
-    GROUP BY g.creation_phase
-    ORDER BY goals DESC, g.creation_phase
-  `);
-
-  const finalizationPhases = db.execute<{ phase: string; goals: number }>(sql`
-    SELECT g.finalization_phase AS phase, COUNT(*)::int AS goals
-    FROM ${goals} g
-    WHERE ${goalFilter}
-      AND g.finalization_phase IS NOT NULL
-      AND TRIM(g.finalization_phase) <> ''
-      AND lower(g.finalization_phase) <> 'indefinido'
-    GROUP BY g.finalization_phase
-    ORDER BY goals DESC, g.finalization_phase
-  `);
-
   const goalkeeperOutlets = db.execute<{ outlet: string; goals: number }>(sql`
     SELECT g.goalkeeper_outlet AS outlet, COUNT(*)::int AS goals
     FROM ${goals} g
@@ -319,6 +321,90 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     WHERE g.team_id = ${teamId}
   `);
 
+  const subMomentTotalsPromise: Promise<{ rows: Array<{ subMomentId: number; subMoment: string; totalGoals: number }> }> =
+    !shouldComputeSubMomentBreakdown
+      ? Promise.resolve({ rows: [] })
+      : momentId
+        ? db.execute<{ subMomentId: number; subMoment: string; totalGoals: number }>(sql`
+            SELECT
+              sm.id AS "subMomentId",
+              sm.name AS "subMoment",
+              COUNT(g.id)::int AS "totalGoals"
+            FROM ${subMoments} sm
+            LEFT JOIN ${goals} g
+              ON g.sub_moment_id = sm.id
+              AND g.team_id = ${teamId}
+              ${bpoCondition}
+            WHERE sm.moment_id = ${momentId}
+            GROUP BY sm.id, sm.name
+            ORDER BY sm.name
+          `)
+        : db.execute<{ subMomentId: number; subMoment: string; totalGoals: number }>(sql`
+            SELECT
+              sm.id AS "subMomentId",
+              sm.name AS "subMoment",
+              COUNT(*)::int AS "totalGoals"
+            FROM ${goals} g
+            JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
+            WHERE ${goalFilter}
+            GROUP BY sm.id, sm.name
+            ORDER BY sm.name
+          `);
+
+  const subMomentActionsPromise: Promise<{ rows: Array<{ subMomentId: number; action: string; goals: number }> }> =
+    !shouldComputeSubMomentBreakdown
+      ? Promise.resolve({ rows: [] })
+      : db.execute<{ subMomentId: number; action: string; goals: number }>(sql`
+          WITH filtered_goals AS (
+            SELECT g.id, g.sub_moment_id, g.action_id
+            FROM ${goals} g
+            WHERE ${goalFilter}
+          ),
+          goal_action_links AS (
+            SELECT fg.id AS goal_id, fg.sub_moment_id, link.action_id
+            FROM filtered_goals fg
+            JOIN LATERAL (
+              SELECT DISTINCT action_id
+              FROM (
+                SELECT fg.action_id AS action_id
+                UNION ALL
+                SELECT ga.action_id
+                FROM ${goalActions} ga
+                WHERE ga.goal_id = fg.id
+              ) raw_actions
+              WHERE action_id IS NOT NULL
+            ) link ON TRUE
+          )
+          SELECT
+            gal.sub_moment_id AS "subMomentId",
+            a.name AS action,
+            COUNT(DISTINCT gal.goal_id)::int AS goals
+          FROM goal_action_links gal
+          JOIN ${actions} a ON a.id = gal.action_id
+          GROUP BY gal.sub_moment_id, a.name
+          ORDER BY gal.sub_moment_id, goals DESC, a.name
+        `);
+
+  const recoverySpaceRowsPromise: Promise<{
+    rows: Array<{ subMomentId: number; subMoment: string; zoneId: number; goals: number }>;
+  }> =
+    !shouldComputeSubMomentBreakdown
+      ? Promise.resolve({ rows: [] })
+      : db.execute<{ subMomentId: number; subMoment: string; zoneId: number; goals: number }>(sql`
+          SELECT
+            g.sub_moment_id AS "subMomentId",
+            sm.name AS "subMoment",
+            g.attacking_space_id AS "zoneId",
+            COUNT(*)::int AS goals
+          FROM ${goals} g
+          JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
+          WHERE ${goalFilter}
+            AND g.attacking_space_id IS NOT NULL
+            AND g.attacking_space_id BETWEEN 1 AND 10
+          GROUP BY g.sub_moment_id, sm.name, g.attacking_space_id
+          ORDER BY g.sub_moment_id, g.attacking_space_id
+        `);
+
   const teamMeta = await db.query.teams.findFirst({
     where: (fields, { eq }) => eq(fields.id, teamId),
     columns: {
@@ -339,15 +425,15 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     scorerRows,
     assistTopRows,
     participationRows,
-    buildUpPhaseRows,
-    creationPhaseRows,
-    finalizationPhaseRows,
     goalkeeperOutletRows,
     cornerProfileRows,
     freekickProfileRows,
     throwInProfileRows,
     momentGoalsRows,
-    teamGoalsRows
+    teamGoalsRows,
+    subMomentTotalsRows,
+    subMomentActionRows,
+    recoverySpaceRows
   ] = await Promise.all([
     distribution,
     assistZones,
@@ -356,15 +442,15 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     topScorers,
     topAssists,
     topParticipation,
-    buildUpPhases,
-    creationPhases,
-    finalizationPhases,
     goalkeeperOutlets,
     cornerProfiles,
     freekickProfiles,
     throwInProfiles,
     momentGoalsCount,
-    teamGoalsCount
+    teamGoalsCount,
+    subMomentTotalsPromise,
+    subMomentActionsPromise,
+    recoverySpaceRowsPromise
   ]);
 
   const normalizeSectorValue = (value?: string | null) => {
@@ -411,6 +497,90 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
         } => Boolean(point)
       );
 
+  const totalsBySubMomentId = new Map<number, { subMoment: string; totalGoals: number }>();
+  for (const row of subMomentTotalsRows.rows) {
+    totalsBySubMomentId.set(row.subMomentId, {
+      subMoment: row.subMoment,
+      totalGoals: row.totalGoals
+    });
+  }
+
+  const actionsBySubMomentId = new Map<number, Array<{ action: string; goals: number }>>();
+  for (const row of subMomentActionRows.rows) {
+    if (shouldHideFromSubMomentActionBreakdown(row.action)) continue;
+    const bucket = actionsBySubMomentId.get(row.subMomentId) ?? [];
+    bucket.push({ action: row.action, goals: row.goals });
+    actionsBySubMomentId.set(row.subMomentId, bucket);
+    if (!totalsBySubMomentId.has(row.subMomentId)) {
+      totalsBySubMomentId.set(row.subMomentId, {
+        subMoment: "",
+        totalGoals: row.goals
+      });
+    }
+  }
+
+  const subMomentActionBreakdown = Array.from(totalsBySubMomentId.entries())
+    .map(([subMomentId, totals]) => {
+      const rawActions = actionsBySubMomentId.get(subMomentId) ?? [];
+      const actions = rawActions
+        .sort((a, b) => (b.goals === a.goals ? a.action.localeCompare(b.action) : b.goals - a.goals))
+        .map((entry) => ({
+          action: entry.action,
+          goals: entry.goals,
+          percent: totals.totalGoals > 0 ? Number(((entry.goals / totals.totalGoals) * 100).toFixed(1)) : 0
+        }));
+
+      return {
+        subMomentId,
+        subMoment: totals.subMoment || "Sub-momento",
+        totalGoals: totals.totalGoals,
+        actions
+      };
+    })
+    .sort((a, b) => a.subMoment.localeCompare(b.subMoment));
+
+  const recoveryCountsBySubMoment = new Map<number, Map<number, number>>();
+  const recoveryNamesBySubMoment = new Map<number, string>();
+  for (const row of recoverySpaceRows.rows) {
+    if (!isTransitionRecoverySubMoment(row.subMoment)) continue;
+    const zoneMap = recoveryCountsBySubMoment.get(row.subMomentId) ?? new Map<number, number>();
+    zoneMap.set(row.zoneId, row.goals);
+    recoveryCountsBySubMoment.set(row.subMomentId, zoneMap);
+    recoveryNamesBySubMoment.set(row.subMomentId, row.subMoment);
+  }
+
+  const transitionRecoveryTotals = subMomentTotalsRows.rows.filter((row) => isTransitionRecoverySubMoment(row.subMoment));
+  const recoverySourceRows =
+    transitionRecoveryTotals.length > 0
+      ? transitionRecoveryTotals
+      : Array.from(recoveryNamesBySubMoment.entries()).map(([subMomentId, subMoment]) => ({
+          subMomentId,
+          subMoment,
+          totalGoals: Array.from(recoveryCountsBySubMoment.get(subMomentId)?.values() ?? []).reduce(
+            (sum, value) => sum + value,
+            0
+          )
+        }));
+
+  const recoverySpaces = recoverySourceRows
+    .map((row) => {
+      const zoneMap = recoveryCountsBySubMoment.get(row.subMomentId) ?? new Map<number, number>();
+      const zones = Array.from({ length: 10 }, (_, idx) => {
+        const zoneId = idx + 1;
+        const goals = zoneMap.get(zoneId) ?? 0;
+        const percent = row.totalGoals > 0 ? Number(((goals / row.totalGoals) * 100).toFixed(1)) : 0;
+        return { zoneId, goals, percent };
+      });
+
+      return {
+        subMomentId: row.subMomentId,
+        subMoment: row.subMoment,
+        totalGoals: row.totalGoals,
+        zones
+      };
+    })
+    .sort((a, b) => a.subMoment.localeCompare(b.subMoment));
+
   return {
     distribution: distributionRows.rows,
     assistZones: normalizePoints(assistRows.rows),
@@ -419,13 +589,12 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     topScorers: scorerRows.rows.map((r) => ({ ...r, photoPath: onlyLocal(r.photoPath) })),
     topAssists: assistTopRows.rows.map((r) => ({ ...r, photoPath: onlyLocal(r.photoPath) })),
     topParticipation: participationRows.rows.map((r) => ({ ...r, photoPath: onlyLocal(r.photoPath) })),
-    buildUpPhases: buildUpPhaseRows.rows,
-    creationPhases: creationPhaseRows.rows,
-    finalizationPhases: finalizationPhaseRows.rows,
     goalkeeperOutlets: goalkeeperOutletRows.rows,
     cornerProfiles: cornerProfileRows.rows,
     freekickProfiles: freekickProfileRows.rows,
     throwInProfiles: throwInProfileRows.rows,
+    subMomentActionBreakdown,
+    recoverySpaces,
     momentGoals: momentGoalsRows.rows[0]?.goals ?? 0,
     teamGoals: teamGoalsRows.rows[0]?.goals ?? 0,
     team: teamMeta ? { ...teamMeta, emblemPath: onlyLocal(teamMeta.emblemPath) } : null

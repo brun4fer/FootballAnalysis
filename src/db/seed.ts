@@ -49,7 +49,8 @@ const MOMENT_SEEDS: MomentSeed[] = [
       {
         name: "Finaliza\u00e7\u00e3o",
         actions: [
-          { name: "Cruzamento", context: "field" },
+          { name: "Cruzamento Direita", context: "field" },
+          { name: "Cruzamento Esquerda", context: "field" },
           { name: "Remate de fora da \u00e1rea", context: "field_goal" },
           { name: "Profundidade", context: "field" },
           { name: "Segunda bola", context: "field" }
@@ -63,17 +64,19 @@ const MOMENT_SEEDS: MomentSeed[] = [
       {
         name: "Recupera\u00e7\u00e3o meio campo defensivo",
         actions: [
-          { name: "Primeiro passe", context: "field" },
-          { name: "Jogador refer\u00eancia", context: "field" },
-          { name: "Transi\u00e7\u00e3o para organiza\u00e7\u00e3o", context: "field" }
+          { name: "Cruzamento Direita", context: "field" },
+          { name: "Cruzamento Esquerda", context: "field" },
+          { name: "Remate Fora de \u00c1rea", context: "field_goal" },
+          { name: "Profundidade", context: "field" }
         ]
       },
       {
         name: "Recupera\u00e7\u00e3o meio campo ofensivo",
         actions: [
-          { name: "Primeiro passe", context: "field" },
-          { name: "Jogador refer\u00eancia", context: "field" },
-          { name: "Transi\u00e7\u00e3o para organiza\u00e7\u00e3o", context: "field" }
+          { name: "Cruzamento Direita", context: "field" },
+          { name: "Cruzamento Esquerda", context: "field" },
+          { name: "Remate Fora de \u00c1rea", context: "field_goal" },
+          { name: "Profundidade", context: "field" }
         ]
       }
     ]

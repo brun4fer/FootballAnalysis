@@ -56,9 +56,7 @@ export const goalInputSchema = z
     assistCoordinates: zoneMarkerSchema.optional().nullable(),
     assistDrawing: pointSchema.optional().nullable(),
     transitionDrawing: pointSchema.optional().nullable(),
-    buildUpPhase: z.string().optional().or(z.literal("")),
-    creationPhase: z.string().optional().or(z.literal("")),
-    finalizationPhase: z.string().optional().or(z.literal("")),
+    attackingSpaceId: z.number().int().min(1).max(10).optional().nullable(),
     cornerProfile: setPieceProfile.optional().nullable(),
     freekickProfile: setPieceProfile.optional().nullable(),
     throwInProfile: throwProfile.optional().nullable(),
@@ -75,11 +73,11 @@ export const goalInputSchema = z
   })
   .superRefine((value, ctx) => {
     const isTransitionMoment = normalizeToken(value.momentName).includes("transicao ofensiva");
-    if (isTransitionMoment && !value.transitionDrawing) {
+    if (isTransitionMoment && !value.transitionDrawing && !value.attackingSpaceId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["transitionDrawing"],
-        message: "transitionDrawing obrigatorio para Transicao Ofensiva"
+        path: ["attackingSpaceId"],
+        message: "attackingSpaceId ou transitionDrawing obrigatorio para Transicao Ofensiva"
       });
     }
   });

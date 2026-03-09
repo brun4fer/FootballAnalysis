@@ -214,8 +214,8 @@ export default function ManageTeamsPage() {
             <Input value={form.pitchDimensions} onChange={(e) => setForm({ ...form, pitchDimensions: e.target.value })} placeholder="105 x 68 m" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Qualidade do relvado (0-100)</label>
-            <Input type="number" value={form.pitchRating} onChange={(e) => setForm({ ...form, pitchRating: e.target.value })} min={0} max={100} />
+            <label className="text-xs text-muted-foreground">Qualidade do relvado (0-10)</label>
+            <Input type="number" value={form.pitchRating} onChange={(e) => setForm({ ...form, pitchRating: e.target.value })} min={0} max={10} />
           </div>
           <div className="md:col-span-3 flex justify-end gap-2">
             {editingId && (

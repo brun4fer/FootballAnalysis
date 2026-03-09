@@ -114,22 +114,19 @@ const hiddenActionNames = new Set([
   "unidades de ligação"
 ]);
 
-const buildUpPhases = [
-  { value: "posse_controlada", label: "Posse controlada" },
-  { value: "transicao_controlada", label: "Transição controlada" },
-  { value: "pressionada", label: "Construção pressionada" }
-] as const;
+const recoveryActionWhitelist = new Set([
+  "cruzamento direita",
+  "cruzamento esquerda",
+  "remate fora de area",
+  "remate de fora da area",
+  "profundidade"
+]);
 
-const creationPhases = [
-  { value: "circulacao_rapida", label: "Circulação rápida" },
-  { value: "rompimento", label: "Rompimento" },
-  { value: "combinacao", label: "Combinação" }
-] as const;
-
-const finalizationPhases = [
-  { value: "remate_posse", label: "Remate em posse" },
-  { value: "remate_longo", label: "Remate longo" },
-] as const;
+const normalizeRecoveryAction = (name: string) => {
+  const normalized = normalizeActionName(name);
+  if (normalized === "remate de fora da area") return "remate fora de area";
+  return normalized;
+};
 
 const cornerProfiles = [
   { value: "aberto", label: "Aberto" },
@@ -180,7 +177,7 @@ const wizardStepDefinitions = [
   { id: "context", label: "Momentos" },
 
 
-  { id: "transition", label: "Zona Recuperacao" },
+  { id: "transition", label: "Espaço Recuperação" },
 
 
   { id: "assist", label: "Zona Assistencia" },
@@ -307,6 +304,143 @@ const mapSurfaceClass =
   "rounded-2xl border border-border/80 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3 shadow-[0_0_40px_rgba(0,0,0,0.4)]";
 const mapSvgClass = "h-auto w-full max-w-full aspect-[3/2] cursor-crosshair touch-none";
 const mapStepContainerClass = "space-y-3 pb-2";
+
+type RecoveryGridVariant = "defensive" | "offensive";
+
+type TacticalZone = {
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+const defensiveRecoveryZones: TacticalZone[] = [
+  { id: 1, x: 8, y: 10, width: 26, height: 12 },
+  { id: 2, x: 34, y: 10, width: 26, height: 12 },
+  { id: 3, x: 8, y: 22, width: 26, height: 7 },
+  { id: 4, x: 34, y: 22, width: 26, height: 7 },
+  { id: 5, x: 8, y: 29, width: 26, height: 22 },
+  { id: 6, x: 34, y: 29, width: 26, height: 22 },
+  { id: 7, x: 8, y: 51, width: 26, height: 7 },
+  { id: 8, x: 34, y: 51, width: 26, height: 7 },
+  { id: 9, x: 8, y: 58, width: 26, height: 12 },
+  { id: 10, x: 34, y: 58, width: 26, height: 12 }
+];
+
+const offensiveRecoveryZones: TacticalZone[] = [
+  { id: 1, x: 60, y: 10, width: 26, height: 12 },
+  { id: 2, x: 86, y: 10, width: 26, height: 12 },
+  { id: 3, x: 60, y: 22, width: 26, height: 7 },
+  { id: 4, x: 86, y: 22, width: 26, height: 7 },
+  { id: 5, x: 60, y: 29, width: 26, height: 16 },
+  { id: 6, x: 86, y: 29, width: 26, height: 16 },
+  { id: 7, x: 60, y: 45, width: 26, height: 13 },
+  { id: 8, x: 86, y: 45, width: 26, height: 13 },
+  { id: 9, x: 60, y: 58, width: 26, height: 12 },
+  { id: 10, x: 86, y: 58, width: 26, height: 12 }
+];
+
+const getRecoveryZones = (variant: RecoveryGridVariant) =>
+  variant === "defensive" ? defensiveRecoveryZones : offensiveRecoveryZones;
+
+const getRecoveryZoneCenterPoint = (variant: RecoveryGridVariant, zoneId: number): Point | null => {
+  const zone = getRecoveryZones(variant).find((entry) => entry.id === zoneId);
+  if (!zone) return null;
+  return {
+    x: (zone.x + zone.width / 2) / 120,
+    y: (zone.y + zone.height / 2) / 80
+  };
+};
+
+const getClosestRecoveryZoneId = (variant: RecoveryGridVariant, point: Point): number | null => {
+  const zones = getRecoveryZones(variant);
+  if (zones.length === 0) return null;
+
+  const best = zones.reduce<{ zoneId: number; distance: number } | null>((currentBest, zone) => {
+    const cx = (zone.x + zone.width / 2) / 120;
+    const cy = (zone.y + zone.height / 2) / 80;
+    const distance = Math.hypot(point.x - cx, point.y - cy);
+    if (!currentBest || distance < currentBest.distance) {
+      return { zoneId: zone.id, distance };
+    }
+    return currentBest;
+  }, null);
+
+  return best?.zoneId ?? null;
+};
+
+function RecoverySpaceGrid({
+  variant,
+  value,
+  onChange,
+  readOnly = false,
+  showHelperText = true
+}: {
+  variant: RecoveryGridVariant;
+  value?: number | null;
+  onChange?: (zoneId: number) => void;
+  readOnly?: boolean;
+  showHelperText?: boolean;
+}) {
+  const zones = getRecoveryZones(variant);
+  const inertOverlay =
+    variant === "defensive" ? <rect x="60" y="10" width="52" height="60" fill="rgba(2,6,23,0.68)" /> : <rect x="8" y="10" width="52" height="60" fill="rgba(2,6,23,0.68)" />;
+
+  return (
+    <div className="space-y-2">
+      <InteractiveMapFrame>
+        <svg viewBox="0 0 120 80" className={cn(mapSvgClass, readOnly ? "cursor-default" : "cursor-pointer")}>
+          <rect x="4" y="6" width="112" height="68" rx="6" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
+          <rect x="8" y="10" width="104" height="60" rx="4" fill="rgba(6,24,40,0.72)" stroke="rgba(34,211,238,0.25)" strokeWidth="0.8" />
+          <line x1="60" y1="10" x2="60" y2="70" stroke="rgba(226,232,240,0.35)" strokeWidth="0.8" strokeDasharray="3 3" />
+          <rect x="8" y="22" width="16" height="36" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
+          <rect x="8" y="29" width="7" height="22" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
+          <rect x="96" y="22" width="16" height="36" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
+          <rect x="105" y="29" width="7" height="22" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
+          {inertOverlay}
+
+          {zones.map((zone) => {
+            const selected = value === zone.id;
+            return (
+              <g
+                key={`${variant}-${zone.id}`}
+                className={readOnly ? "" : "cursor-pointer"}
+                onPointerDown={() => {
+                  if (!readOnly && onChange) onChange(zone.id);
+                }}
+              >
+                <rect
+                  x={zone.x}
+                  y={zone.y}
+                  width={zone.width}
+                  height={zone.height}
+                  fill={selected ? "rgba(34, 211, 238, 0.3)" : "rgba(15,23,42,0.04)"}
+                  stroke={selected ? "rgba(34,211,238,0.95)" : "rgba(226,232,240,0.45)"}
+                  strokeWidth={selected ? 1.2 : 0.7}
+                />
+                <text
+                  x={zone.x + zone.width / 2}
+                  y={zone.y + zone.height / 2 + 1.5}
+                  textAnchor="middle"
+                  className="fill-white text-[4px] font-semibold"
+                  pointerEvents="none"
+                >
+                  {zone.id}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </InteractiveMapFrame>
+      {showHelperText && (
+        <p className="text-xs text-muted-foreground">
+          Selecione uma zona para guardar em <code className="font-mono text-cyan-300">attacking_space_id</code>.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function InteractiveMapFrame({ children }: { children: ReactNode }) {
   return <div className={mapSurfaceClass}>{children}</div>;
@@ -856,11 +990,9 @@ type ExistingGoal = {
   goalCoordinates: Point | null;
   fieldDrawing: Point | null;
   transitionDrawing?: Point | null;
+  attackingSpaceId?: number | null;
   assistCoordinates?: { x?: number; y?: number; sector?: string | null } | null;
   assistDrawing?: Point | null;
-  buildUpPhase?: string | null;
-  creationPhase?: string | null;
-  finalizationPhase?: string | null;
   cornerProfile?: string | null;
   freekickProfile?: string | null;
   throwInProfile?: string | null;
@@ -911,9 +1043,7 @@ const [previousMomentDescription, setPreviousMomentDescription] = useState("");
 const [goalPoint, setGoalPoint] = useState<Point | null>(null);
 const [assistDrawingPoint, setAssistDrawingPoint] = useState<Point | null>(null);
 const [transitionDrawingPoint, setTransitionDrawingPoint] = useState<Point | null>(null);
-const [buildUpPhase, setBuildUpPhase] = useState("");
-const [creationPhase, setCreationPhase] = useState("");
-const [finalizationPhase, setFinalizationPhase] = useState("");
+const [attackingSpaceId, setAttackingSpaceId] = useState<number | undefined>();
 const [notes, setNotes] = useState("");
 const [videoPath, setVideoPath] = useState("");
 const [involvements, setInvolvements] = useState<Involvement[]>([]);
@@ -959,8 +1089,8 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
 
     if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
     if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
-    if (isOffensiveTransitionMoment && !transitionDrawingPoint) {
-      throw new Error("Transicao Ofensiva requer marcar a zona de recuperacao.");
+    if (shouldShowTransitionStep && !attackingSpaceId) {
+      throw new Error("Seleciona o espaço de recuperação.");
     }
     const hasFoulSufferedAction = selectedActions.some((a) => {
       const normalized = normalizeActionName(a.name);
@@ -1010,9 +1140,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       fieldDrawing: fieldPoint ?? undefined,
       assistDrawing: assistDrawingPoint ?? undefined,
       transitionDrawing: transitionDrawingPoint ?? undefined,
-      buildUpPhase: buildUpPhase || undefined,
-      creationPhase: creationPhase || undefined,
-      finalizationPhase: finalizationPhase || undefined,
+      attackingSpaceId: attackingSpaceId ?? undefined,
       cornerProfile: cornerProfile || undefined,
       freekickProfile: resolvedFreekickProfile || undefined,
       throwInProfile: throwInProfile || undefined,
@@ -1046,9 +1174,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     setGoalPoint(null);
     setAssistDrawingPoint(null);
     setTransitionDrawingPoint(null);
-    setBuildUpPhase("");
-    setCreationPhase("");
-    setFinalizationPhase("");
+    setAttackingSpaceId(undefined);
     setNotes("");
     setVideoPath("");
     setInvolvements([]);
@@ -1080,8 +1206,8 @@ const updateMutation = useMutation({
     const resolvedFreekickProfile = derivedFreekickProfile || freekickProfile;
     if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
     if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
-    if (isOffensiveTransitionMoment && !transitionDrawingPoint) {
-      throw new Error("Transicao Ofensiva requer marcar a zona de recuperacao.");
+    if (shouldShowTransitionStep && !attackingSpaceId) {
+      throw new Error("Seleciona o espaço de recuperação.");
     }
     const hasFoulSufferedAction = selectedActions.some((a) => {
       const normalized = normalizeActionName(a.name);
@@ -1131,9 +1257,7 @@ const updateMutation = useMutation({
       fieldDrawing: fieldPoint ?? undefined,
       assistDrawing: assistDrawingPoint ?? undefined,
       transitionDrawing: transitionDrawingPoint ?? undefined,
-      buildUpPhase: buildUpPhase || undefined,
-      creationPhase: creationPhase || undefined,
-      finalizationPhase: finalizationPhase || undefined,
+      attackingSpaceId: attackingSpaceId ?? undefined,
       cornerProfile: cornerProfile || undefined,
       freekickProfile: resolvedFreekickProfile || undefined,
       throwInProfile: throwInProfile || undefined,
@@ -1227,18 +1351,19 @@ const filteredChampionships = useMemo(() => {
   const normalizedMomentName = normalizeActionName(selectedMoment?.name ?? "");
   const normalizedSubMomentName = normalizeActionName(selectedSubMoment?.name ?? "");
   const isOffensiveTransitionMoment = normalizedMomentName === "transicao ofensiva";
-  const isTransitionRecoverySubMoment =
-    (normalizedSubMomentName.includes("recuperacao") &&
-      normalizedSubMomentName.includes("meio campo defensivo")) ||
-    (normalizedSubMomentName.includes("recuperacao") &&
-      normalizedSubMomentName.includes("meio campo ofensivo"));
+  const isRecoveryDefensiveSubMoment =
+    normalizedSubMomentName.includes("recuperacao") && normalizedSubMomentName.includes("meio campo defensivo");
+  const isRecoveryOffensiveSubMoment =
+    normalizedSubMomentName.includes("recuperacao") && normalizedSubMomentName.includes("meio campo ofensivo");
+  const isTransitionRecoverySubMoment = isRecoveryDefensiveSubMoment || isRecoveryOffensiveSubMoment;
   const isOffensiveTransitionRecovery = isOffensiveTransitionMoment && isTransitionRecoverySubMoment;
-  const transitionRecoveryZoneLabel = normalizedSubMomentName.includes("defensivo")
-    ? "Recuperacao no Meio Defensivo"
-    : normalizedSubMomentName.includes("ofensivo")
-      ? "Recuperacao no Meio Ofensivo"
-      : "Seleciona o sub-momento de recuperacao";
-  const shouldShowTransitionStep = isOffensiveTransitionMoment;
+  const transitionRecoveryZoneLabel = isRecoveryDefensiveSubMoment
+    ? "Recuperação no Meio Campo Defensivo"
+    : isRecoveryOffensiveSubMoment
+      ? "Recuperação no Meio Campo Ofensivo"
+      : "Seleciona o sub-momento de recuperação";
+  const recoveryGridVariant: RecoveryGridVariant = isRecoveryOffensiveSubMoment ? "offensive" : "defensive";
+  const shouldShowTransitionStep = isOffensiveTransitionRecovery;
   const visibleSteps = useMemo(
     () => wizardStepDefinitions.filter((wizardStep) => shouldShowTransitionStep || wizardStep.id !== "transition"),
     [shouldShowTransitionStep]
@@ -1247,6 +1372,7 @@ const filteredChampionships = useMemo(() => {
   useEffect(() => {
     if (!shouldShowTransitionStep) {
       setTransitionDrawingPoint(null);
+      setAttackingSpaceId(undefined);
       if (step === "transition") {
         setStep("assist");
       }
@@ -1255,14 +1381,58 @@ const filteredChampionships = useMemo(() => {
 
   const filteredActions = useMemo(() => {
     if (!subMomentId || !lookupsQuery.data) return [];
-    return lookupsQuery.data.actions.filter((a) => {
+    const bySubMoment = lookupsQuery.data.actions.filter((a) => {
       if (a.subMomentId !== subMomentId) return false;
       const normalized = normalizeActionName(a.name);
       if (hiddenActionNames.has(normalized)) return false;
-      if (isOffensiveTransitionRecovery && normalized === "espacos que atacam") return false;
       return true;
     });
+
+    if (!isOffensiveTransitionRecovery) return bySubMoment;
+
+    const whitelistedFromSubMoment = bySubMoment.filter((action) =>
+      recoveryActionWhitelist.has(normalizeRecoveryAction(action.name))
+    );
+    if (whitelistedFromSubMoment.length > 0) return whitelistedFromSubMoment;
+
+    const fallbackByName = new Map<string, LookupAction>();
+    lookupsQuery.data.actions.forEach((action) => {
+      const normalized = normalizeActionName(action.name);
+      if (hiddenActionNames.has(normalized)) return;
+      const canonical = normalizeRecoveryAction(action.name);
+      if (!recoveryActionWhitelist.has(canonical)) return;
+      if (!fallbackByName.has(canonical)) {
+        fallbackByName.set(canonical, action);
+      }
+    });
+    return Array.from(fallbackByName.values());
   }, [lookupsQuery.data, subMomentId, isOffensiveTransitionRecovery]);
+
+  useEffect(() => {
+    setActionIds((prev) => {
+      const next = prev.filter((id) => filteredActions.some((action) => action.id === id));
+      if (next.length === prev.length && next.every((id, idx) => id === prev[idx])) {
+        return prev;
+      }
+      return next;
+    });
+  }, [filteredActions]);
+
+  useEffect(() => {
+    if (!shouldShowTransitionStep || !attackingSpaceId) return;
+    const mappedPoint = getRecoveryZoneCenterPoint(recoveryGridVariant, attackingSpaceId);
+    if (mappedPoint) {
+      setTransitionDrawingPoint(mappedPoint);
+    }
+  }, [attackingSpaceId, recoveryGridVariant, shouldShowTransitionStep]);
+
+  useEffect(() => {
+    if (!shouldShowTransitionStep || attackingSpaceId || !transitionDrawingPoint) return;
+    const inferredZoneId = getClosestRecoveryZoneId(recoveryGridVariant, transitionDrawingPoint);
+    if (inferredZoneId) {
+      setAttackingSpaceId(inferredZoneId);
+    }
+  }, [attackingSpaceId, recoveryGridVariant, shouldShowTransitionStep, transitionDrawingPoint]);
 
   const selectedActions = useMemo(
     () => filteredActions.filter((a) => actionIds.includes(a.id)),
@@ -1423,9 +1593,7 @@ const filteredChampionships = useMemo(() => {
     setFieldPoint(existingGoal.fieldDrawing ?? null);
     setAssistDrawingPoint(existingGoal.assistDrawing ?? toPoint(existingGoal.assistCoordinates) ?? null);
     setTransitionDrawingPoint(existingGoal.transitionDrawing ?? null);
-    setBuildUpPhase(existingGoal.buildUpPhase ?? "");
-    setCreationPhase(existingGoal.creationPhase ?? "");
-    setFinalizationPhase(existingGoal.finalizationPhase ?? "");
+    setAttackingSpaceId(existingGoal.attackingSpaceId ?? undefined);
     setCornerProfile(existingGoal.cornerProfile ?? "");
     setFreekickProfile(existingGoal.freekickProfile ?? "");
     setThrowInProfile(existingGoal.throwInProfile ?? "");
@@ -1520,7 +1688,7 @@ const filteredChampionships = useMemo(() => {
         return Boolean(momentId && subMomentId && actionIds.length > 0 && minute >= 0);
 
       case "transition":
-        return shouldShowTransitionStep ? Boolean(transitionDrawingPoint) : true;
+        return shouldShowTransitionStep ? Boolean(attackingSpaceId) : true;
 
 
       case "assist":
@@ -2310,14 +2478,14 @@ const filteredChampionships = useMemo(() => {
 
 
               <div className="space-y-2">
-
-
                 <label className="text-sm font-medium">Minuto</label>
-
-
-                <Input type="number" min={0} max={130} value={minute} onChange={(e) => setMinute(Number(e.target.value))} />
-
-
+                <Input 
+                  type="text" 
+                  value={minute} 
+                  onChange={(e) => setMinute(parseInt(e.target.value) || 0)} 
+                  placeholder="ex: 23 ou 45+2"
+                  className="bg-card/70 border-border/60 text-white"
+                />
               </div>
 
 
@@ -2366,6 +2534,7 @@ const filteredChampionships = useMemo(() => {
                     setFieldPoint(null);
                     setAssistDrawingPoint(null);
                     setTransitionDrawingPoint(null);
+                    setAttackingSpaceId(undefined);
 
 
                   }}
@@ -2448,6 +2617,7 @@ const filteredChampionships = useMemo(() => {
 
                     setCrossAuthorId(undefined);
                     setTransitionDrawingPoint(null);
+                    setAttackingSpaceId(undefined);
 
 
                   }}
@@ -2967,7 +3137,7 @@ const filteredChampionships = useMemo(() => {
               <div className="flex items-center justify-between">
 
 
-                <label className="text-sm font-medium">Zona de Recuperacao</label>
+                <label className="text-sm font-medium">Espaço de Recuperação</label>
 
 
                 <span className="text-xs text-muted-foreground">{transitionRecoveryZoneLabel}</span>
@@ -2976,11 +3146,10 @@ const filteredChampionships = useMemo(() => {
               </div>
 
 
-              <PitchPinpoint
-                value={transitionDrawingPoint}
-                onChange={setTransitionDrawingPoint}
-                storageField="transition_drawing"
-                pinColor="#eab308"
+              <RecoverySpaceGrid
+                variant={recoveryGridVariant}
+                value={attackingSpaceId}
+                onChange={(zoneId) => setAttackingSpaceId(zoneId)}
               />
 
 
@@ -3076,7 +3245,7 @@ const filteredChampionships = useMemo(() => {
               <div className="flex items-center justify-between">
 
 
-                <div className="text-sm font-medium">Ponto no Campo</div>
+                <div className="text-sm font-medium">Zona de Remate</div>
 
 
                 <span className="text-xs text-muted-foreground">
@@ -3092,42 +3261,6 @@ const filteredChampionships = useMemo(() => {
 
 
               <PitchPinpoint value={fieldPoint} onChange={setFieldPoint} storageField="field_drawing" pinColor="#22c55e" />
-
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2 rounded-xl border border-border/60 bg-card/40 p-3">
-                  <label className="text-sm font-medium">Fase de construção</label>
-                  <Select value={buildUpPhase} onChange={(e) => setBuildUpPhase(e.target.value)}>
-                    <option value="">Sem indicação</option>
-                    {buildUpPhases.map((option) => (
-                      <option key={option.value} value={option.value} className="text-black">
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="space-y-2 rounded-xl border border-border/60 bg-card/40 p-3">
-                  <label className="text-sm font-medium">Fase de criação</label>
-                  <Select value={creationPhase} onChange={(e) => setCreationPhase(e.target.value)}>
-                    <option value="">Sem indicação</option>
-                    {creationPhases.map((option) => (
-                      <option key={option.value} value={option.value} className="text-black">
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="space-y-2 rounded-xl border border-border/60 bg-card/40 p-3">
-                  <label className="text-sm font-medium">Fase de finalização</label>
-                  <Select value={finalizationPhase} onChange={(e) => setFinalizationPhase(e.target.value)}>
-                    <option value="">Sem indicação</option>
-                    {finalizationPhases.map((option) => (
-                      <option key={option.value} value={option.value} className="text-black">
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
 
 
 
@@ -3357,8 +3490,8 @@ const filteredChampionships = useMemo(() => {
 
                 {shouldShowTransitionStep && (
                   <>
-                    <span className="text-muted-foreground">Zona de recuperacao</span>
-                    <span>{transitionDrawingPoint ? `(${transitionDrawingPoint.x.toFixed(2)}, ${transitionDrawingPoint.y.toFixed(2)})` : "N/A"}</span>
+                    <span className="text-muted-foreground">Espaço de recuperação</span>
+                    <span>{attackingSpaceId ? `Zona ${attackingSpaceId}` : "N/A"}</span>
                   </>
                 )}
 
@@ -3369,20 +3502,10 @@ const filteredChampionships = useMemo(() => {
                 <span>{goalPoint ? `(${goalPoint.x.toFixed(2)}, ${goalPoint.y.toFixed(2)})` : "N/A"}</span>
 
 
-                <span className="text-muted-foreground">Campo</span>
+                <span className="text-muted-foreground">Zona de Remate</span>
 
 
                 <span>{fieldPoint ? `(${fieldPoint.x.toFixed(2)}, ${fieldPoint.y.toFixed(2)})` : "N/A"}</span>
-
-
-
-
-                <span className="text-muted-foreground">Fase de construção</span>
-                <span>{labelFromOption(buildUpPhases, buildUpPhase)}</span>
-                <span className="text-muted-foreground">Fase de criação</span>
-                <span>{labelFromOption(creationPhases, creationPhase)}</span>
-                <span className="text-muted-foreground">Fase de finalização</span>
-                <span>{labelFromOption(finalizationPhases, finalizationPhase)}</span>
                 <span className="text-muted-foreground">Vídeo</span>
 
 
@@ -3484,22 +3607,14 @@ const filteredChampionships = useMemo(() => {
 
                 {shouldShowTransitionStep && (
                   <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Recuperacao</div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Espaço de Recuperação</div>
                     <div className="rounded-lg border border-border/50 bg-slate-950/60 p-2">
-                      <svg viewBox="0 0 105 68" className="w-full">
-                        <rect x="1" y="1" width="103" height="66" rx="8" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
-                        <line x1="52.5" y1="1" x2="52.5" y2="67" stroke="rgba(148,163,184,0.35)" strokeDasharray="3 3" />
-                        <circle cx="52.5" cy="34" r="9.15" stroke="rgba(148,163,184,0.35)" fill="none" />
-                        <rect x="1" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
-                        <rect x="90" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
-                        {transitionDrawingPoint && (
-                          <g transform={`translate(${transitionDrawingPoint.x * 105}, ${transitionDrawingPoint.y * 68})`}>
-                            <circle r="3.4" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
-                            <circle r="1.8" fill="#0f172a" />
-                            <circle r="0.9" fill="#eab308" />
-                          </g>
-                        )}
-                      </svg>
+                      <RecoverySpaceGrid
+                        variant={recoveryGridVariant}
+                        value={attackingSpaceId}
+                        readOnly
+                        showHelperText={false}
+                      />
                     </div>
                   </div>
                 )}
@@ -3508,7 +3623,7 @@ const filteredChampionships = useMemo(() => {
                 <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
 
 
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Campo</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Zona de Remate</div>
 
 
                   <div className="rounded-lg border border-border/50 bg-slate-950/60 p-2">

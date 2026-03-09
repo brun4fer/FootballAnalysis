@@ -128,12 +128,20 @@ export default function ManagePlayersPage() {
     }
   });
 
-  const deletePlayer = useMutation({
-    mutationFn: (id: number) => fetchJson(`/api/manage/players/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["manage-players"] })
-  });
+const deletePlayer = useMutation({
+  mutationFn: (id: number) => fetchJson(`/api/manage/players/${id}`, { method: "DELETE" }),
+  onSuccess: () => qc.invalidateQueries({ queryKey: ["manage-players"] })
+});
 
-  const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [teams]);
+// Definimos as posições uma vez para usar nos 3 selects
+const footballPositions = [
+  { group: "Guarda-Redes", positions: ["GR"] },
+  { group: "Defesa", positions: ["DC", "DE", "DD", "LBO"] },
+  { group: "Médios", positions: ["MDC", "MC", "MO"] },
+  { group: "Ataque", positions: ["EE", "ED", "SA", "PL"] },
+];
+
+const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [teams]);
   const teamMap = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const champMap = useMemo(() => new Map(championships.map((c) => [c.id, c])), [championships]);
 
@@ -231,25 +239,74 @@ export default function ManagePlayersPage() {
               helperText="Use JPG/PNG; guardado no Vercel Blob com URL pública."
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Posição principal</label>
-            <Input
-              value={form.primaryPosition}
-              onChange={(e) => setForm({ ...form, primaryPosition: e.target.value })}
-              placeholder="ex.: PL, MC, DC"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Posição secundária</label>
-            <Input value={form.secondaryPosition} onChange={(e) => setForm({ ...form, secondaryPosition: e.target.value })} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Posição terciária</label>
-            <Input value={form.tertiaryPosition} onChange={(e) => setForm({ ...form, tertiaryPosition: e.target.value })} />
-          </div>
+          
+
+<div className="space-y-4">
+  {/* Posição Principal */}
+  <div className="space-y-1">
+    <label className="text-xs text-muted-foreground">Posição principal</label>
+    <Select
+      value={form.primaryPosition}
+      onChange={(e) => setForm({ ...form, primaryPosition: e.target.value })}
+    >
+      <option value="">Selecionar...</option>
+      {footballPositions.map((grp) => (
+        <optgroup key={grp.group} label={grp.group} className="text-black">
+          {grp.positions.map((pos) => (
+            <option key={pos} value={pos}>{pos}</option>
+          ))}
+        </optgroup>
+      ))}
+    </Select>
+  </div>
+
+  {/* Posição Secundária */}
+  <div className="space-y-1">
+    <label className="text-xs text-muted-foreground">Posição secundária</label>
+    <Select
+      value={form.secondaryPosition}
+      onChange={(e) => setForm({ ...form, secondaryPosition: e.target.value })}
+    >
+      <option value="">Nenhuma / Opcional</option>
+      {footballPositions.map((grp) => (
+        <optgroup key={grp.group} label={grp.group} className="text-black">
+          {grp.positions.map((pos) => (
+            <option key={pos} value={pos}>{pos}</option>
+          ))}
+        </optgroup>
+      ))}
+    </Select>
+  </div>
+
+  {/* Posição Terciária */}
+  <div className="space-y-1">
+    <label className="text-xs text-muted-foreground">Posição terciária</label>
+    <Select
+      value={form.tertiaryPosition}
+      onChange={(e) => setForm({ ...form, tertiaryPosition: e.target.value })}
+    >
+      <option value="">Nenhuma / Opcional</option>
+      {footballPositions.map((grp) => (
+        <optgroup key={grp.group} label={grp.group} className="text-black">
+          {grp.positions.map((pos) => (
+            <option key={pos} value={pos}>{pos}</option>
+          ))}
+        </optgroup>
+      ))}
+    </Select>
+  </div>
+</div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Pé dominante</label>
-            <Input value={form.dominantFoot} onChange={(e) => setForm({ ...form, dominantFoot: e.target.value })} placeholder="Esquerdo / Direito / Ambos" />
+            <Select 
+              value={form.dominantFoot} 
+              onChange={(e) => setForm({ ...form, dominantFoot: e.target.value })}
+            >
+              <option value="">Selecionar...</option>
+              <option value="Esquerdo">Esquerdo</option>
+              <option value="Direito">Direito</option>
+              <option value="Ambos">Ambos</option>
+            </Select>
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Altura (cm)</label>

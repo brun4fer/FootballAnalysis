@@ -26,9 +26,6 @@ type GoalDetailProps = {
     fieldDrawing?: Coordinate | null;
     goalCoordinates?: Coordinate | null;
     assistCoordinates?: { x?: number; y?: number; label?: string } | null;
-    buildUpPhase?: string | null;
-    creationPhase?: string | null;
-    finalizationPhase?: string | null;
     cornerProfile?: "fechado" | "aberto" | "combinado" | null;
     freekickProfile?: "fechado" | "aberto" | "combinado" | null;
     throwInProfile?: "area" | "organizacao" | null;
@@ -61,10 +58,6 @@ const goalkeeperOutlets = {
   curto_para_longo: "Curto para longo",
   bola_longa: "Bola longa"
 } as const;
-
-function formatValue(value?: string | null) {
-  return value && value.trim() ? value : "—";
-}
 
 function formatProfile(value?: string | null) {
   if (!value) return "—";
@@ -224,12 +217,6 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
             <div className="grid grid-cols-2 gap-2">
               <span className="text-muted-foreground">Saída do GR</span>
               <span>{formatOutlet(goal.goalkeeperOutlet)}</span>
-              <span className="text-muted-foreground">Fase de construção</span>
-              <span>{formatValue(goal.buildUpPhase)}</span>
-              <span className="text-muted-foreground">Fase de criação</span>
-              <span>{formatValue(goal.creationPhase)}</span>
-              <span className="text-muted-foreground">Fase de finalização</span>
-              <span>{formatValue(goal.finalizationPhase)}</span>
               <span className="text-muted-foreground">Perfil de canto</span>
               <span>{formatProfile(goal.cornerProfile)}</span>
               <span className="text-muted-foreground">Perfil de livre</span>
@@ -263,7 +250,7 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader title="Ponto do remate" />
+          <CardHeader title="Zona de Remate" />
           <CardContent>
             {hydrated ? (
               fieldPoint ? (
@@ -280,3 +267,4 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
     </div>
   );
 }
+

@@ -15,7 +15,7 @@ const seeds = [
       { name: "Criação", actions: ["Ligação no corredor central", "Ligação na largura", "Bola longa", "Profundidade"] },
       {
         name: "Finalização",
-        actions: ["Cruzamento", "Remate de fora da área", "Profundidade", "Segunda bola"]
+        actions: ["Cruzamento Direita", "Cruzamento Esquerda", "Remate de fora da área", "Profundidade", "Segunda bola"]
       }
     ]
   },
@@ -23,7 +23,7 @@ const seeds = [
     name: "Transição Ofensiva",
     sub: ["Recuperação meio campo defensivo", "Recuperação meio campo ofensivo"].map((subName) => ({
       name: subName,
-      actions: ["Primeiro passe", "Jogadores referência", "Espaços que atacam", "Transição para organização"]
+      actions: ["Cruzamento Direita", "Cruzamento Esquerda", "Remate Fora de Área", "Profundidade"]
     }))
   },
   {
