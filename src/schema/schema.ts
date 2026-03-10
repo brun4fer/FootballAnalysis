@@ -189,6 +189,31 @@ export const goals = pgTable(
   })
 );
 
+export const goalSubMomentActions = pgTable(
+  "goal_sub_moment_actions",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    goalId: bigint("goal_id", { mode: "number" })
+      .notNull()
+      .references(() => goals.id, { onDelete: "cascade" }),
+    subMomentId: bigint("sub_moment_id", { mode: "number" })
+      .notNull()
+      .references(() => subMoments.id, { onDelete: "cascade" }),
+    actionId: bigint("action_id", { mode: "number" })
+      .notNull()
+      .references(() => actions.id, { onDelete: "cascade" }),
+    sequenceOrder: integer("sequence_order").notNull()
+  },
+  (table) => ({
+    uniqGoalSequenceOrder: uniqueIndex("goal_sub_moment_actions_goal_sequence_key").on(table.goalId, table.sequenceOrder),
+    uniqGoalSubMoment: uniqueIndex("goal_sub_moment_actions_goal_sub_moment_key").on(table.goalId, table.subMomentId),
+    idxGoal: index("idx_goal_sub_moment_actions_goal").on(table.goalId),
+    idxSubMoment: index("idx_goal_sub_moment_actions_sub_moment").on(table.subMomentId),
+    idxAction: index("idx_goal_sub_moment_actions_action").on(table.actionId),
+    sequenceOrderCheck: check("goal_sub_moment_actions_sequence_order_check", sql`${table.sequenceOrder} > 0`)
+  })
+);
+
 export const goalActions = pgTable(
   "goal_actions",
   {
@@ -231,5 +256,6 @@ export type Championship = typeof championships.$inferSelect;
 export type Team = typeof teams.$inferSelect;
 export type Player = typeof players.$inferSelect;
 export type Goal = typeof goals.$inferSelect;
+export type GoalSubMomentAction = typeof goalSubMomentActions.$inferSelect;
 export type GoalAction = typeof goalActions.$inferSelect;
 export type GoalInvolvement = typeof goalInvolvements.$inferSelect;

@@ -131,6 +131,13 @@ const recoveryActionOrder = [
   "jogador referencia"
 ] as const;
 
+const offensiveOrganizationSequenceNames = [
+  "saida do gr",
+  "construcao",
+  "criacao",
+  "finalizacao"
+] as const;
+
 const normalizeRecoveryAction = (name: string) => {
   const normalized = normalizeActionName(name);
   if (normalized === "remate de fora da area") return "remate fora de area";
@@ -988,6 +995,13 @@ type ExistingGoal = {
   actionId: number;
   actionIds?: number[];
   actions?: Array<{ actionId: number; actionName?: string | null }>;
+  subMomentSequence?: Array<{
+    subMomentId: number;
+    subMomentName?: string | null;
+    actionId: number;
+    actionName?: string | null;
+    sequenceOrder: number;
+  }>;
   cornerTakerId?: number | null;
   freekickTakerId?: number | null;
   penaltyTakerId?: number | null;
@@ -1037,6 +1051,7 @@ const [minute, setMinute] = useState(0);
 const [momentId, setMomentId] = useState<number | undefined>();
 const [subMomentId, setSubMomentId] = useState<number | undefined>();
 const [actionIds, setActionIds] = useState<number[]>([]);
+const [offensiveSequenceActionBySubMoment, setOffensiveSequenceActionBySubMoment] = useState<Record<number, number>>({});
 const [cornerProfile, setCornerProfile] = useState<string>("");
 const [freekickProfile, setFreekickProfile] = useState<string>("");
 const [throwInProfile, setThrowInProfile] = useState<string>("");
@@ -1085,12 +1100,26 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
 
   const createMutation = useMutation({
   mutationFn: async () => {
-    if (!teamId || !opponentTeamId || !scorerId || !momentId || !subMomentId || actionIds.length === 0) {
+    const effectiveSubMomentId = resolvedSubMomentId;
+    const effectiveActionIds = resolvedActionIds;
+    const subMomentSequencePayload = isOffensiveOrganizationMoment
+      ? offensiveOrganizationSequenceSelection
+      : effectiveSubMomentId && effectiveActionIds.length > 0
+        ? [{ subMomentId: effectiveSubMomentId, actionId: effectiveActionIds[0], sequenceOrder: 1 }]
+        : [];
+
+    if (!teamId || !opponentTeamId || !scorerId || !momentId || !effectiveSubMomentId || effectiveActionIds.length === 0) {
       throw new Error("Campos obrigatórios em falta");
+    }
+    if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationCatalogue) {
+      throw new Error("Sub-momentos de Organização Ofensiva não encontrados no catálogo.");
+    }
+    if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationSequence) {
+      throw new Error("Preenche os 4 sub-momentos da Organização Ofensiva.");
     }
     if (!seasonId || !championshipId) throw new Error("Selecione época e campeonato.");
 
-    const selectedActions = lookupsQuery.data?.actions.filter((a) => actionIds.includes(a.id)) ?? [];
+    const selectedActions = lookupsQuery.data?.actions.filter((a) => effectiveActionIds.includes(a.id)) ?? [];
     const requiresGoal = selectedActions.some((a) => a.name.toLowerCase().includes("marcador") || a.context === "field_goal");
     const requiresField = selectedActions.length > 0;
     const derivedFreekickProfile = deriveFreekickProfileFromActions(selectedActions);
@@ -1113,7 +1142,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       throw new Error("Seleciona o jogador que sofreu a falta.");
     }
     const selectedSubMomentName = normalizeActionName(
-      lookupsQuery.data?.subMoments.find((s) => s.id === subMomentId)?.name ?? ""
+      lookupsQuery.data?.subMoments.find((s) => s.id === effectiveSubMomentId)?.name ?? ""
     );
     const isDirectFreekickOrPenalty =
       ((selectedSubMomentName.includes("livre") &&
@@ -1135,8 +1164,9 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       minute,
       momentId,
       momentName: selectedMoment?.name ?? undefined,
-      subMomentId,
-      actionIds,
+      subMomentId: effectiveSubMomentId,
+      actionIds: effectiveActionIds,
+      subMomentSequence: subMomentSequencePayload,
       cornerTakerId,
       freekickTakerId,
       penaltyTakerId,
@@ -1176,6 +1206,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     setMomentId(undefined);
     setSubMomentId(undefined);
     setActionIds([]);
+    setOffensiveSequenceActionBySubMoment({});
     setCornerProfile("");
     setFreekickProfile("");
     setThrowInProfile("");
@@ -1203,12 +1234,26 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
 const updateMutation = useMutation({
   mutationFn: async () => {
     if (!existingGoal) return;
-    if (!teamId || !opponentTeamId || !scorerId || !momentId || !subMomentId || actionIds.length === 0) {
+    const effectiveSubMomentId = resolvedSubMomentId;
+    const effectiveActionIds = resolvedActionIds;
+    const subMomentSequencePayload = isOffensiveOrganizationMoment
+      ? offensiveOrganizationSequenceSelection
+      : effectiveSubMomentId && effectiveActionIds.length > 0
+        ? [{ subMomentId: effectiveSubMomentId, actionId: effectiveActionIds[0], sequenceOrder: 1 }]
+        : [];
+
+    if (!teamId || !opponentTeamId || !scorerId || !momentId || !effectiveSubMomentId || effectiveActionIds.length === 0) {
       throw new Error("Campos obrigatórios em falta");
+    }
+    if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationCatalogue) {
+      throw new Error("Sub-momentos de Organização Ofensiva não encontrados no catálogo.");
+    }
+    if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationSequence) {
+      throw new Error("Preenche os 4 sub-momentos da Organização Ofensiva.");
     }
     if (!seasonId || !championshipId) throw new Error("Selecione época e campeonato.");
 
-    const selectedActions = lookupsQuery.data?.actions.filter((a) => actionIds.includes(a.id)) ?? [];
+    const selectedActions = lookupsQuery.data?.actions.filter((a) => effectiveActionIds.includes(a.id)) ?? [];
     const requiresGoal = selectedActions.some((a) => a.name.toLowerCase().includes("marcador") || a.context === "field_goal");
     const requiresField = selectedActions.length > 0;
     const derivedFreekickProfile = deriveFreekickProfileFromActions(selectedActions);
@@ -1230,7 +1275,7 @@ const updateMutation = useMutation({
       throw new Error("Seleciona o jogador que sofreu a falta.");
     }
     const selectedSubMomentName = normalizeActionName(
-      lookupsQuery.data?.subMoments.find((s) => s.id === subMomentId)?.name ?? ""
+      lookupsQuery.data?.subMoments.find((s) => s.id === effectiveSubMomentId)?.name ?? ""
     );
     const isDirectFreekickOrPenalty =
       ((selectedSubMomentName.includes("livre") &&
@@ -1252,8 +1297,9 @@ const updateMutation = useMutation({
       minute,
       momentId,
       momentName: selectedMoment?.name ?? undefined,
-      subMomentId,
-      actionIds,
+      subMomentId: effectiveSubMomentId,
+      actionIds: effectiveActionIds,
+      subMomentSequence: subMomentSequencePayload,
       cornerTakerId,
       freekickTakerId,
       penaltyTakerId,
@@ -1356,8 +1402,85 @@ const filteredChampionships = useMemo(() => {
 
 
   const selectedMoment = momentId ? lookupsQuery.data?.moments.find((m) => m.id === momentId) : undefined;
-  const selectedSubMoment = subMomentId ? lookupsQuery.data?.subMoments.find((s) => s.id === subMomentId) : undefined;
   const normalizedMomentName = normalizeActionName(selectedMoment?.name ?? "");
+  const isOffensiveOrganizationMoment = normalizedMomentName === "organizacao ofensiva";
+
+  const offensiveOrganizationSubMomentRows = useMemo(() => {
+    if (!isOffensiveOrganizationMoment || !lookupsQuery.data) return [];
+    const byNormalizedName = new Map(filteredSubMoments.map((subMoment) => [normalizeActionName(subMoment.name), subMoment]));
+    return offensiveOrganizationSequenceNames
+      .map((name, index) => {
+        const subMoment = byNormalizedName.get(name);
+        if (!subMoment) return null;
+        const availableActions = lookupsQuery.data.actions.filter((action) => {
+          if (action.subMomentId !== subMoment.id) return false;
+          return !hiddenActionNames.has(normalizeActionName(action.name));
+        });
+        return {
+          sequenceOrder: index + 1,
+          subMoment,
+          actions: availableActions
+        };
+      })
+      .filter(
+        (
+          row
+        ): row is {
+          sequenceOrder: number;
+          subMoment: { id: number; name: string; momentId: number };
+          actions: LookupAction[];
+        } => Boolean(row)
+      );
+  }, [isOffensiveOrganizationMoment, filteredSubMoments, lookupsQuery.data]);
+
+  const offensiveOrganizationSequenceSelection = useMemo(
+    () =>
+      offensiveOrganizationSubMomentRows
+        .map((row) => {
+          const actionId = offensiveSequenceActionBySubMoment[row.subMoment.id];
+          if (!actionId) return null;
+          return {
+            subMomentId: row.subMoment.id,
+            actionId,
+            sequenceOrder: row.sequenceOrder
+          };
+        })
+        .filter(
+          (
+            item
+          ): item is {
+            subMomentId: number;
+            actionId: number;
+            sequenceOrder: number;
+          } => Boolean(item)
+        ),
+    [offensiveOrganizationSubMomentRows, offensiveSequenceActionBySubMoment]
+  );
+
+  useEffect(() => {
+    if (!isOffensiveOrganizationMoment) return;
+    const validSubMomentIds = new Set(offensiveOrganizationSubMomentRows.map((row) => row.subMoment.id));
+    setOffensiveSequenceActionBySubMoment((prev) => {
+      const nextEntries = Object.entries(prev).filter(([key]) => validSubMomentIds.has(Number(key)));
+      if (nextEntries.length === Object.keys(prev).length) return prev;
+      return Object.fromEntries(nextEntries.map(([key, value]) => [Number(key), value]));
+    });
+  }, [isOffensiveOrganizationMoment, offensiveOrganizationSubMomentRows]);
+
+  const hasCompleteOffensiveOrganizationCatalogue =
+    offensiveOrganizationSubMomentRows.length === offensiveOrganizationSequenceNames.length;
+  const hasCompleteOffensiveOrganizationSequence =
+    hasCompleteOffensiveOrganizationCatalogue &&
+    offensiveOrganizationSequenceSelection.length === offensiveOrganizationSequenceNames.length;
+
+  const resolvedSubMomentId = isOffensiveOrganizationMoment
+    ? offensiveOrganizationSequenceSelection[offensiveOrganizationSequenceSelection.length - 1]?.subMomentId
+    : subMomentId;
+  const resolvedActionIds = isOffensiveOrganizationMoment
+    ? offensiveOrganizationSequenceSelection.map((entry) => entry.actionId)
+    : actionIds;
+
+  const selectedSubMoment = resolvedSubMomentId ? lookupsQuery.data?.subMoments.find((s) => s.id === resolvedSubMomentId) : undefined;
   const normalizedSubMomentName = normalizeActionName(selectedSubMoment?.name ?? "");
   const isOffensiveTransitionMoment = normalizedMomentName === "transicao ofensiva";
   const isRecoveryDefensiveSubMoment =
@@ -1389,6 +1512,7 @@ const filteredChampionships = useMemo(() => {
   }, [shouldShowTransitionStep, step]);
 
   const filteredActions = useMemo(() => {
+    if (isOffensiveOrganizationMoment) return [];
     if (!subMomentId || !lookupsQuery.data) return [];
     const bySubMoment = lookupsQuery.data.actions.filter((a) => {
       if (a.subMomentId !== subMomentId) return false;
@@ -1421,9 +1545,13 @@ const filteredChampionships = useMemo(() => {
     return recoveryActionOrder
       .map((canonical) => actionByCanonical.get(canonical))
       .filter((action): action is LookupAction => Boolean(action));
-  }, [lookupsQuery.data, subMomentId, isOffensiveTransitionRecovery]);
+  }, [lookupsQuery.data, subMomentId, isOffensiveTransitionRecovery, isOffensiveOrganizationMoment]);
 
   useEffect(() => {
+    if (isOffensiveOrganizationMoment) {
+      setActionIds([]);
+      return;
+    }
     setActionIds((prev) => {
       const next = prev.filter((id) => filteredActions.some((action) => action.id === id));
       if (next.length === prev.length && next.every((id, idx) => id === prev[idx])) {
@@ -1431,7 +1559,7 @@ const filteredChampionships = useMemo(() => {
       }
       return next;
     });
-  }, [filteredActions]);
+  }, [filteredActions, isOffensiveOrganizationMoment]);
 
   useEffect(() => {
     if (!shouldShowTransitionStep || !attackingSpaceId) return;
@@ -1449,10 +1577,30 @@ const filteredChampionships = useMemo(() => {
     }
   }, [attackingSpaceId, recoveryGridVariant, shouldShowTransitionStep, transitionDrawingPoint]);
 
-  const selectedActions = useMemo(
-    () => filteredActions.filter((a) => actionIds.includes(a.id)),
-    [filteredActions, actionIds]
-  );
+  const selectedActions = useMemo(() => {
+    if (!lookupsQuery.data) return [];
+    if (isOffensiveOrganizationMoment) {
+      const actionById = new Map(lookupsQuery.data.actions.map((action) => [action.id, action]));
+      return offensiveOrganizationSequenceSelection
+        .map((entry) => actionById.get(entry.actionId))
+        .filter((action): action is LookupAction => Boolean(action));
+    }
+    return filteredActions.filter((a) => actionIds.includes(a.id));
+  }, [lookupsQuery.data, isOffensiveOrganizationMoment, offensiveOrganizationSequenceSelection, filteredActions, actionIds]);
+
+  const offensiveSequenceSummary = useMemo(() => {
+    if (!lookupsQuery.data || !isOffensiveOrganizationMoment) return [];
+    const actionById = new Map(lookupsQuery.data.actions.map((action) => [action.id, action]));
+    return offensiveOrganizationSubMomentRows.map((row) => {
+      const selectedActionId = offensiveSequenceActionBySubMoment[row.subMoment.id];
+      const selectedAction = selectedActionId ? actionById.get(selectedActionId) : undefined;
+      return {
+        sequenceOrder: row.sequenceOrder,
+        subMomentName: row.subMoment.name,
+        actionName: selectedAction?.name ?? null
+      };
+    });
+  }, [lookupsQuery.data, isOffensiveOrganizationMoment, offensiveOrganizationSubMomentRows, offensiveSequenceActionBySubMoment]);
 
   const normalizedSelectedActionNames = useMemo(
     () => selectedActions.map((action) => normalizeActionName(action.name)),
@@ -1604,6 +1752,15 @@ const filteredChampionships = useMemo(() => {
       ? existingGoal.actionIds
       : existingGoal.actions?.map((a) => a.actionId) ?? (existingGoal.actionId ? [existingGoal.actionId] : []);
     setActionIds(existingActions);
+    const existingSequence =
+      existingGoal.subMomentSequence && existingGoal.subMomentSequence.length > 0
+        ? existingGoal.subMomentSequence
+        : existingGoal.subMomentId && existingActions.length > 0
+          ? [{ subMomentId: existingGoal.subMomentId, actionId: existingActions[0], sequenceOrder: 1 }]
+          : [];
+    setOffensiveSequenceActionBySubMoment(
+      Object.fromEntries(existingSequence.map((entry) => [entry.subMomentId, entry.actionId]))
+    );
     setGoalPoint(existingGoal.goalCoordinates ?? null);
     setFieldPoint(existingGoal.fieldDrawing ?? null);
     setAssistDrawingPoint(existingGoal.assistDrawing ?? toPoint(existingGoal.assistCoordinates) ?? null);
@@ -1700,7 +1857,13 @@ const filteredChampionships = useMemo(() => {
       case "context":
 
 
-        return Boolean(momentId && subMomentId && actionIds.length > 0 && minute >= 0);
+        return Boolean(
+          momentId &&
+            minute >= 0 &&
+            (isOffensiveOrganizationMoment
+              ? hasCompleteOffensiveOrganizationSequence
+              : resolvedSubMomentId && resolvedActionIds.length > 0)
+        );
 
       case "transition":
         return shouldShowTransitionStep ? Boolean(attackingSpaceId) : true;
@@ -1778,9 +1941,9 @@ const filteredChampionships = useMemo(() => {
     momentId &&
 
 
-    subMomentId &&
-
-    actionIds.length > 0 &&
+    (isOffensiveOrganizationMoment
+      ? hasCompleteOffensiveOrganizationSequence
+      : resolvedSubMomentId && resolvedActionIds.length > 0) &&
 
 
     (!hasCornerMarkerAction || cornerTakerId) &&
@@ -2537,6 +2700,7 @@ const filteredChampionships = useMemo(() => {
                     setMomentId(val ? Number(val) : undefined);
                     setSubMomentId(undefined);
                     setActionIds([]);
+                    setOffensiveSequenceActionBySubMoment({});
                     setCornerProfile("");
                     setFreekickProfile("");
                     setThrowInProfile("");
@@ -2585,216 +2749,235 @@ const filteredChampionships = useMemo(() => {
               </div>
 
 
-              <div className="space-y-2">
-
-
-                <label className="text-sm font-medium">Sub-momento</label>
-
-
-                <Select
-
-
-                  value={subMomentId?.toString() ?? ""}
-
-
-                  onChange={(e) => {
-
-
-                    const val = e.target.value;
-
-
-                    if (val === "__create__") {
-
-
-                      setModal({ kind: "submoment", open: true });
-
-
-                      return;
-
-
-                    }
-
-
-                    setSubMomentId(val ? Number(val) : undefined);
-
-
-                    setActionIds([]);
-
-
-                    setCornerTakerId(undefined);
-
-
-                    setFreekickTakerId(undefined);
-
-
-                    setPenaltyTakerId(undefined);
-
-
-                    setCrossAuthorId(undefined);
-                    setTransitionDrawingPoint(null);
-                    setAttackingSpaceId(undefined);
-
-
-                  }}
-
-
-                  disabled={!momentId}
-
-
-                >
-
-
-                  <option value="">Selecionar sub-momento</option>
-
-
-                  <option value="__create__" disabled={!momentId}>
-
-
-                    + Criar novo...
-
-
-                  </option>
-
-
-                  {filteredSubMoments.map((s) => (
-
-
-                    <option key={s.id} value={s.id} className="text-black">
-
-
-                      {s.name}
-
-
-                    </option>
-
-
-                  ))}
-
-
-                </Select>
-
-
-              </div>
-
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Ações</label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => setModal({ kind: "action", open: true })}
-                  >
-                    + Criar novo...
-                  </Button>
-                </div>
-                {filteredActions.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-border/60 bg-card/60 p-3 text-xs text-muted-foreground">
-                    Seleciona um sub-momento para ver as ações disponíveis.
+              {isOffensiveOrganizationMoment ? (
+                <div className="md:col-span-2 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-sm font-medium">Sequência de Organização Ofensiva</label>
+                      <p className="text-xs text-muted-foreground">
+                        Regista uma ação por fase: Saída do GR, Construção, Criação e Finalização.
+                      </p>
+                    </div>
+                    <Badge className="bg-cyan-500/10 text-cyan-100">
+                      {offensiveOrganizationSequenceSelection.length}/{offensiveOrganizationSequenceNames.length} fases
+                    </Badge>
                   </div>
-                ) : (
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {filteredActions.map((action) => {
-                      const isSelected = actionIds.includes(action.id);
-                      return (
-                        <label
-                          key={action.id}
-                          className={cn(
-                            "flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm",
-                            isSelected
-                              ? "border-emerald-400 bg-emerald-500/10 text-white"
-                              : "border-border/50 bg-card/70 text-muted-foreground"
-                          )}
+                  {!hasCompleteOffensiveOrganizationCatalogue ? (
+                    <div className="rounded-xl border border-dashed border-amber-400/40 bg-amber-500/10 p-3 text-xs text-amber-100">
+                      A configuração de sub-momentos da Organização Ofensiva não está completa.
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-4">
+                      {offensiveOrganizationSubMomentRows.map((row) => (
+                        <div
+                          key={`oo-seq-${row.subMoment.id}`}
+                          className="rounded-2xl border border-border/70 bg-gradient-to-b from-slate-900/70 to-slate-950/50 p-3 shadow-[0_16px_32px_rgba(2,6,23,0.4)]"
                         >
-                          <input
-                            type="checkbox"
-                            className="sr-only"
-                            checked={isSelected}
-                            onChange={() =>
-                              setActionIds((prev) =>
-                                prev.includes(action.id) ? prev.filter((id) => id !== action.id) : [...prev, action.id]
-                              )
-                            }
-                          />
-                          <div>
-                            <span className="font-medium text-white">{action.name}</span>
-                            <p className="text-[11px] text-muted-foreground">
-                              {action.context === "field_goal" ? "Campo + Baliza" : "Campo"}
-                            </p>
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="rounded-md border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                              Fase {row.sequenceOrder}
+                            </span>
+                            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                              {offensiveSequenceActionBySubMoment[row.subMoment.id] ? "Definida" : "Por definir"}
+                            </span>
                           </div>
-                          <span className="rounded-full border border-current px-2 py-0.5 text-[11px] font-semibold">
-                            {isSelected ? "Selecionado" : "Selecionar"}
-                          </span>
-                        </label>
-                      );
-                    })}
+                          <div className="mb-3 text-sm font-semibold text-white">{row.subMoment.name}</div>
+                          <div className="space-y-2">
+                            {row.actions.length === 0 ? (
+                              <div className="rounded-lg border border-dashed border-border/60 bg-card/50 px-2 py-2 text-[11px] text-muted-foreground">
+                                Sem ações disponíveis para este sub-momento.
+                              </div>
+                            ) : (
+                              row.actions.map((action) => {
+                                const isSelected = offensiveSequenceActionBySubMoment[row.subMoment.id] === action.id;
+                                return (
+                                  <button
+                                    key={`oo-action-${row.subMoment.id}-${action.id}`}
+                                    type="button"
+                                    onClick={() =>
+                                      setOffensiveSequenceActionBySubMoment((prev) => ({
+                                        ...prev,
+                                        [row.subMoment.id]: action.id
+                                      }))
+                                    }
+                                    className={cn(
+                                      "w-full rounded-lg border px-2 py-2 text-left text-xs transition",
+                                      isSelected
+                                        ? "border-emerald-400 bg-emerald-500/12 text-emerald-100"
+                                        : "border-border/50 bg-card/60 text-muted-foreground hover:border-cyan-400/40 hover:text-white"
+                                    )}
+                                  >
+                                    <div className="font-medium">{action.name}</div>
+                                    <div className="mt-1 text-[10px] opacity-80">
+                                      {action.context === "field_goal" ? "Campo + Baliza" : "Campo"}
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Sub-momento</label>
+                    <Select
+                      value={subMomentId?.toString() ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "__create__") {
+                          setModal({ kind: "submoment", open: true });
+                          return;
+                        }
+                        setSubMomentId(val ? Number(val) : undefined);
+                        setActionIds([]);
+                        setOffensiveSequenceActionBySubMoment({});
+                        setCornerTakerId(undefined);
+                        setFreekickTakerId(undefined);
+                        setPenaltyTakerId(undefined);
+                        setCrossAuthorId(undefined);
+                        setTransitionDrawingPoint(null);
+                        setAttackingSpaceId(undefined);
+                      }}
+                      disabled={!momentId}
+                    >
+                      <option value="">Selecionar sub-momento</option>
+                      <option value="__create__" disabled={!momentId}>
+                        + Criar novo...
+                      </option>
+                      {filteredSubMoments.map((s) => (
+                        <option key={s.id} value={s.id} className="text-black">
+                          {s.name}
+                        </option>
+                      ))}
+                    </Select>
                   </div>
-                )}
-                {selectedActions.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedActions.map((action) => (
-                      <Badge key={action.id} className="bg-emerald-500/10 text-emerald-100">
-                        {action.name}
-                      </Badge>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Ações</label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => setModal({ kind: "action", open: true })}
+                      >
+                        + Criar novo...
+                      </Button>
+                    </div>
+                    {filteredActions.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-border/60 bg-card/60 p-3 text-xs text-muted-foreground">
+                        Seleciona um sub-momento para ver as ações disponíveis.
+                      </div>
+                    ) : (
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {filteredActions.map((action) => {
+                          const isSelected = actionIds.includes(action.id);
+                          return (
+                            <label
+                              key={action.id}
+                              className={cn(
+                                "flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm",
+                                isSelected
+                                  ? "border-emerald-400 bg-emerald-500/10 text-white"
+                                  : "border-border/50 bg-card/70 text-muted-foreground"
+                              )}
+                            >
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={isSelected}
+                                onChange={() =>
+                                  setActionIds((prev) =>
+                                    prev.includes(action.id) ? prev.filter((id) => id !== action.id) : [...prev, action.id]
+                                  )
+                                }
+                              />
+                              <div>
+                                <span className="font-medium text-white">{action.name}</span>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {action.context === "field_goal" ? "Campo + Baliza" : "Campo"}
+                                </p>
+                              </div>
+                              <span className="rounded-full border border-current px-2 py-0.5 text-[11px] font-semibold">
+                                {isSelected ? "Selecionado" : "Selecionar"}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {selectedActions.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedActions.map((action) => (
+                          <Badge key={action.id} className="bg-emerald-500/10 text-emerald-100">
+                            {action.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {hasReferencePlayersAction && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Quem foi o jogador referência?</label>
+                  <Select
+                    value={referencePlayerId?.toString() ?? ""}
+                    onChange={(e) => setReferencePlayerId(e.target.value ? Number(e.target.value) : undefined)}
+                    disabled={!teamId || playersQuery.isLoading}
+                    className="bg-card/70 border-border/60 text-white"
+                  >
+                    <option value="">Selecionar jogador</option>
+                    {currentPlayers.map((p) => (
+                      <option key={p.id} value={p.id} className="text-black">
+                        {p.name}
+                      </option>
                     ))}
-                  </div>
-                )}
-                {hasReferencePlayersAction && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Quem foi o jogador referência?</label>
-                    <Select
-                      value={referencePlayerId?.toString() ?? ""}
-                      onChange={(e) => setReferencePlayerId(e.target.value ? Number(e.target.value) : undefined)}
-                      disabled={!teamId || playersQuery.isLoading}
-                      className="bg-card/70 border-border/60 text-white"
-                    >
-                      <option value="">Selecionar jogador</option>
-                      {currentPlayers.map((p) => (
-                        <option key={p.id} value={p.id} className="text-black">
-                          {p.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                )}
-                {hasThrowInMarkerAction && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Quem efetuou o lançamento?</label>
-                    <Select
-                      value={throwInTakerId?.toString() ?? ""}
-                      onChange={(e) => setThrowInTakerId(e.target.value ? Number(e.target.value) : undefined)}
-                      disabled={!teamId || playersQuery.isLoading}
-                      className="bg-card/70 border-border/60 text-white"
-                    >
-                      <option value="">Selecionar jogador</option>
-                      {currentPlayers.map((p) => (
-                        <option key={p.id} value={p.id} className="text-black">
-                          {p.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                )}
-                {hasFoulSufferedAction && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Quem sofreu a falta?</label>
-                    <Select
-                      value={foulSufferedById?.toString() ?? ""}
-                      onChange={(e) => setFoulSufferedById(e.target.value ? Number(e.target.value) : undefined)}
-                      disabled={!teamId || playersQuery.isLoading}
-                      className="bg-card/70 border-border/60 text-white"
-                    >
-                      <option value="">Selecionar jogador</option>
-                      {currentPlayers.map((p) => (
-                        <option key={p.id} value={p.id} className="text-black">
-                          {p.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                )}
-              </div>
+                  </Select>
+                </div>
+              )}
+              {hasThrowInMarkerAction && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Quem efetuou o lançamento?</label>
+                  <Select
+                    value={throwInTakerId?.toString() ?? ""}
+                    onChange={(e) => setThrowInTakerId(e.target.value ? Number(e.target.value) : undefined)}
+                    disabled={!teamId || playersQuery.isLoading}
+                    className="bg-card/70 border-border/60 text-white"
+                  >
+                    <option value="">Selecionar jogador</option>
+                    {currentPlayers.map((p) => (
+                      <option key={p.id} value={p.id} className="text-black">
+                        {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
+              {hasFoulSufferedAction && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Quem sofreu a falta?</label>
+                  <Select
+                    value={foulSufferedById?.toString() ?? ""}
+                    onChange={(e) => setFoulSufferedById(e.target.value ? Number(e.target.value) : undefined)}
+                    disabled={!teamId || playersQuery.isLoading}
+                    className="bg-card/70 border-border/60 text-white"
+                  >
+                    <option value="">Selecionar jogador</option>
+                    {currentPlayers.map((p) => (
+                      <option key={p.id} value={p.id} className="text-black">
+                        {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              )}
 
 
               {hasCornerAction && (
@@ -3348,7 +3531,7 @@ const filteredChampionships = useMemo(() => {
                 <span className="text-muted-foreground">Sub-momento</span>
 
 
-                <span>{lookupsQuery.data?.subMoments.find((s) => s.id === subMomentId)?.name ?? "-"}</span>
+                <span>{lookupsQuery.data?.subMoments.find((s) => s.id === resolvedSubMomentId)?.name ?? "-"}</span>
 
 
                 <span className="text-muted-foreground">Ações</span>
@@ -3359,6 +3542,18 @@ const filteredChampionships = useMemo(() => {
                     ? selectedActions.map((action) => action.name).join(", ")
                     : "-"}
                 </span>
+                {isOffensiveOrganizationMoment && (
+                  <>
+                    <span className="text-muted-foreground">Sequência OO</span>
+                    <span>
+                      {offensiveSequenceSummary.length > 0
+                        ? offensiveSequenceSummary
+                            .map((entry) => `${entry.sequenceOrder}. ${entry.subMomentName}: ${entry.actionName ?? "—"}`)
+                            .join(" | ")
+                        : "-"}
+                    </span>
+                  </>
+                )}
                 {hasReferencePlayersAction && (
                   <>
                     <span className="text-muted-foreground">Jogador referência</span>

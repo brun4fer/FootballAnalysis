@@ -34,7 +34,14 @@ export async function POST(req: Request) {
       fieldDrawing: json?.fieldDrawing ? JSON.parse(JSON.stringify(json.fieldDrawing)) : json?.fieldDrawing,
       goalCoordinates: json?.goalCoordinates ? JSON.parse(JSON.stringify(json.goalCoordinates)) : json?.goalCoordinates,
       assistCoordinates: json?.assistCoordinates ? JSON.parse(JSON.stringify(json.assistCoordinates)) : json?.assistCoordinates,
-      assistDrawing: json?.assistDrawing ? JSON.parse(JSON.stringify(json.assistDrawing)) : json?.assistDrawing
+      assistDrawing: json?.assistDrawing ? JSON.parse(JSON.stringify(json.assistDrawing)) : json?.assistDrawing,
+      subMomentSequence: Array.isArray(json?.subMomentSequence)
+        ? json.subMomentSequence.map((entry: any) => ({
+            subMomentId: Number(entry?.subMomentId),
+            actionId: Number(entry?.actionId),
+            sequenceOrder: Number(entry?.sequenceOrder)
+          }))
+        : undefined
     };
 
     const id = await createGoal(payload);

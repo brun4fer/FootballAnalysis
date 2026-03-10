@@ -40,8 +40,17 @@ export const goalInputSchema = z
     minute: z.number().int().min(0).max(130),
     momentId: z.number().int().positive(),
     momentName: z.string().optional().nullable(),
-    subMomentId: z.number().int().positive(),
-    actionIds: z.array(z.number().int().positive()).min(1),
+    subMomentId: z.number().int().positive().optional(),
+    actionIds: z.array(z.number().int().positive()).optional().default([]),
+    subMomentSequence: z
+      .array(
+        z.object({
+          subMomentId: z.number().int().positive(),
+          actionId: z.number().int().positive(),
+          sequenceOrder: z.number().int().min(1)
+        })
+      )
+      .optional(),
     cornerTakerId: z.number().int().positive().optional().nullable(),
     freekickTakerId: z.number().int().positive().optional().nullable(),
     penaltyTakerId: z.number().int().positive().optional().nullable(),
@@ -72,6 +81,25 @@ export const goalInputSchema = z
       .optional()
   })
   .superRefine((value, ctx) => {
+    const hasSingleFlow = Boolean(value.subMomentId && value.actionIds.length > 0);
+    const hasSequenceFlow = Boolean(value.subMomentSequence && value.subMomentSequence.length > 0);
+    if (!hasSingleFlow && !hasSequenceFlow) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["subMomentSequence"],
+        message: "Fornece subMomentSequence ou subMomentId + actionIds."
+      });
+    }
+    if (value.subMomentSequence && value.subMomentSequence.length > 0) {
+      const sequenceOrders = value.subMomentSequence.map((entry) => entry.sequenceOrder);
+      if (new Set(sequenceOrders).size !== sequenceOrders.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["subMomentSequence"],
+          message: "sequenceOrder duplicado em subMomentSequence."
+        });
+      }
+    }
     const isTransitionMoment = normalizeToken(value.momentName).includes("transicao ofensiva");
     if (isTransitionMoment && !value.transitionDrawing && !value.attackingSpaceId) {
       ctx.addIssue({
