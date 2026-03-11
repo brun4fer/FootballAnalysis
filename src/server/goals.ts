@@ -656,7 +656,8 @@ async function upsertGoal(
     }
   });
 
-  if (isOffensiveOrganizationMomentName(moment.name)) {
+  const isOffensiveOrganizationMoment = isOffensiveOrganizationMomentName(moment.name);
+  if (isOffensiveOrganizationMoment) {
     if (orderedSequenceEntries.length !== OFFENSIVE_ORGANIZATION_SEQUENCE.length) {
       throw new Error("Organizacao Ofensiva requer 4 sub-momentos.");
     }
@@ -671,7 +672,11 @@ async function upsertGoal(
   }
 
   const sequenceActionIds = [...new Set(orderedSequenceEntries.map((entry) => entry.actionId))];
-  const requestedActionIds = parsed.actionIds.length > 0 ? [...new Set(parsed.actionIds)] : sequenceActionIds;
+  const requestedActionIds = isOffensiveOrganizationMoment
+    ? sequenceActionIds
+    : parsed.actionIds.length > 0
+      ? [...new Set(parsed.actionIds)]
+      : sequenceActionIds;
   const actionIdsToLookup = [...new Set([...requestedActionIds, ...sequenceActionIds])];
   const actionRows =
     actionIdsToLookup.length === 0
@@ -881,4 +886,26 @@ export async function createGoal(payload: unknown) {
 
 export async function updateGoal(id: number, payload: unknown) {
   return upsertGoal("update", payload, id);
+}
+
+export async function deleteGoal(goalId: number) {
+  const existingGoal = await db.query.goals.findFirst({
+    where: eq(goals.id, goalId),
+    columns: { id: true }
+  });
+  if (!existingGoal) {
+    throw new Error("Goal not found");
+  }
+
+  const supportsGoalSubMomentActions = await hasGoalSubMomentActionsTable();
+  await db.transaction(async (tx) => {
+    if (supportsGoalSubMomentActions) {
+      await tx.delete(goalSubMomentActions).where(eq(goalSubMomentActions.goalId, goalId));
+    }
+    await tx.delete(goalActions).where(eq(goalActions.goalId, goalId));
+    await tx.delete(goalInvolvements).where(eq(goalInvolvements.goalId, goalId));
+    await tx.delete(goals).where(eq(goals.id, goalId));
+  });
+
+  return goalId;
 }

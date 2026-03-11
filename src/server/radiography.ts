@@ -8,6 +8,7 @@ import {
   players,
   goalInvolvements,
   goalActions,
+  goalSubMomentActions,
   actions
 } from "../schema/schema";
 
@@ -61,6 +62,22 @@ const setPieceCase = sql`
 
 const onlyLocal = (path?: string | null) => (path && path.startsWith("http") ? null : path || null);
 
+async function hasTable(tableName: string) {
+  try {
+    const result = await db.execute<{ exists: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = ANY(current_schemas(false))
+          AND table_name = ${tableName}
+      ) AS "exists"
+    `);
+    return Boolean(result.rows[0]?.exists);
+  } catch {
+    return false;
+  }
+}
+
 export type RadiographyBpoCategory = "corners" | "free_kicks" | "direct_free_kicks" | "throw_ins";
 
 type RadiographyFilters = {
@@ -72,6 +89,16 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
   const momentId = filters?.momentId;
   const bpoCategory = filters?.bpoCategory;
   const shouldComputeSubMomentBreakdown = Boolean(momentId || bpoCategory);
+  const hasGoalSubMomentActionsTable = await hasTable("goal_sub_moment_actions");
+  const selectedMoment = momentId
+    ? await db.query.moments.findFirst({
+        where: (fields, { eq }) => eq(fields.id, momentId),
+        columns: { name: true }
+      })
+    : null;
+  const shouldUseSequenceBreakdown =
+    hasGoalSubMomentActionsTable &&
+    Boolean(selectedMoment && normalizeToken(selectedMoment.name).includes("organizacao ofensiva"));
   const teamCondition = sql`g.team_id = ${teamId}`;
   const momentCondition = momentId ? sql` AND g.moment_id = ${momentId}` : sql``;
   const isCornerGoal = sql`EXISTS (
@@ -365,66 +392,110 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
   const subMomentTotalsPromise: Promise<{ rows: Array<{ subMomentId: number; subMoment: string; totalGoals: number }> }> =
     !shouldComputeSubMomentBreakdown
       ? Promise.resolve({ rows: [] })
-      : momentId
-        ? db.execute<{ subMomentId: number; subMoment: string; totalGoals: number }>(sql`
-            SELECT
-              sm.id AS "subMomentId",
-              sm.name AS "subMoment",
-              COUNT(g.id)::int AS "totalGoals"
-            FROM ${subMoments} sm
-            LEFT JOIN ${goals} g
-              ON g.sub_moment_id = sm.id
-              AND g.team_id = ${teamId}
-              ${bpoCondition}
-            WHERE sm.moment_id = ${momentId}
-            GROUP BY sm.id, sm.name
-            ORDER BY sm.name
-          `)
-        : db.execute<{ subMomentId: number; subMoment: string; totalGoals: number }>(sql`
-            SELECT
-              sm.id AS "subMomentId",
-              sm.name AS "subMoment",
-              COUNT(*)::int AS "totalGoals"
-            FROM ${goals} g
-            JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
-            WHERE ${goalFilter}
-            GROUP BY sm.id, sm.name
-            ORDER BY sm.name
-          `);
+      : shouldUseSequenceBreakdown
+        ? momentId
+          ? db.execute<{ subMomentId: number; subMoment: string; totalGoals: number }>(sql`
+              WITH filtered_goal_sequences AS (
+                SELECT gsma.goal_id, gsma.sub_moment_id
+                FROM ${goalSubMomentActions} gsma
+                JOIN ${goals} g ON g.id = gsma.goal_id
+                WHERE ${goalFilter}
+              )
+              SELECT
+                sm.id AS "subMomentId",
+                sm.name AS "subMoment",
+                COUNT(fgs.goal_id)::int AS "totalGoals"
+              FROM ${subMoments} sm
+              LEFT JOIN filtered_goal_sequences fgs ON fgs.sub_moment_id = sm.id
+              WHERE sm.moment_id = ${momentId}
+              GROUP BY sm.id, sm.name
+              ORDER BY sm.name
+            `)
+          : db.execute<{ subMomentId: number; subMoment: string; totalGoals: number }>(sql`
+              SELECT
+                sm.id AS "subMomentId",
+                sm.name AS "subMoment",
+                COUNT(*)::int AS "totalGoals"
+              FROM ${goalSubMomentActions} gsma
+              JOIN ${goals} g ON g.id = gsma.goal_id
+              JOIN ${subMoments} sm ON sm.id = gsma.sub_moment_id
+              WHERE ${goalFilter}
+              GROUP BY sm.id, sm.name
+              ORDER BY sm.name
+            `)
+        : momentId
+          ? db.execute<{ subMomentId: number; subMoment: string; totalGoals: number }>(sql`
+              SELECT
+                sm.id AS "subMomentId",
+                sm.name AS "subMoment",
+                COUNT(g.id)::int AS "totalGoals"
+              FROM ${subMoments} sm
+              LEFT JOIN ${goals} g
+                ON g.sub_moment_id = sm.id
+                AND g.team_id = ${teamId}
+                ${bpoCondition}
+              WHERE sm.moment_id = ${momentId}
+              GROUP BY sm.id, sm.name
+              ORDER BY sm.name
+            `)
+          : db.execute<{ subMomentId: number; subMoment: string; totalGoals: number }>(sql`
+              SELECT
+                sm.id AS "subMomentId",
+                sm.name AS "subMoment",
+                COUNT(*)::int AS "totalGoals"
+              FROM ${goals} g
+              JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
+              WHERE ${goalFilter}
+              GROUP BY sm.id, sm.name
+              ORDER BY sm.name
+            `);
 
   const subMomentActionsPromise: Promise<{ rows: Array<{ subMomentId: number; action: string; goals: number }> }> =
     !shouldComputeSubMomentBreakdown
       ? Promise.resolve({ rows: [] })
-      : db.execute<{ subMomentId: number; action: string; goals: number }>(sql`
-          WITH filtered_goals AS (
-            SELECT g.id, g.sub_moment_id, g.action_id
-            FROM ${goals} g
+      : shouldUseSequenceBreakdown
+        ? db.execute<{ subMomentId: number; action: string; goals: number }>(sql`
+            SELECT
+              gsma.sub_moment_id AS "subMomentId",
+              a.name AS action,
+              COUNT(*)::int AS goals
+            FROM ${goalSubMomentActions} gsma
+            JOIN ${goals} g ON g.id = gsma.goal_id
+            JOIN ${actions} a ON a.id = gsma.action_id
             WHERE ${goalFilter}
-          ),
-          goal_action_links AS (
-            SELECT fg.id AS goal_id, fg.sub_moment_id, link.action_id
-            FROM filtered_goals fg
-            JOIN LATERAL (
-              SELECT DISTINCT action_id
-              FROM (
-                SELECT fg.action_id AS action_id
-                UNION ALL
-                SELECT ga.action_id
-                FROM ${goalActions} ga
-                WHERE ga.goal_id = fg.id
-              ) raw_actions
-              WHERE action_id IS NOT NULL
-            ) link ON TRUE
-          )
-          SELECT
-            gal.sub_moment_id AS "subMomentId",
-            a.name AS action,
-            COUNT(DISTINCT gal.goal_id)::int AS goals
-          FROM goal_action_links gal
-          JOIN ${actions} a ON a.id = gal.action_id
-          GROUP BY gal.sub_moment_id, a.name
-          ORDER BY gal.sub_moment_id, goals DESC, a.name
-        `);
+            GROUP BY gsma.sub_moment_id, a.name
+            ORDER BY gsma.sub_moment_id, goals DESC, a.name
+          `)
+        : db.execute<{ subMomentId: number; action: string; goals: number }>(sql`
+            WITH filtered_goals AS (
+              SELECT g.id, g.sub_moment_id, g.action_id
+              FROM ${goals} g
+              WHERE ${goalFilter}
+            ),
+            goal_action_links AS (
+              SELECT fg.id AS goal_id, fg.sub_moment_id, link.action_id
+              FROM filtered_goals fg
+              JOIN LATERAL (
+                SELECT DISTINCT action_id
+                FROM (
+                  SELECT fg.action_id AS action_id
+                  UNION ALL
+                  SELECT ga.action_id
+                  FROM ${goalActions} ga
+                  WHERE ga.goal_id = fg.id
+                ) raw_actions
+                WHERE action_id IS NOT NULL
+              ) link ON TRUE
+            )
+            SELECT
+              gal.sub_moment_id AS "subMomentId",
+              a.name AS action,
+              COUNT(DISTINCT gal.goal_id)::int AS goals
+            FROM goal_action_links gal
+            JOIN ${actions} a ON a.id = gal.action_id
+            GROUP BY gal.sub_moment_id, a.name
+            ORDER BY gal.sub_moment_id, goals DESC, a.name
+          `);
 
   const recoverySpaceRowsPromise: Promise<{
     rows: Array<{ subMomentId: number; subMoment: string; zoneId: number; goals: number }>;

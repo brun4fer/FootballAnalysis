@@ -1,6 +1,17 @@
 import { db } from "../db/client";
-import { players, teams } from "../schema/schema";
+import { championships, players, teams } from "../schema/schema";
 import { eq, asc } from "drizzle-orm";
+
+export async function listChampionships() {
+  return db
+    .select({
+      id: championships.id,
+      name: championships.name,
+      seasonId: championships.seasonId
+    })
+    .from(championships)
+    .orderBy(asc(championships.name));
+}
 
 export async function listTeams(championshipId?: number) {
   const base = db

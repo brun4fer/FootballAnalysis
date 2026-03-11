@@ -10,10 +10,16 @@ import { cn } from "@/lib/utils";
 type TeamOption = {
   id: number;
   name: string;
+  championshipId?: number | null;
   emblemPath?: string | null;
   coach?: string | null;
   stadium?: string | null;
   pitchDimensions?: string | null;
+};
+
+type ChampionshipOption = {
+  id: number;
+  name: string;
 };
 
 type MomentOption = {
@@ -589,18 +595,21 @@ function TransitionRecoveryCard({ row }: { row: RecoverySpaceBreakdown }) {
 }
 
 export default function RadiographyPanel({
-  teams,
+  initialChampionshipId,
   initialTeamId
 }: {
-  teams: TeamOption[];
+  initialChampionshipId?: number;
   initialTeamId?: number;
-}) {
-  const [teamId, setTeamId] = useState<number | undefined>(() => {
-    if (initialTeamId && teams.some((team) => team.id === initialTeamId)) {
-      return initialTeamId;
-    }
-    return teams[0]?.id;
-  });
+} = {}) {
+  const [championshipOptions, setChampionshipOptions] = useState<ChampionshipOption[]>([]);
+  const [teamOptions, setTeamOptions] = useState<TeamOption[]>([]);
+  const [championshipId, setChampionshipId] = useState<number | undefined>(initialChampionshipId);
+  const [teamId, setTeamId] = useState<number | undefined>(undefined);
+  const [championshipsLoading, setChampionshipsLoading] = useState(false);
+  const [championshipsError, setChampionshipsError] = useState<string | null>(null);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
+  const hasAppliedInitialTeam = useRef(false);
   const [momentOptions, setMomentOptions] = useState<MomentOption[]>([]);
   const [momentId, setMomentId] = useState<number | undefined>(undefined);
   const [bpoCategory, setBpoCategory] = useState<BpoCategory | undefined>(undefined);
@@ -636,24 +645,50 @@ export default function RadiographyPanel({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!teams.length) return;
-    if (initialTeamId && teams.some((team) => team.id === initialTeamId)) {
-      setTeamId(initialTeamId);
-    } else if (!teamId) {
-      setTeamId(teams[0].id);
-    }
-  }, [initialTeamId, teams, teamId]);
+    let isCancelled = false;
+    setChampionshipsLoading(true);
+    setChampionshipsError(null);
+
+    fetch("/api/championships", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          throw new Error(json?.error ?? "Falha ao carregar campeonatos");
+        }
+        return res.json() as Promise<ChampionshipOption[]>;
+      })
+      .then((payload) => {
+        if (isCancelled) return;
+        setChampionshipOptions(payload);
+        if (initialChampionshipId && payload.some((championship) => championship.id === initialChampionshipId)) {
+          setChampionshipId(initialChampionshipId);
+        }
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          setChampionshipOptions([]);
+          setChampionshipsError(err.message ?? "Erro ao carregar campeonatos");
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) setChampionshipsLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [initialChampionshipId]);
 
   useEffect(() => {
     let isCancelled = false;
-    fetch("/api/lookups", { cache: "no-store" })
+    fetch("/api/lookups/moments", { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error("Falha ao carregar momentos");
         return res.json();
       })
       .then((payload) => {
         if (!isCancelled) {
-          setMomentOptions(payload?.moments ?? []);
+          setMomentOptions(Array.isArray(payload) ? payload : []);
         }
       })
       .catch(() => {
@@ -667,7 +702,67 @@ export default function RadiographyPanel({
   }, []);
 
   useEffect(() => {
-    if (!teamId) return;
+    setTeamId(undefined);
+    setRadiography(null);
+    setError(null);
+    setTeamsError(null);
+
+    if (!championshipId) {
+      setTeamOptions([]);
+      return;
+    }
+
+    let isCancelled = false;
+    setTeamsLoading(true);
+    setTeamOptions([]);
+
+    fetch(`/api/teams?championshipId=${championshipId}`, { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          throw new Error(json?.error ?? "Falha ao carregar equipas");
+        }
+        return res.json() as Promise<TeamOption[]>;
+      })
+      .then((payload) => {
+        if (isCancelled) return;
+        setTeamOptions(payload);
+        if (
+          initialTeamId &&
+          !hasAppliedInitialTeam.current &&
+          payload.some((team) => team.id === initialTeamId)
+        ) {
+          setTeamId(initialTeamId);
+          hasAppliedInitialTeam.current = true;
+        }
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          setTeamOptions([]);
+          setTeamsError(err.message ?? "Erro ao carregar equipas");
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) setTeamsLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [championshipId, initialTeamId]);
+
+  const selectedTeam = useMemo(
+    () => teamOptions.find((team) => team.id === teamId),
+    [teamOptions, teamId]
+  );
+
+  useEffect(() => {
+    if (!championshipId || !teamId || !selectedTeam) {
+      setRadiography(null);
+      setLoading(false);
+      return;
+    }
+
     let isCancelled = false;
     setLoading(true);
     setError(null);
@@ -701,13 +796,13 @@ export default function RadiographyPanel({
     return () => {
       isCancelled = true;
     };
-  }, [teamId, momentId, bpoCategory]);
+  }, [championshipId, teamId, selectedTeam, momentId, bpoCategory]);
 
   const distribution = useMemo(
     () => cleanDataset(radiography?.distribution ?? [], "category", "goals"),
     [radiography?.distribution]
   );
-  const currentTeam = teams.find((team) => team.id === teamId) ?? radiography?.team;
+  const currentTeam = selectedTeam ?? radiography?.team;
   const isSpecificFilterActive = Boolean(momentId || bpoCategory);
   const isAllMomentsFilter = !momentId && !bpoCategory;
   const selectedMoment = momentId ? momentOptions.find((moment) => moment.id === momentId) : undefined;
@@ -769,8 +864,8 @@ export default function RadiographyPanel({
     [radiography?.recoverySpaces]
   );
 
-  if (!teams.length) {
-    return <div className="text-sm text-muted-foreground">Sem equipas registadas.</div>;
+  if (!championshipsLoading && championshipOptions.length === 0) {
+    return <div className="text-sm text-muted-foreground">Sem campeonatos registados.</div>;
   }
 
   return (
@@ -798,10 +893,35 @@ export default function RadiographyPanel({
         </div>
         <div className="w-full max-w-xs">
           <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Campeonato
+          </label>
+          <Select
+            value={championshipId?.toString() ?? ""}
+            onChange={(e) => setChampionshipId(e.target.value ? Number(e.target.value) : undefined)}
+          >
+            <option value="" className="text-black">
+              Selecionar campeonato
+            </option>
+            {championshipOptions.map((championship) => (
+              <option key={championship.id} value={championship.id} className="text-black">
+                {championship.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="w-full max-w-xs">
+          <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
             Equipa
           </label>
-          <Select value={teamId ?? ""} onChange={(e) => setTeamId(Number(e.target.value) || undefined)}>
-            {teams.map((team) => (
+          <Select
+            value={teamId?.toString() ?? ""}
+            onChange={(e) => setTeamId(e.target.value ? Number(e.target.value) : undefined)}
+            disabled={!championshipId || teamsLoading}
+          >
+            <option value="" className="text-black">
+              {!championshipId ? "Seleciona campeonato primeiro" : "Selecionar equipa"}
+            </option>
+            {teamOptions.map((team) => (
               <option key={team.id} value={team.id} className="text-black">
                 {team.name}
               </option>
@@ -815,6 +935,7 @@ export default function RadiographyPanel({
           <Select
             value={momentId ? `moment:${momentId}` : bpoCategory ? `bpo:${bpoCategory}` : ""}
             onChange={(e) => handleFilterChange(e.target.value)}
+            disabled={!teamId || !selectedTeam}
           >
             <option value="" className="text-black">
               Todos os momentos
@@ -838,8 +959,18 @@ export default function RadiographyPanel({
       </div>
 
       <div className="space-y-2">
+        {championshipsLoading && <div className="text-sm text-muted-foreground">Carregando campeonatos...</div>}
+        {championshipsError && <div className="text-sm text-destructive">{championshipsError}</div>}
+        {teamsLoading && championshipId && <div className="text-sm text-muted-foreground">Carregando equipas...</div>}
+        {teamsError && <div className="text-sm text-destructive">{teamsError}</div>}
         {loading && <div className="text-sm text-muted-foreground">Carregando radiografia...</div>}
         {error && <div className="text-sm text-destructive">{error}</div>}
+        {championshipId && !teamsLoading && teamOptions.length === 0 && (
+          <div className="text-sm text-muted-foreground">Sem equipas para o campeonato selecionado.</div>
+        )}
+        {!teamId && championshipId && !teamsLoading && teamOptions.length > 0 && (
+          <div className="text-sm text-muted-foreground">Seleciona uma equipa para ver a radiografia.</div>
+        )}
       </div>
 
       {radiography && (

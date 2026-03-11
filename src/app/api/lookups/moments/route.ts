@@ -7,6 +7,14 @@ import { moments } from "@/schema/schema";
 
 const schema = z.object({ name: z.string().min(2) });
 
+export async function GET() {
+  const rows = await db.query.moments.findMany({
+    columns: { id: true, name: true },
+    orderBy: (fields, { asc }) => [asc(fields.name)]
+  });
+  return NextResponse.json(rows);
+}
+
 export async function POST(req: Request) {
   try {
     const body = schema.parse(await req.json());

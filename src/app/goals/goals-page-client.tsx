@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GoalWizard } from "./goal-wizard";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Team = { id: number; name: string; championshipId?: number | null };
 type Season = { id: number; name: string };
@@ -30,10 +32,13 @@ const fetcher = async <T,>(url: string): Promise<T> => {
 };
 
 export function GoalsPageClient() {
+  const queryClient = useQueryClient();
   const [seasonId, setSeasonId] = useState("");
   const [championshipId, setChampionshipId] = useState("");
   const [teamId, setTeamId] = useState<number | undefined>(undefined);
   const [currentPage, setCurrentPage] = useState(0);
+  const [pendingDeleteGoalId, setPendingDeleteGoalId] = useState<number | null>(null);
+  const [deleteFeedback, setDeleteFeedback] = useState<string | null>(null);
 
   const lookupsQuery = useQuery({
     queryKey: ["lookups"],
@@ -69,6 +74,23 @@ export function GoalsPageClient() {
   const totalPages = Math.ceil(goals.length / PAGE_SIZE);
   const paginatedGoals = goals.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
+  const deleteGoalMutation = useMutation({
+    mutationFn: async (goalId: number) => {
+      const res = await fetch(`/api/goals/${goalId}`, { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "Erro ao eliminar o golo.");
+      return json;
+    },
+    onSuccess: () => {
+      setDeleteFeedback("Golo eliminado com sucesso.");
+      setPendingDeleteGoalId(null);
+      queryClient.invalidateQueries({ queryKey: ["goals-page-history", teamId] });
+    },
+    onError: (error: any) => {
+      setDeleteFeedback(error?.message ?? "Erro ao eliminar o golo.");
+    }
+  });
+
   useEffect(() => {
     setCurrentPage(0);
   }, [seasonId, championshipId, teamId, goals.length]);
@@ -85,6 +107,11 @@ export function GoalsPageClient() {
       <Card>
         <CardHeader title="Histórico de Golos" description="5 registos por página" />
         <CardContent className="space-y-3">
+          {deleteFeedback && (
+            <div className="rounded-md border border-border/60 bg-card/60 px-3 py-2 text-xs text-muted-foreground">
+              {deleteFeedback}
+            </div>
+          )}
           <div className="grid gap-3 md:grid-cols-3">
             <Select
               value={seasonId}
@@ -149,6 +176,17 @@ export function GoalsPageClient() {
                 <Button variant="ghost" size="sm">
                   <Link href={`/stats/goal/${goal.id}`}>Ver</Link>
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="border border-rose-400/40 text-rose-200 hover:bg-rose-500/15"
+                  onClick={() => {
+                    setDeleteFeedback(null);
+                    setPendingDeleteGoalId(goal.id);
+                  }}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" /> Eliminar
+                </Button>
               </div>
             ))
           ) : (
@@ -177,6 +215,22 @@ export function GoalsPageClient() {
           )}
         </CardContent>
       </Card>
+      <ConfirmDialog
+        open={pendingDeleteGoalId !== null}
+        title="Eliminar Golo"
+        description="Tem a certeza de que pretende eliminar este golo?"
+        cancelLabel="Cancelar"
+        confirmLabel="Confirmar eliminação"
+        loading={deleteGoalMutation.isPending}
+        onCancel={() => {
+          if (deleteGoalMutation.isPending) return;
+          setPendingDeleteGoalId(null);
+        }}
+        onConfirm={() => {
+          if (!pendingDeleteGoalId || deleteGoalMutation.isPending) return;
+          deleteGoalMutation.mutate(pendingDeleteGoalId);
+        }}
+      />
     </div>
   );
 }

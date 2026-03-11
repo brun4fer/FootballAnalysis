@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
 import Image from "next/image";
+import { GoalDeleteButton } from "./goal-delete-button";
 
 
 
@@ -144,8 +145,11 @@ export default async function GoalDetail({ params }: { params: { id: string } })
     <div className="space-y-6">
 
       <div className="flex items-center gap-3">
-
-
+        <Link href="/teams">
+          <Button variant="ghost" size="sm" className="gap-1">
+            <ArrowLeft className="h-4 w-4" /> Voltar
+          </Button>
+        </Link>
         <div>
 
           <h1 className="text-2xl font-semibold">Golo #{id}</h1>
@@ -444,6 +448,9 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
         </Card>
 
+      </div>
+      <div className="flex justify-end">
+        <GoalDeleteButton goalId={id} />
       </div>
 
     </div>

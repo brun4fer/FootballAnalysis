@@ -1100,13 +1100,19 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
 
   const createMutation = useMutation({
   mutationFn: async () => {
-    const effectiveSubMomentId = resolvedSubMomentId;
-    const effectiveActionIds = resolvedActionIds;
     const subMomentSequencePayload = isOffensiveOrganizationMoment
-      ? offensiveOrganizationSequenceSelection
-      : effectiveSubMomentId && effectiveActionIds.length > 0
-        ? [{ subMomentId: effectiveSubMomentId, actionId: effectiveActionIds[0], sequenceOrder: 1 }]
+      ? [...offensiveOrganizationSequenceSelection]
+          .sort((a, b) => a.sequenceOrder - b.sequenceOrder)
+          .map((entry) => ({ ...entry }))
+      : resolvedSubMomentId && resolvedActionIds.length > 0
+        ? [{ subMomentId: resolvedSubMomentId, actionId: resolvedActionIds[0], sequenceOrder: 1 }]
         : [];
+    const effectiveActionIds = isOffensiveOrganizationMoment
+      ? subMomentSequencePayload.map((entry) => entry.actionId)
+      : resolvedActionIds;
+    const effectiveSubMomentId = isOffensiveOrganizationMoment
+      ? subMomentSequencePayload[subMomentSequencePayload.length - 1]?.subMomentId
+      : resolvedSubMomentId;
 
     if (!teamId || !opponentTeamId || !scorerId || !momentId || !effectiveSubMomentId || effectiveActionIds.length === 0) {
       throw new Error("Campos obrigatórios em falta");
@@ -1234,13 +1240,19 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
 const updateMutation = useMutation({
   mutationFn: async () => {
     if (!existingGoal) return;
-    const effectiveSubMomentId = resolvedSubMomentId;
-    const effectiveActionIds = resolvedActionIds;
     const subMomentSequencePayload = isOffensiveOrganizationMoment
-      ? offensiveOrganizationSequenceSelection
-      : effectiveSubMomentId && effectiveActionIds.length > 0
-        ? [{ subMomentId: effectiveSubMomentId, actionId: effectiveActionIds[0], sequenceOrder: 1 }]
+      ? [...offensiveOrganizationSequenceSelection]
+          .sort((a, b) => a.sequenceOrder - b.sequenceOrder)
+          .map((entry) => ({ ...entry }))
+      : resolvedSubMomentId && resolvedActionIds.length > 0
+        ? [{ subMomentId: resolvedSubMomentId, actionId: resolvedActionIds[0], sequenceOrder: 1 }]
         : [];
+    const effectiveActionIds = isOffensiveOrganizationMoment
+      ? subMomentSequencePayload.map((entry) => entry.actionId)
+      : resolvedActionIds;
+    const effectiveSubMomentId = isOffensiveOrganizationMoment
+      ? subMomentSequencePayload[subMomentSequencePayload.length - 1]?.subMomentId
+      : resolvedSubMomentId;
 
     if (!teamId || !opponentTeamId || !scorerId || !momentId || !effectiveSubMomentId || effectiveActionIds.length === 0) {
       throw new Error("Campos obrigatórios em falta");

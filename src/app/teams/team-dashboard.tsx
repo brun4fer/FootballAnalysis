@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SimpleBar } from "@/components/ui/charts";
-import { FileText, PlayCircle, X, Eye } from "lucide-react";
+import { FileText, PlayCircle, X, Eye, Trash2 } from "lucide-react";
 import { useAppContext } from "@/components/ui/app-context";
 import { GoalWizard } from "../goals/goal-wizard";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Team = {
   id: number;
@@ -130,6 +131,8 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
   const [goalPage, setGoalPage] = useState(0);
   const [editingGoalId, setEditingGoalId] = useState<number | null>(null);
   const [editingGoal, setEditingGoal] = useState<any | null>(null);
+  const [pendingDeleteGoalId, setPendingDeleteGoalId] = useState<number | null>(null);
+  const [deleteFeedback, setDeleteFeedback] = useState<string | null>(null);
 
   const lookupsQuery = useQuery({
     queryKey: ["lookups"],
@@ -198,6 +201,27 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
     topScorersQuery.refetch();
     momentsQuery.refetch();
   };
+
+  const deleteGoalMutation = useMutation({
+    mutationFn: async (goalId: number) => {
+      const res = await fetch(`/api/goals/${goalId}`, { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "Erro ao eliminar o golo.");
+      return json;
+    },
+    onSuccess: (_data, goalId) => {
+      setDeleteFeedback("Golo eliminado com sucesso.");
+      setPendingDeleteGoalId(null);
+      if (editingGoalId === goalId) {
+        setEditingGoalId(null);
+        setEditingGoal(null);
+      }
+      refreshAll();
+    },
+    onError: (error: any) => {
+      setDeleteFeedback(error?.message ?? "Erro ao eliminar o golo.");
+    }
+  });
 
   const goalEvents = useMemo(() => goalsQuery.data ?? [], [goalsQuery.data]);
   const goalPageCount = Math.ceil(goalEvents.length / PAGE_SIZE);
@@ -426,6 +450,11 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
           <Card>
             <CardHeader title="Histórico de Golos" description="Editar rapidamente qualquer golo" />
             <CardContent className="space-y-2 text-sm">
+              {deleteFeedback && (
+                <div className="rounded-md border border-border/60 bg-card/60 px-3 py-2 text-xs text-muted-foreground">
+                  {deleteFeedback}
+                </div>
+              )}
               {goalEvents.length > 0 ? (
                 paginatedGoalEvents.map((g) => (
                   <div key={g.id} className="flex items-center justify-between rounded-lg border border-border/60 bg-card px-3 py-2">
@@ -450,6 +479,17 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => loadGoalForEdit(g.id)}>
                         Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="border border-rose-400/40 text-rose-200 hover:bg-rose-500/15"
+                        onClick={() => {
+                          setDeleteFeedback(null);
+                          setPendingDeleteGoalId(g.id);
+                        }}
+                      >
+                        <Trash2 className="mr-1 h-4 w-4" /> Eliminar
                       </Button>
                     </div>
                   </div>
@@ -479,6 +519,22 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
               )}
             </CardContent>
           </Card>
+          <ConfirmDialog
+            open={pendingDeleteGoalId !== null}
+            title="Eliminar Golo"
+            description="Tem a certeza de que pretende eliminar este golo?"
+            cancelLabel="Cancelar"
+            confirmLabel="Confirmar eliminação"
+            loading={deleteGoalMutation.isPending}
+            onCancel={() => {
+              if (deleteGoalMutation.isPending) return;
+              setPendingDeleteGoalId(null);
+            }}
+            onConfirm={() => {
+              if (!pendingDeleteGoalId || deleteGoalMutation.isPending) return;
+              deleteGoalMutation.mutate(pendingDeleteGoalId);
+            }}
+          />
 
           {editingGoalId && (
             <div className="fixed inset-0 z-50 bg-black/80">
