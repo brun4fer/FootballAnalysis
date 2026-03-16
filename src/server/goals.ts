@@ -630,11 +630,6 @@ async function upsertGoal(
   if (!moment) throw new Error("Moment not found");
 
   const orderedSequenceEntries = [...sequenceEntries].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
-  orderedSequenceEntries.forEach((entry, idx) => {
-    if (entry.sequenceOrder !== idx + 1) {
-      throw new Error("subMomentSequence must start at 1 and be contiguous.");
-    }
-  });
 
   const sequenceSubMomentIds = [...new Set(orderedSequenceEntries.map((entry) => entry.subMomentId))];
   const subMomentRows = await db
@@ -658,17 +653,9 @@ async function upsertGoal(
 
   const isOffensiveOrganizationMoment = isOffensiveOrganizationMomentName(moment.name);
   if (isOffensiveOrganizationMoment) {
-    if (orderedSequenceEntries.length !== OFFENSIVE_ORGANIZATION_SEQUENCE.length) {
-      throw new Error("Organizacao Ofensiva requer 4 sub-momentos.");
+    if (orderedSequenceEntries.length > OFFENSIVE_ORGANIZATION_SEQUENCE.length) {
+      throw new Error("Organizacao Ofensiva permite no maximo 4 fases.");
     }
-    OFFENSIVE_ORGANIZATION_SEQUENCE.forEach((requiredName, idx) => {
-      const sequenceEntry = orderedSequenceEntries.find((entry) => entry.sequenceOrder === idx + 1);
-      if (!sequenceEntry) throw new Error("Organizacao Ofensiva requer sequenceOrder de 1 a 4.");
-      const sequenceSubMoment = subMomentById.get(sequenceEntry.subMomentId);
-      if (!sequenceSubMoment || normalizeToken(sequenceSubMoment.name) !== requiredName) {
-        throw new Error("A sequencia de Organizacao Ofensiva deve ser: Saida do GR, Construcao, Criacao e Finalizacao.");
-      }
-    });
   }
 
   const sequenceActionIds = [...new Set(orderedSequenceEntries.map((entry) => entry.actionId))];

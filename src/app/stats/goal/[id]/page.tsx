@@ -137,6 +137,12 @@ export default async function GoalDetail({ params }: { params: { id: string } })
   const referencePlayerName = goal.referencePlayerName ?? null;
   const foulVictimName = goal.foulVictimName ?? goal.foulSufferedByName ?? null;
   const previousMomentDescription = goal.previousMomentDescription ?? null;
+  const subMomentSequenceLines =
+    goal.subMomentSequence && goal.subMomentSequence.length > 0
+      ? [...goal.subMomentSequence]
+          .sort((a, b) => a.sequenceOrder - b.sequenceOrder)
+          .map((entry) => `${entry.subMomentName ?? `#${entry.subMomentId}`} - ${entry.actionName ?? `#${entry.actionId}`}`)
+      : [];
 
 
 
@@ -314,9 +320,21 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
               <span>{goal.momentName ?? goal.momentId}</span>
 
-              <span className="text-muted-foreground">Sub-momento</span>
+              <span className="text-muted-foreground">Sub-momentos</span>
 
-              <span>{goal.subMomentName ?? goal.subMomentId}</span>
+              <span>
+                {subMomentSequenceLines.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    {subMomentSequenceLines.map((line) => (
+                      <span key={line} className="text-xs text-white/90">
+                        {line}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  goal.subMomentName ?? goal.subMomentId
+                )}
+              </span>
 
 
               {goal.cornerTakerId && (

@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button";
 
 type Coordinate = { x: number; y: number };
 type GoalActionDto = { actionId: number; actionName?: string | null };
+type GoalSubMomentSequenceDto = {
+  subMomentId: number;
+  subMomentName?: string | null;
+  actionId: number;
+  actionName?: string | null;
+  sequenceOrder: number;
+};
 
 type GoalDetailProps = {
   goal: {
@@ -22,6 +29,7 @@ type GoalDetailProps = {
     subMomentName?: string | null;
     actionName?: string | null;
     actions?: GoalActionDto[];
+    subMomentSequence?: GoalSubMomentSequenceDto[];
     videoPath?: string | null;
     fieldDrawing?: Coordinate | null;
     goalCoordinates?: Coordinate | null;
@@ -129,6 +137,18 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
     return listed;
   }, [goal.actionName, goal.actions]);
 
+  const subMomentSequenceLabels = useMemo(() => {
+    const ordered = [...(goal.subMomentSequence ?? [])].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+    return ordered.map((entry) => {
+      const subMomentLabel = entry.subMomentName ?? `#${entry.subMomentId}`;
+      const actionLabel = entry.actionName ?? `#${entry.actionId}`;
+      return {
+        key: `${entry.sequenceOrder}-${entry.subMomentId}-${entry.actionId}`,
+        label: `${subMomentLabel} - ${actionLabel}`
+      };
+    });
+  }, [goal.subMomentSequence]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -173,8 +193,20 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
               </span>
               <span className="text-muted-foreground">Momento</span>
               <span>{goal.momentName ?? "—"}</span>
-              <span className="text-muted-foreground">Sub-momento</span>
-              <span>{goal.subMomentName ?? "—"}</span>
+              <span className="text-muted-foreground">Sub-momentos</span>
+              <span>
+                {subMomentSequenceLabels.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    {subMomentSequenceLabels.map((entry) => (
+                      <span key={entry.key} className="text-xs text-white/90">
+                        {entry.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  goal.subMomentName ?? "-"
+                )}
+              </span>
               <span className="text-muted-foreground">Ações registadas</span>
               <span className="col-span-1">
                 {actionLabels.length > 0 ? (

@@ -1120,8 +1120,8 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationCatalogue) {
       throw new Error("Sub-momentos de Organização Ofensiva não encontrados no catálogo.");
     }
-    if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationSequence) {
-      throw new Error("Preenche os 4 sub-momentos da Organização Ofensiva.");
+    if (isOffensiveOrganizationMoment && !hasAnyOffensiveOrganizationSelection) {
+      throw new Error("Seleciona pelo menos uma fase da Organização Ofensiva.");
     }
     if (!seasonId || !championshipId) throw new Error("Selecione época e campeonato.");
 
@@ -1260,8 +1260,8 @@ const updateMutation = useMutation({
     if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationCatalogue) {
       throw new Error("Sub-momentos de Organização Ofensiva não encontrados no catálogo.");
     }
-    if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationSequence) {
-      throw new Error("Preenche os 4 sub-momentos da Organização Ofensiva.");
+    if (isOffensiveOrganizationMoment && !hasAnyOffensiveOrganizationSelection) {
+      throw new Error("Seleciona pelo menos uma fase da Organização Ofensiva.");
     }
     if (!seasonId || !championshipId) throw new Error("Selecione época e campeonato.");
 
@@ -1481,9 +1481,7 @@ const filteredChampionships = useMemo(() => {
 
   const hasCompleteOffensiveOrganizationCatalogue =
     offensiveOrganizationSubMomentRows.length === offensiveOrganizationSequenceNames.length;
-  const hasCompleteOffensiveOrganizationSequence =
-    hasCompleteOffensiveOrganizationCatalogue &&
-    offensiveOrganizationSequenceSelection.length === offensiveOrganizationSequenceNames.length;
+  const hasAnyOffensiveOrganizationSelection = offensiveOrganizationSequenceSelection.length > 0;
 
   const resolvedSubMomentId = isOffensiveOrganizationMoment
     ? offensiveOrganizationSequenceSelection[offensiveOrganizationSequenceSelection.length - 1]?.subMomentId
@@ -1873,7 +1871,7 @@ const filteredChampionships = useMemo(() => {
           momentId &&
             minute >= 0 &&
             (isOffensiveOrganizationMoment
-              ? hasCompleteOffensiveOrganizationSequence
+              ? hasAnyOffensiveOrganizationSelection
               : resolvedSubMomentId && resolvedActionIds.length > 0)
         );
 
@@ -1954,7 +1952,7 @@ const filteredChampionships = useMemo(() => {
 
 
     (isOffensiveOrganizationMoment
-      ? hasCompleteOffensiveOrganizationSequence
+      ? hasAnyOffensiveOrganizationSelection
       : resolvedSubMomentId && resolvedActionIds.length > 0) &&
 
 
@@ -2767,7 +2765,7 @@ const filteredChampionships = useMemo(() => {
                     <div>
                       <label className="text-sm font-medium">Sequência de Organização Ofensiva</label>
                       <p className="text-xs text-muted-foreground">
-                        Regista uma ação por fase: Saída do GR, Construção, Criação e Finalização.
+                        Seleciona apenas as fases observadas (cada fase é opcional).
                       </p>
                     </div>
                     <Badge className="bg-cyan-500/10 text-cyan-100">
@@ -2807,10 +2805,17 @@ const filteredChampionships = useMemo(() => {
                                     key={`oo-action-${row.subMoment.id}-${action.id}`}
                                     type="button"
                                     onClick={() =>
-                                      setOffensiveSequenceActionBySubMoment((prev) => ({
-                                        ...prev,
-                                        [row.subMoment.id]: action.id
-                                      }))
+                                      setOffensiveSequenceActionBySubMoment((prev) => {
+                                        const currentActionId = prev[row.subMoment.id];
+                                        if (currentActionId === action.id) {
+                                          const { [row.subMoment.id]: _removed, ...rest } = prev;
+                                          return rest;
+                                        }
+                                        return {
+                                          ...prev,
+                                          [row.subMoment.id]: action.id
+                                        };
+                                      })
                                     }
                                     className={cn(
                                       "w-full rounded-lg border px-2 py-2 text-left text-xs transition",
