@@ -139,7 +139,6 @@ export async function rankingsOverview(seasonId?: number, championshipId?: numbe
     ) sub
     WHERE goals > 0
     ORDER BY goals DESC, name
-    LIMIT 20
   `);
 
   const topAssists = db.execute<{ playerId: number; name: string; team: string; assists: number; photoPath: string | null }>(sql`
@@ -151,7 +150,6 @@ export async function rankingsOverview(seasonId?: number, championshipId?: numbe
     WHERE g.assist_id IS NOT NULL
     GROUP BY p.id, p.name, t.name, p.photo_path
     ORDER BY assists DESC, p.name
-    LIMIT 20
   `);
 
   const goalInvolvement = db.execute<{
@@ -218,7 +216,6 @@ export async function rankingsOverview(seasonId?: number, championshipId?: numbe
     ) sub
     WHERE involvement > 0
     ORDER BY involvement DESC, name
-    LIMIT 20
   `);
 
   const results = await Promise.all([

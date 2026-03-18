@@ -34,6 +34,20 @@ const palette = ["#67e8f9", "#22d3ee", "#a78bfa", "#f97316", "#22c55e", "#38bdf8
 const computeHeight = (length: number) => Math.min(Math.max(length * 44 + 120, 280), 540);
 const BAR_SIZE = 30;
 
+const toNumber = (value: unknown) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const formatShare = (value: number, total: number) => {
+  if (total <= 0) return "0%";
+  const share = (value / total) * 100;
+  const rounded = Number(share.toFixed(1));
+  return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+};
+
+const formatValueWithShare = (value: number, total: number) => `${value} (${formatShare(value, total)})`;
+
 export function SimpleBar({
   data,
   xKey,
@@ -47,6 +61,7 @@ export function SimpleBar({
 }) {
   const height = computeHeight(data.length);
   const yTickStyle = { ...tickStyle, textAnchor: "end" as const };
+  const total = data.reduce((sum, item) => sum + toNumber(item?.[yKey]), 0);
 
   return (
     <div className="w-full" style={{ height }}>
@@ -77,7 +92,13 @@ export function SimpleBar({
             tickLine={false}
             dx={-10}
           />
-          <Tooltip {...tooltipStyles} />
+          <Tooltip
+            {...tooltipStyles}
+            formatter={(value: unknown, name: string) => {
+              const numericValue = toNumber(value);
+              return [formatValueWithShare(numericValue, total), name];
+            }}
+          />
           <Bar dataKey={yKey} fill={BAR_COLOR} radius={[0, 10, 10, 0]} barSize={BAR_SIZE} />
         </BarChart>
       </ResponsiveContainer>
@@ -86,6 +107,8 @@ export function SimpleBar({
 }
 
 export function SimplePie({ data, labelKey, valueKey }: { data: any[]; labelKey: string; valueKey: string }) {
+  const total = data.reduce((sum, item) => sum + toNumber(item?.[valueKey]), 0);
+
   return (
     <ResponsiveContainer width="100%" height={280}>
       <PieChart>
@@ -94,8 +117,19 @@ export function SimplePie({ data, labelKey, valueKey }: { data: any[]; labelKey:
             <Cell key={idx} fill={palette[idx % palette.length]} />
           ))}
         </Pie>
-        <Tooltip {...tooltipStyles} />
-        <Legend />
+        <Tooltip
+          {...tooltipStyles}
+          formatter={(value: unknown, name: string) => {
+            const numericValue = toNumber(value);
+            return [formatValueWithShare(numericValue, total), name];
+          }}
+        />
+        <Legend
+          formatter={(value: string, entry: any) => {
+            const numericValue = toNumber(entry?.payload?.[valueKey]);
+            return `${value} - ${formatValueWithShare(numericValue, total)}`;
+          }}
+        />
       </PieChart>
     </ResponsiveContainer>
   );

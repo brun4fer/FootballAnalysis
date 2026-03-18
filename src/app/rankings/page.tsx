@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { RankingModal, type RankingModalItem } from "@/components/ui/ranking-modal";
 import { Select } from "@/components/ui/select";
 import { useAppContext } from "@/components/ui/app-context";
 import { cn } from "@/lib/utils";
@@ -66,15 +67,35 @@ function RankingCard({
   title,
   rows,
   valueKey,
-  valueLabel
+  valueLabel,
+  onClick
 }: {
   title: string;
   rows: Array<Record<string, any>>;
   valueKey: string;
   valueLabel: string;
+  onClick?: () => void;
 }) {
   return (
-    <Card className="h-full bg-[#0b1220]/70">
+    <Card
+      className={cn(
+        "h-full bg-[#0b1220]/70",
+        onClick && "cursor-pointer transition hover:border-cyan-400/50 hover:bg-[#0b1220]/90"
+      )}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       <CardHeader title={title} />
       <CardContent className="space-y-3">
         {rows.length === 0 ? (
@@ -84,10 +105,10 @@ function RankingCard({
             {rows.slice(0, 8).map((row, idx) => (
               <div
                 key={`${row.team ?? row.name}-${idx}`}
-                className="flex items-center justify-between rounded-lg border border-border/50 bg-white/5 px-3 py-2"
+                className="flex items-start justify-between gap-3 rounded-lg border border-border/50 bg-white/5 px-3 py-2"
               >
-                <div className="flex items-center gap-3">
-                  <span className="w-7 text-center text-xs text-muted-foreground">{idx + 1}º</span>
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <span className="w-7 shrink-0 text-center text-xs text-muted-foreground">{idx + 1}º</span>
                   <div className="relative h-9 w-9 overflow-hidden rounded-full bg-slate-800">
                     <Image
                       src={
@@ -102,14 +123,14 @@ function RankingCard({
                       priority={idx < 3}
                     />
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-white">{row.team ?? row.name}</span>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="line-clamp-2 text-sm font-medium leading-snug text-white break-words whitespace-normal">{row.team ?? row.name}</span>
                     {row.name && row.team && row.name !== row.team && (
-                      <span className="text-xs text-muted-foreground">{row.team}</span>
+                      <span className="line-clamp-2 text-xs leading-snug text-muted-foreground break-words whitespace-normal">{row.team}</span>
                     )}
                   </div>
                 </div>
-                <div className="flex items-baseline gap-1 text-sm font-semibold text-emerald-200">
+                <div className="flex shrink-0 items-baseline gap-1 pl-2 text-sm font-semibold text-emerald-200">
                   <span>{row[valueKey] ?? 0}</span>
                   <span className="text-[11px] font-normal text-muted-foreground">{valueLabel}</span>
                 </div>
@@ -126,15 +147,35 @@ function TopPlayersCard({
   title,
   rows,
   valueKey,
-  valueLabel
+  valueLabel,
+  onClick
 }: {
   title: string;
   rows: Array<Record<string, any>>;
   valueKey: string;
   valueLabel: string;
+  onClick?: () => void;
 }) {
   return (
-    <Card className="h-full bg-[#0b1220]/70">
+    <Card
+      className={cn(
+        "h-full bg-[#0b1220]/70",
+        onClick && "cursor-pointer transition hover:border-cyan-400/50 hover:bg-[#0b1220]/90"
+      )}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       <CardHeader title={title} />
       <CardContent className="space-y-3">
         {rows.length === 0 ? (
@@ -144,10 +185,10 @@ function TopPlayersCard({
             {rows.slice(0, 3).map((row, idx) => (
               <div
                 key={`${row.name}-${idx}`}
-                className="flex items-center justify-between rounded-lg border border-border/50 bg-white/5 px-3 py-2"
+                className="flex items-start justify-between gap-3 rounded-lg border border-border/50 bg-white/5 px-3 py-2"
               >
-                <div className="flex items-center gap-3">
-                  <span className="w-6 text-center text-xs text-muted-foreground">{idx + 1}º</span>
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <span className="w-6 shrink-0 text-center text-xs text-muted-foreground">{idx + 1}º</span>
                   <div className="relative h-9 w-9 overflow-hidden rounded-full bg-slate-800">
                     <Image
                       src={(row.photoPath || "/images/default.png") as string}
@@ -158,12 +199,12 @@ function TopPlayersCard({
                       priority={idx === 0}
                     />
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-white">{row.name}</span>
-                    {row.team && <span className="text-xs text-muted-foreground">{row.team}</span>}
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="line-clamp-2 text-sm font-medium leading-snug text-white break-words whitespace-normal">{row.name}</span>
+                    {row.team && <span className="line-clamp-2 text-xs leading-snug text-muted-foreground break-words whitespace-normal">{row.team}</span>}
                   </div>
                 </div>
-                <div className="flex items-baseline gap-1 text-sm font-semibold text-emerald-200">
+                <div className="flex shrink-0 items-baseline gap-1 pl-2 text-sm font-semibold text-emerald-200">
                   <span>{row[valueKey] ?? 0}</span>
                   <span className="text-[11px] font-normal text-muted-foreground">{valueLabel}</span>
                 </div>
@@ -232,6 +273,12 @@ export default function RankingsPage() {
   const [champA, setChampA] = useState<string>(selection.championshipId ? String(selection.championshipId) : "");
   const [champB, setChampB] = useState<string>("");
   const [isMounted, setIsMounted] = useState(false);
+  const [rankingModal, setRankingModal] = useState<{
+    title: string;
+    items: RankingModalItem[];
+    singularLabel: string;
+    pluralLabel: string;
+  } | null>(null);
 
   useEffect(() => setIsMounted(true), []);
   useEffect(() => {
@@ -297,6 +344,21 @@ export default function RankingsPage() {
     if (champName) return champName;
     if (seasonName) return seasonName;
     return "Sem contexto";
+  };
+
+  const openRankingModal = (
+    title: string,
+    rows: Array<Record<string, any>>,
+    valueKey: string,
+    singularLabel: string,
+    pluralLabel: string
+  ) => {
+    const items: RankingModalItem[] = rows.map((row, idx) => ({
+      id: (row.playerId ?? row.teamId ?? `${title}-${idx}`) as number | string,
+      name: (row.name ?? row.team ?? "—") as string,
+      value: Number(row[valueKey] ?? 0)
+    }));
+    setRankingModal({ title, items, singularLabel, pluralLabel });
   };
 
   const nameA = labelFor(champA, seasonA);
@@ -405,7 +467,18 @@ export default function RankingsPage() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-cyan-500/10">
+                <Card
+                  className="bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-cyan-500/10 cursor-pointer transition hover:border-cyan-400/50 hover:bg-emerald-500/20"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openRankingModal("1. Total de Golos", rankingsQuery.data.totalGoals, "goals", "golo", "golos")}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openRankingModal("1. Total de Golos", rankingsQuery.data.totalGoals, "goals", "golo", "golos");
+                    }
+                  }}
+                >
                   <CardHeader title="Total de Golos" />
                   <CardContent>
                     <div className="text-3xl font-semibold text-white">
@@ -417,7 +490,20 @@ export default function RankingsPage() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-indigo-500/15 via-slate-500/10 to-indigo-500/5">
+                <Card
+                  className="bg-gradient-to-br from-indigo-500/15 via-slate-500/10 to-indigo-500/5 cursor-pointer transition hover:border-cyan-400/50 hover:bg-indigo-500/20"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    openRankingModal("2. Golos em Organização", rankingsQuery.data.organization, "goals", "golo", "golos")
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openRankingModal("2. Golos em Organização", rankingsQuery.data.organization, "goals", "golo", "golos");
+                    }
+                  }}
+                >
                   <CardHeader title="Organização" />
                   <CardContent>
                     <div className="text-3xl font-semibold text-white">
@@ -429,7 +515,18 @@ export default function RankingsPage() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-amber-500/5">
+                <Card
+                  className="bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-amber-500/5 cursor-pointer transition hover:border-cyan-400/50 hover:bg-amber-500/20"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openRankingModal("3. Golos em Transição", rankingsQuery.data.transition, "goals", "golo", "golos")}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openRankingModal("3. Golos em Transição", rankingsQuery.data.transition, "goals", "golo", "golos");
+                    }
+                  }}
+                >
                   <CardHeader title="Transição" />
                   <CardContent>
                     <div className="text-3xl font-semibold text-white">
@@ -444,18 +541,110 @@ export default function RankingsPage() {
               </div>
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <RankingCard title="1. Total de Golos" rows={rankingsQuery.data.totalGoals} valueKey="goals" valueLabel="golos" />
-                <RankingCard title="2. Golos em Organização" rows={rankingsQuery.data.organization} valueKey="goals" valueLabel="golos" />
-                <RankingCard title="3. Golos em Transição" rows={rankingsQuery.data.transition} valueKey="goals" valueLabel="golos" />
-                <RankingCard title="4. Total Bola Parada" rows={rankingsQuery.data.setPiecesTotal} valueKey="goals" valueLabel="golos" />
-                <RankingCard title="5. Cantos" rows={rankingsQuery.data.corners} valueKey="goals" valueLabel="golos" />
-                <RankingCard title="6. Livres" rows={rankingsQuery.data.freeKicks} valueKey="goals" valueLabel="golos" />
-                <RankingCard title="7. Livres Diretos" rows={rankingsQuery.data.freeKicksDirect} valueKey="goals" valueLabel="golos" />
-                <RankingCard title="8. Penáltis" rows={rankingsQuery.data.penalties} valueKey="goals" valueLabel="golos" />
-                <RankingCard title="9. Lançamentos Laterais" rows={rankingsQuery.data.throwIns} valueKey="goals" valueLabel="golos" />
-                <TopPlayersCard title="10. Top Marcadores" rows={rankingsQuery.data.topScorers} valueKey="goals" valueLabel="golos" />
-                <TopPlayersCard title="11. Assistências" rows={rankingsQuery.data.topAssists} valueKey="assists" valueLabel="assist." />
-                <TopPlayersCard title="12. Participação em Golos (G+A)" rows={rankingsQuery.data.goalInvolvement} valueKey="involvement" valueLabel="ações" />
+                <RankingCard
+                  title="1. Total de Golos"
+                  rows={rankingsQuery.data.totalGoals}
+                  valueKey="goals"
+                  valueLabel="golos"
+                  onClick={() => openRankingModal("1. Total de Golos", rankingsQuery.data.totalGoals, "goals", "golo", "golos")}
+                />
+                <RankingCard
+                  title="2. Golos em Organização"
+                  rows={rankingsQuery.data.organization}
+                  valueKey="goals"
+                  valueLabel="golos"
+                  onClick={() =>
+                    openRankingModal("2. Golos em Organização", rankingsQuery.data.organization, "goals", "golo", "golos")
+                  }
+                />
+                <RankingCard
+                  title="3. Golos em Transição"
+                  rows={rankingsQuery.data.transition}
+                  valueKey="goals"
+                  valueLabel="golos"
+                  onClick={() => openRankingModal("3. Golos em Transição", rankingsQuery.data.transition, "goals", "golo", "golos")}
+                />
+                <RankingCard
+                  title="4. Total Bola Parada"
+                  rows={rankingsQuery.data.setPiecesTotal}
+                  valueKey="goals"
+                  valueLabel="golos"
+                  onClick={() =>
+                    openRankingModal("4. Total Bola Parada", rankingsQuery.data.setPiecesTotal, "goals", "golo", "golos")
+                  }
+                />
+                <RankingCard
+                  title="5. Cantos"
+                  rows={rankingsQuery.data.corners}
+                  valueKey="goals"
+                  valueLabel="golos"
+                  onClick={() => openRankingModal("5. Cantos", rankingsQuery.data.corners, "goals", "golo", "golos")}
+                />
+                <RankingCard
+                  title="6. Livres"
+                  rows={rankingsQuery.data.freeKicks}
+                  valueKey="goals"
+                  valueLabel="golos"
+                  onClick={() => openRankingModal("6. Livres", rankingsQuery.data.freeKicks, "goals", "golo", "golos")}
+                />
+                <RankingCard
+                  title="7. Livres Diretos"
+                  rows={rankingsQuery.data.freeKicksDirect}
+                  valueKey="goals"
+                  valueLabel="golos"
+                  onClick={() =>
+                    openRankingModal("7. Livres Diretos", rankingsQuery.data.freeKicksDirect, "goals", "golo", "golos")
+                  }
+                />
+                <RankingCard
+                  title="8. Penáltis"
+                  rows={rankingsQuery.data.penalties}
+                  valueKey="goals"
+                  valueLabel="golos"
+                  onClick={() => openRankingModal("8. Penáltis", rankingsQuery.data.penalties, "goals", "golo", "golos")}
+                />
+                <RankingCard
+                  title="9. Lançamentos Laterais"
+                  rows={rankingsQuery.data.throwIns}
+                  valueKey="goals"
+                  valueLabel="golos"
+                  onClick={() =>
+                    openRankingModal("9. Lançamentos Laterais", rankingsQuery.data.throwIns, "goals", "golo", "golos")
+                  }
+                />
+                <TopPlayersCard
+                  title="10. Top Marcadores"
+                  rows={rankingsQuery.data.topScorers}
+                  valueKey="goals"
+                  valueLabel="golos"
+                  onClick={() =>
+                    openRankingModal("10. Top Marcadores", rankingsQuery.data.topScorers, "goals", "golo", "golos")
+                  }
+                />
+                <TopPlayersCard
+                  title="11. Assistências"
+                  rows={rankingsQuery.data.topAssists}
+                  valueKey="assists"
+                  valueLabel="assist."
+                  onClick={() =>
+                    openRankingModal("11. Assistências", rankingsQuery.data.topAssists, "assists", "assistência", "assistências")
+                  }
+                />
+                <TopPlayersCard
+                  title="12. Participação em Golos (G+A)"
+                  rows={rankingsQuery.data.goalInvolvement}
+                  valueKey="involvement"
+                  valueLabel="ações"
+                  onClick={() =>
+                    openRankingModal(
+                      "12. Participação em Golos (G+A)",
+                      rankingsQuery.data.goalInvolvement,
+                      "involvement",
+                      "participação",
+                      "participações"
+                    )
+                  }
+                />
               </div>
             </div>
           )}
@@ -656,6 +845,17 @@ export default function RankingsPage() {
       </div>
 
       {tab === "ligas" ? renderRankings() : renderComparison()}
+      <RankingModal
+        open={Boolean(rankingModal)}
+        title={rankingModal?.title ?? "Ranking"}
+        items={rankingModal?.items ?? []}
+        singularLabel={rankingModal?.singularLabel ?? "valor"}
+        pluralLabel={rankingModal?.pluralLabel ?? "valores"}
+        onOpenChange={(open) => {
+          if (!open) setRankingModal(null);
+        }}
+      />
     </div>
   );
 }
+

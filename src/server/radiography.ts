@@ -22,25 +22,6 @@ const normalizeToken = (value: string) =>
     .toLowerCase()
     .trim();
 
-const hiddenActionPatterns = [
-  "jogador referencia",
-  "jogadores referencia",
-  "espacos que atacam",
-  "falta sobre",
-  "falta sofrida",
-  "sofreu a falta",
-  "momento anterior",
-  "marcador",
-  "assistencia",
-  "assistencia e marcador",
-  "marcador e assistencia"
-];
-
-const shouldHideFromSubMomentActionBreakdown = (actionName: string) => {
-  const normalized = normalizeToken(actionName);
-  return hiddenActionPatterns.some((pattern) => normalized.includes(pattern));
-};
-
 const isTransitionRecoverySubMoment = (subMomentName: string) => {
   const normalized = normalizeToken(subMomentName);
   return (
@@ -90,15 +71,7 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
   const bpoCategory = filters?.bpoCategory;
   const shouldComputeSubMomentBreakdown = Boolean(momentId || bpoCategory);
   const hasGoalSubMomentActionsTable = await hasTable("goal_sub_moment_actions");
-  const selectedMoment = momentId
-    ? await db.query.moments.findFirst({
-        where: (fields, { eq }) => eq(fields.id, momentId),
-        columns: { name: true }
-      })
-    : null;
-  const shouldUseSequenceBreakdown =
-    hasGoalSubMomentActionsTable &&
-    Boolean(selectedMoment && normalizeToken(selectedMoment.name).includes("organizacao ofensiva"));
+  const shouldUseRelationalBreakdown = hasGoalSubMomentActionsTable;
   const teamCondition = sql`g.team_id = ${teamId}`;
   const momentCondition = momentId ? sql` AND g.moment_id = ${momentId}` : sql``;
   const isCornerGoal = sql`EXISTS (
@@ -229,7 +202,6 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     WHERE ${goalFilter}
     GROUP BY p.id, p.name, p.photo_path
     ORDER BY goals DESC, p.name
-    LIMIT 3
   `);
 
   const topAssists = db.execute<{ id: number; name: string; assists: number; photoPath: string | null }>(sql`
@@ -239,7 +211,6 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     WHERE ${goalFilter} AND g.assist_id IS NOT NULL
     GROUP BY p.id, p.name, p.photo_path
     ORDER BY assists DESC, p.name
-    LIMIT 3
   `);
 
   const topParticipation = db.execute<{ id: number; name: string; involvement: number; photoPath: string | null }>(sql`
@@ -272,7 +243,6 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     WHERE (COALESCE(s.goals,0) + COALESCE(a.assists,0) + COALESCE(i.involvements,0)) > 0
       AND p.team_id = ${teamId}
     ORDER BY involvement DESC, p.name
-    LIMIT 3
   `);
 
   const topReferencePlayers = db.execute<{ id: number; name: string; referenceCount: number; photoPath: string | null }>(sql`
@@ -392,7 +362,7 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
   const subMomentTotalsPromise: Promise<{ rows: Array<{ subMomentId: number; subMoment: string; totalGoals: number }> }> =
     !shouldComputeSubMomentBreakdown
       ? Promise.resolve({ rows: [] })
-      : shouldUseSequenceBreakdown
+      : shouldUseRelationalBreakdown
         ? momentId
           ? db.execute<{ subMomentId: number; subMoment: string; totalGoals: number }>(sql`
               WITH filtered_goal_sequences AS (
@@ -453,7 +423,7 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
   const subMomentActionsPromise: Promise<{ rows: Array<{ subMomentId: number; action: string; goals: number }> }> =
     !shouldComputeSubMomentBreakdown
       ? Promise.resolve({ rows: [] })
-      : shouldUseSequenceBreakdown
+      : shouldUseRelationalBreakdown
         ? db.execute<{ subMomentId: number; action: string; goals: number }>(sql`
             SELECT
               gsma.sub_moment_id AS "subMomentId",
@@ -619,9 +589,27 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     });
   }
 
+  const subMomentIdsForCatalog = Array.from(totalsBySubMomentId.keys());
+  const subMomentActionCatalogRows =
+    shouldComputeSubMomentBreakdown && subMomentIdsForCatalog.length > 0
+      ? await db.execute<{ subMomentId: number; action: string }>(sql`
+          SELECT
+            a.sub_moment_id AS "subMomentId",
+            a.name AS action
+          FROM ${actions} a
+          WHERE a.sub_moment_id IN (${sql.join(subMomentIdsForCatalog.map((id) => sql`${id}`), sql`, `)})
+          ORDER BY a.sub_moment_id, a.name
+        `)
+      : { rows: [] as Array<{ subMomentId: number; action: string }> };
+  const actionCatalogBySubMomentId = new Map<number, string[]>();
+  for (const row of subMomentActionCatalogRows.rows) {
+    const bucket = actionCatalogBySubMomentId.get(row.subMomentId) ?? [];
+    bucket.push(row.action);
+    actionCatalogBySubMomentId.set(row.subMomentId, bucket);
+  }
+
   const actionsBySubMomentId = new Map<number, Array<{ action: string; goals: number }>>();
   for (const row of subMomentActionRows.rows) {
-    if (shouldHideFromSubMomentActionBreakdown(row.action)) continue;
     const bucket = actionsBySubMomentId.get(row.subMomentId) ?? [];
     bucket.push({ action: row.action, goals: row.goals });
     actionsBySubMomentId.set(row.subMomentId, bucket);
@@ -636,7 +624,18 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
   const subMomentActionBreakdown = Array.from(totalsBySubMomentId.entries())
     .map(([subMomentId, totals]) => {
       const rawActions = actionsBySubMomentId.get(subMomentId) ?? [];
-      const actions = rawActions
+      const goalsByActionName = new Map(rawActions.map((entry) => [entry.action, entry.goals]));
+      const catalogActions = actionCatalogBySubMomentId.get(subMomentId) ?? [];
+      const catalogActionSet = new Set(catalogActions);
+      const mergedActions = [
+        ...catalogActions.map((actionName) => ({
+          action: actionName,
+          goals: goalsByActionName.get(actionName) ?? 0
+        })),
+        ...rawActions.filter((entry) => !catalogActionSet.has(entry.action))
+      ];
+
+      const actions = mergedActions
         .sort((a, b) => (b.goals === a.goals ? a.action.localeCompare(b.action) : b.goals - a.goals))
         .map((entry) => ({
           action: entry.action,

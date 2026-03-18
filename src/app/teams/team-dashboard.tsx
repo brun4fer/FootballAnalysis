@@ -12,6 +12,7 @@ import { FileText, PlayCircle, X, Eye, Trash2 } from "lucide-react";
 import { useAppContext } from "@/components/ui/app-context";
 import { GoalWizard } from "../goals/goal-wizard";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { RankingModal, type RankingModalItem } from "@/components/ui/ranking-modal";
 
 type Team = {
   id: number;
@@ -37,6 +38,10 @@ type GoalEvent = {
   fieldDrawing?: { x: number; y: number } | null;
   action?: string;
 };
+
+type ScorerRankingRow = { id: number; name: string; goals: number; assists: number };
+type AssistRankingRow = { id: number; name: string; assists: number; goals: number };
+type InvolvementRankingRow = { id: number; name: string; involvement: number };
 
 const fetcher = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url);
@@ -133,6 +138,12 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
   const [editingGoal, setEditingGoal] = useState<any | null>(null);
   const [pendingDeleteGoalId, setPendingDeleteGoalId] = useState<number | null>(null);
   const [deleteFeedback, setDeleteFeedback] = useState<string | null>(null);
+  const [rankingModal, setRankingModal] = useState<{
+    title: string;
+    items: RankingModalItem[];
+    singularLabel: string;
+    pluralLabel: string;
+  } | null>(null);
 
   const lookupsQuery = useQuery({
     queryKey: ["lookups"],
@@ -169,7 +180,19 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
   const topScorersQuery = useQuery({
     queryKey: ["top-scorers", teamId],
     enabled: Boolean(teamId),
-    queryFn: () => fetcher<Array<{ id: number; name: string; goals: number; assists: number }>>(`/api/stats/top-scorers?teamId=${teamId}`)
+    queryFn: () => fetcher<ScorerRankingRow[]>(`/api/stats/top-scorers?teamId=${teamId}`)
+  });
+
+  const topAssistsQuery = useQuery({
+    queryKey: ["top-assists", teamId],
+    enabled: Boolean(teamId),
+    queryFn: () => fetcher<AssistRankingRow[]>(`/api/stats/top-assists?teamId=${teamId}`)
+  });
+
+  const topInvolvementQuery = useQuery({
+    queryKey: ["top-involvement", teamId],
+    enabled: Boolean(teamId),
+    queryFn: () => fetcher<InvolvementRankingRow[]>(`/api/stats/involvement?teamId=${teamId}`)
   });
 
   const momentsQuery = useQuery({
@@ -180,25 +203,39 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
 
   const totalGoals = goalsQuery.data?.length ?? 0;
   const topScorers = topScorersQuery.data ?? [];
-  const topScorer = topScorers.reduce<{ id: number; name: string; goals: number; assists: number } | null>(
-    (best, current) => (!best || current.goals > best.goals ? current : best),
-    null
+  const topAssists = topAssistsQuery.data ?? [];
+  const topInvolvement = topInvolvementQuery.data ?? [];
+  const topScorer = topScorers[0] ?? null;
+  const topAssistant = topAssists[0] ?? null;
+  const topParticipation = topInvolvement[0] ?? null;
+
+  const scorerRankingItems = useMemo<RankingModalItem[]>(
+    () => (topScorersQuery.data ?? []).map((row) => ({ id: row.id, name: row.name, value: row.goals })),
+    [topScorersQuery.data]
   );
-  const topAssistant = topScorers.reduce<{ id: number; name: string; goals: number; assists: number } | null>(
-    (best, current) => (!best || current.assists > best.assists ? current : best),
-    null
+  const assistRankingItems = useMemo<RankingModalItem[]>(
+    () => (topAssistsQuery.data ?? []).map((row) => ({ id: row.id, name: row.name, value: row.assists })),
+    [topAssistsQuery.data]
   );
-  const topParticipation = topScorers.reduce<{ id: number; name: string; participations: number } | null>((best, current) => {
-    const participations = (current.goals ?? 0) + (current.assists ?? 0);
-    if (!best || participations > best.participations) {
-      return { id: current.id, name: current.name, participations };
-    }
-    return best;
-  }, null);
+  const involvementRankingItems = useMemo<RankingModalItem[]>(
+    () => (topInvolvementQuery.data ?? []).map((row) => ({ id: row.id, name: row.name, value: row.involvement })),
+    [topInvolvementQuery.data]
+  );
+
+  const openRankingModal = (
+    title: string,
+    items: RankingModalItem[],
+    singularLabel: string,
+    pluralLabel: string
+  ) => {
+    setRankingModal({ title, items, singularLabel, pluralLabel });
+  };
 
   const refreshAll = () => {
     goalsQuery.refetch();
     topScorersQuery.refetch();
+    topAssistsQuery.refetch();
+    topInvolvementQuery.refetch();
     momentsQuery.refetch();
   };
 
@@ -353,7 +390,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
             <div className="grid gap-4 lg:grid-cols-5">
               <Card className="border-border/60 bg-slate-900/55">
                 <CardHeader title="Emblema da Equipa" />
-                <CardContent className="flex items-center gap-3">
+                <CardContent className="flex items-start gap-3">
                   <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-slate-800/60">
                     {selectedTeam?.emblemPath ? (
                       <img src={selectedTeam.emblemPath} alt={`Emblema ${selectedTeam.name}`} className="h-full w-full object-cover" />
@@ -361,34 +398,76 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                       <span className="text-xs text-muted-foreground">Sem imagem</span>
                     )}
                   </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-white">{selectedTeam?.name ?? "Equipa"}</div>
-                    <div className="text-xs text-muted-foreground">Placeholder circular ativo</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="line-clamp-2 text-sm font-semibold leading-snug text-white break-words whitespace-normal">
+                      {selectedTeam?.name ?? "Equipa"}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-border/60 bg-slate-900/55">
+              <Card
+                className="border-border/60 bg-slate-900/55 cursor-pointer transition hover:border-cyan-400/50 hover:bg-slate-900/70"
+                role="button"
+                tabIndex={0}
+                onClick={() => openRankingModal("Melhor Marcador", scorerRankingItems, "golo", "golos")}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openRankingModal("Melhor Marcador", scorerRankingItems, "golo", "golos");
+                  }
+                }}
+              >
                 <CardHeader title="Melhor Marcador" />
                 <CardContent>
-                  <div className="text-sm font-semibold text-white">{topScorer?.name ?? "Sem dados"}</div>
+                  <div className="line-clamp-2 text-sm font-semibold leading-snug text-white break-words whitespace-normal">
+                    {topScorer?.name ?? "Sem dados"}
+                  </div>
                   <div className="text-xs text-muted-foreground">{topScorer ? `${topScorer.goals} golos` : "Sem registos"}</div>
                 </CardContent>
               </Card>
 
-              <Card className="border-border/60 bg-slate-900/55">
+              <Card
+                className="border-border/60 bg-slate-900/55 cursor-pointer transition hover:border-cyan-400/50 hover:bg-slate-900/70"
+                role="button"
+                tabIndex={0}
+                onClick={() => openRankingModal("Mais Assistências", assistRankingItems, "assistência", "assistências")}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openRankingModal("Mais Assistências", assistRankingItems, "assistência", "assistências");
+                  }
+                }}
+              >
                 <CardHeader title="Mais Assistencias" />
                 <CardContent>
-                  <div className="text-sm font-semibold text-white">{topAssistant?.name ?? "Sem dados"}</div>
+                  <div className="line-clamp-2 text-sm font-semibold leading-snug text-white break-words whitespace-normal">
+                    {topAssistant?.name ?? "Sem dados"}
+                  </div>
                   <div className="text-xs text-muted-foreground">{topAssistant ? `${topAssistant.assists} assistencias` : "Sem registos"}</div>
                 </CardContent>
               </Card>
 
-              <Card className="border-border/60 bg-slate-900/55">
+              <Card
+                className="border-border/60 bg-slate-900/55 cursor-pointer transition hover:border-cyan-400/50 hover:bg-slate-900/70"
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  openRankingModal("Mais Participações em Golo", involvementRankingItems, "participação", "participações")
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openRankingModal("Mais Participações em Golo", involvementRankingItems, "participação", "participações");
+                  }
+                }}
+              >
                 <CardHeader title="Mais Participacoes em Golo" />
                 <CardContent>
-                  <div className="text-sm font-semibold text-white">{topParticipation?.name ?? "Sem dados"}</div>
-                  <div className="text-xs text-muted-foreground">{topParticipation ? `${topParticipation.participations} participacoes` : "Sem registos"}</div>
+                  <div className="line-clamp-2 text-sm font-semibold leading-snug text-white break-words whitespace-normal">
+                    {topParticipation?.name ?? "Sem dados"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{topParticipation ? `${topParticipation.involvement} participacoes` : "Sem registos"}</div>
                 </CardContent>
               </Card>
 
@@ -533,6 +612,16 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
             onConfirm={() => {
               if (!pendingDeleteGoalId || deleteGoalMutation.isPending) return;
               deleteGoalMutation.mutate(pendingDeleteGoalId);
+            }}
+          />
+          <RankingModal
+            open={Boolean(rankingModal)}
+            title={rankingModal?.title ?? "Ranking"}
+            items={rankingModal?.items ?? []}
+            singularLabel={rankingModal?.singularLabel ?? "valor"}
+            pluralLabel={rankingModal?.pluralLabel ?? "valores"}
+            onOpenChange={(open) => {
+              if (!open) setRankingModal(null);
             }}
           />
 

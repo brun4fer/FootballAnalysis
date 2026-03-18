@@ -10,12 +10,37 @@ const seeds = [
       { name: "Saída do GR", actions: ["Em organização", "Curto para longo", "Bola longa", "Jogador Referência"] },
       {
         name: "Construção",
-        actions: ["Ligação por dentro", "Ligação na largura", "Bola longa no corredor central", "Bola longa na largura", "Jogador Referência"]
+        actions: [
+          "Ligação por dentro",
+          "Ligação na largura",
+          "Bola longa no corredor central",
+          "Bola longa na largura",
+          "Lançamento para organização",
+          "Jogador Referência"
+        ]
       },
-      { name: "Criação", actions: ["Ligação no corredor central", "Ligação na largura", "Bola longa", "Profundidade", "Jogador Referência"] },
+      {
+        name: "Criação",
+        actions: [
+          "Ligação no corredor central",
+          "Ligação na largura",
+          "Bola longa",
+          "Profundidade",
+          "Lançamento para organização",
+          "Jogador Referência"
+        ]
+      },
       {
         name: "Finalização",
-        actions: ["Cruzamento Direita", "Cruzamento Esquerda", "Remate de fora da área", "Profundidade", "Segunda bola", "Jogador Referência"]
+        actions: [
+          "Cruzamento Direita",
+          "Cruzamento Esquerda",
+          "Remate de fora da área",
+          "Profundidade",
+          "Segunda bola",
+          "Lançamento para organização",
+          "Jogador Referência"
+        ]
       }
     ]
   },

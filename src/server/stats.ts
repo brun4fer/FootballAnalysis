@@ -52,6 +52,33 @@ export async function topScorers(teamId: number) {
   return result.rows;
 }
 
+export async function topAssists(teamId: number) {
+  const result = await db.execute<{ id: number; name: string; assists: number; goals: number }>(sql`
+    WITH goal_counts AS (
+      SELECT scorer_id, COUNT(*)::int AS goals
+      FROM ${goals}
+      WHERE team_id = ${teamId}
+      GROUP BY scorer_id
+    ),
+    assist_counts AS (
+      SELECT assist_id, COUNT(*)::int AS assists
+      FROM ${goals}
+      WHERE team_id = ${teamId} AND assist_id IS NOT NULL
+      GROUP BY assist_id
+    )
+    SELECT p.id,
+           p.name,
+           COALESCE(ac.assists, 0) AS assists,
+           COALESCE(gc.goals, 0) AS goals
+    FROM ${players} p
+    LEFT JOIN goal_counts gc ON gc.scorer_id = p.id
+    LEFT JOIN assist_counts ac ON ac.assist_id = p.id
+    WHERE p.team_id = ${teamId} AND COALESCE(ac.assists, 0) > 0
+    ORDER BY COALESCE(ac.assists, 0) DESC, COALESCE(gc.goals, 0) DESC, p.name;
+  `);
+  return result.rows;
+}
+
 export async function mostInvolved(teamId: number) {
   const result = await db.execute<{ id: number; name: string; involvement: number }>(sql`
     WITH goal_counts AS (
@@ -72,15 +99,19 @@ export async function mostInvolved(teamId: number) {
       WHERE role != 'assist'
       GROUP BY player_id
     )
-    SELECT p.id,
-           p.name,
-           COALESCE(gc.goals, 0) + COALESCE(ac.assists, 0) + COALESCE(ic.involvements, 0) AS involvement
-    FROM ${players} p
-    LEFT JOIN goal_counts gc ON gc.scorer_id = p.id
-    LEFT JOIN assist_counts ac ON ac.assist_id = p.id
-    LEFT JOIN involvement_counts ic ON ic.player_id = p.id
-    WHERE p.team_id = ${teamId}
-    ORDER BY involvement DESC, p.name;
+    SELECT ranked.id, ranked.name, ranked.involvement
+    FROM (
+      SELECT p.id,
+             p.name,
+             COALESCE(gc.goals, 0) + COALESCE(ac.assists, 0) + COALESCE(ic.involvements, 0) AS involvement
+      FROM ${players} p
+      LEFT JOIN goal_counts gc ON gc.scorer_id = p.id
+      LEFT JOIN assist_counts ac ON ac.assist_id = p.id
+      LEFT JOIN involvement_counts ic ON ic.player_id = p.id
+      WHERE p.team_id = ${teamId}
+    ) ranked
+    WHERE ranked.involvement > 0
+    ORDER BY ranked.involvement DESC, ranked.name;
   `);
   return result.rows;
 }

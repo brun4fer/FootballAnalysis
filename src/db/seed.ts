@@ -36,6 +36,7 @@ const MOMENT_SEEDS: MomentSeed[] = [
           { name: "Liga\u00e7\u00e3o na largura", context: "field" },
           { name: "Bola longa no corredor central", context: "field" },
           { name: "Bola longa na largura", context: "field" },
+          { name: "Lan\u00e7amento para organiza\u00e7\u00e3o", context: "field" },
           { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       },
@@ -46,6 +47,7 @@ const MOMENT_SEEDS: MomentSeed[] = [
           { name: "Liga\u00e7\u00e3o na largura", context: "field" },
           { name: "Bola longa", context: "field" },
           { name: "Profundidade", context: "field" },
+          { name: "Lan\u00e7amento para organiza\u00e7\u00e3o", context: "field" },
           { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       },
@@ -57,6 +59,7 @@ const MOMENT_SEEDS: MomentSeed[] = [
           { name: "Remate de fora da \u00e1rea", context: "field_goal" },
           { name: "Profundidade", context: "field" },
           { name: "Segunda bola", context: "field" },
+          { name: "Lan\u00e7amento para organiza\u00e7\u00e3o", context: "field" },
           { name: "Jogador Refer\u00eancia", context: "field" }
         ]
       }

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { RankingModal, type RankingModalItem } from "@/components/ui/ranking-modal";
 import { Select } from "@/components/ui/select";
 import { SimplePie } from "@/components/ui/charts";
 import { cn } from "@/lib/utils";
@@ -89,6 +90,18 @@ type RadiographyResponse = {
 };
 
 const defaultImage = "/images/default.png";
+const resolveImageSrc = (value?: string | null) => {
+  const src = value?.trim();
+  if (!src) return defaultImage;
+  if (src.startsWith("/")) return src;
+  try {
+    const parsed = new URL(src);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return src;
+  } catch {
+    return defaultImage;
+  }
+  return defaultImage;
+};
 
 const LABEL_OVERRIDES: Record<string, string> = {
   organizacao: "Organização",
@@ -132,22 +145,6 @@ const MAP_WRAPPER_CLASS =
 const MAP_SVG_CLASS = "w-full aspect-[3/2]";
 const ACTION_BAR_COLOR = "rgba(34,211,238,0.72)";
 const ZERO_ACTION_BAR_BG_CLASS = "bg-muted/20";
-const SUB_MOMENT_ACTIONS: Record<string, string[]> = {
-  "saida do gr": ["Em organização", "Curto para longo", "Bola longa"],
-  construcao: [
-    "Bola longa na largura",
-    "Bola longa no corredor central",
-    "Ligação na largura",
-    "Ligação por dentro"
-  ],
-  criacao: ["Ligação no corredor central", "Ligação na largura", "Bola longa", "Profundidade"],
-  finalizacao: ["Cruzamento Direita", "Cruzamento Esquerda", "Remate de fora da área", "Profundidade", "Segunda bola"],
-  "recuperacao meio campo defensivo": ["Cruzamento Direita", "Cruzamento Esquerda", "Remate Fora de Área", "Profundidade"],
-  "recuperacao meio campo ofensivo": ["Cruzamento Direita", "Cruzamento Esquerda", "Remate Fora de Área", "Profundidade"],
-  "lancamento lateral": ["Lançamento para a área", "Passagem para organização"],
-  canto: ["Canto aberto", "Canto fechado", "Canto combinado"],
-  livre: ["Livre aberto", "Livre fechado", "Livre combinado"]
-};
 
 type RecoveryGridVariant = "defensive" | "offensive";
 type TacticalZone = { id: number; x: number; y: number; width: number; height: number };
@@ -185,7 +182,20 @@ const normalizeToken = (value: string) =>
     .toLowerCase()
     .trim();
 
-const getConfiguredSubMomentActions = (subMomentName: string) => SUB_MOMENT_ACTIONS[normalizeToken(subMomentName)] ?? [];
+const normalizeActionLabelToken = (value: string) => normalizeToken(value).replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+
+const HIDDEN_ACTION_CHART_LABELS = new Set([
+  "marcador",
+  "marcador do canto",
+  "marcador do lancamento",
+  "marcador do penalti",
+  "marcador da falta",
+  "falta sobre",
+  "momento anterior"
+]);
+
+const shouldHideActionFromChart = (actionName: string) =>
+  HIDDEN_ACTION_CHART_LABELS.has(normalizeActionLabelToken(actionName));
 
 const isTransitionOffensiveMoment = (momentName?: string) =>
   normalizeToken(momentName ?? "").includes("transicao ofensiva");
@@ -218,15 +228,35 @@ function TopPlayersCard({
   title,
   rows,
   valueKey,
-  valueLabel
+  valueLabel,
+  onClick
 }: {
   title: string;
   rows: PlayerRow[];
   valueKey: "goals" | "assists" | "involvement";
   valueLabel: string;
+  onClick?: () => void;
 }) {
   return (
-    <Card className="h-full bg-[#0c1220]/70">
+    <Card
+      className={cn(
+        "h-full bg-[#0c1220]/70",
+        onClick && "cursor-pointer transition hover:border-cyan-400/50 hover:bg-[#0c1220]/90"
+      )}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       <CardHeader title={title} />
       <CardContent className="space-y-3">
         {rows.length === 0 ? (
@@ -236,13 +266,13 @@ function TopPlayersCard({
             {rows.slice(0, 3).map((row, idx) => (
               <div
                 key={`${row.id}-${idx}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-white/5 px-3 py-2"
+                className="flex items-start justify-between gap-3 rounded-lg border border-border/50 bg-white/5 px-3 py-2"
               >
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
                   <span className="w-6 shrink-0 text-center text-xs text-muted-foreground">{idx + 1}º</span>
                   <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-800">
                     <Image
-                      src={row.photoPath || defaultImage}
+                      src={resolveImageSrc(row.photoPath)}
                       alt={row.name}
                       fill
                       sizes="40px"
@@ -250,9 +280,11 @@ function TopPlayersCard({
                       priority={idx === 0}
                     />
                   </div>
-                  <span className="truncate text-sm font-medium text-white">{row.name}</span>
+                  <span className="line-clamp-2 min-w-0 text-sm font-medium leading-snug text-white break-words whitespace-normal">
+                    {row.name}
+                  </span>
                 </div>
-                <div className="min-w-[56px] shrink-0 text-right text-sm font-semibold text-emerald-200">
+                <div className="min-w-[56px] shrink-0 pl-2 text-right text-sm font-semibold text-emerald-200">
                   <span>{row[valueKey] ?? 0}</span>
                   <span className="ml-1 text-[11px] font-normal text-muted-foreground">{valueLabel}</span>
                 </div>
@@ -265,9 +297,37 @@ function TopPlayersCard({
   );
 }
 
-function TopMetricCard({ title, value, subtitle }: { title: string; value: string; subtitle: string }) {
+function TopMetricCard({
+  title,
+  value,
+  subtitle,
+  onClick
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
+  onClick?: () => void;
+}) {
   return (
-    <Card className="bg-[#0c1420]/70 border border-border/60">
+    <Card
+      className={cn(
+        "bg-[#0c1420]/70 border border-border/60",
+        onClick && "cursor-pointer transition hover:border-cyan-400/50 hover:bg-[#0c1420]/90"
+      )}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       <CardHeader title={title} />
       <CardContent className="space-y-1">
         <div className="text-xl font-semibold text-white">{value}</div>
@@ -288,14 +348,14 @@ function ReferencePlayersCard({ rows }: { rows: PlayerRow[] }) {
           {rows.slice(0, 3).map((row, idx) => (
             <div
               key={`${row.id}-${idx}`}
-              className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-white/5 px-3 py-2"
+              className="flex items-start justify-between gap-3 rounded-lg border border-border/50 bg-white/5 px-3 py-2"
             >
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
                 <span className="w-6 shrink-0 text-center text-xs text-muted-foreground">{idx + 1}º</span>
                 <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/70 bg-white">
                   {row.photoPath ? (
                     <Image
-                      src={row.photoPath}
+                      src={resolveImageSrc(row.photoPath)}
                       alt={row.name}
                       fill
                       sizes="40px"
@@ -306,9 +366,11 @@ function ReferencePlayersCard({ rows }: { rows: PlayerRow[] }) {
                     <div className="h-full w-full rounded-full bg-white" />
                   )}
                 </div>
-                <span className="truncate text-sm font-medium text-white">{row.name}</span>
+                <span className="line-clamp-2 min-w-0 text-sm font-medium leading-snug text-white break-words whitespace-normal">
+                  {row.name}
+                </span>
               </div>
-              <div className="min-w-[56px] shrink-0 text-right text-sm font-semibold text-cyan-200">
+              <div className="min-w-[56px] shrink-0 pl-2 text-right text-sm font-semibold text-cyan-200">
                 {row.references ?? 0} R
               </div>
             </div>
@@ -643,6 +705,12 @@ export default function RadiographyPanel({
   const [radiography, setRadiography] = useState<RadiographyResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rankingModal, setRankingModal] = useState<{
+    title: string;
+    items: RankingModalItem[];
+    singularLabel: string;
+    pluralLabel: string;
+  } | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
@@ -818,6 +886,27 @@ export default function RadiographyPanel({
   const bestScorer = radiography?.topScorers[0];
   const bestAssist = radiography?.topAssists[0];
   const bestParticipation = radiography?.topParticipation[0];
+  const scorerRankingItems = useMemo<RankingModalItem[]>(
+    () => (radiography?.topScorers ?? []).map((row) => ({ id: row.id, name: row.name, value: row.goals ?? 0 })),
+    [radiography?.topScorers]
+  );
+  const assistRankingItems = useMemo<RankingModalItem[]>(
+    () => (radiography?.topAssists ?? []).map((row) => ({ id: row.id, name: row.name, value: row.assists ?? 0 })),
+    [radiography?.topAssists]
+  );
+  const participationRankingItems = useMemo<RankingModalItem[]>(
+    () =>
+      (radiography?.topParticipation ?? []).map((row) => ({ id: row.id, name: row.name, value: row.involvement ?? 0 })),
+    [radiography?.topParticipation]
+  );
+  const openRankingModal = (
+    title: string,
+    items: RankingModalItem[],
+    singularLabel: string,
+    pluralLabel: string
+  ) => {
+    setRankingModal({ title, items, singularLabel, pluralLabel });
+  };
   const assistZonePoints = useMemo(
     () => (radiography?.assistZones ?? []).filter((point) => typeof point.x === "number" && typeof point.y === "number"),
     [radiography?.assistZones]
@@ -834,25 +923,12 @@ export default function RadiographyPanel({
     () =>
       (radiography?.subMomentActionBreakdown ?? []).map((entry) => ({
         ...entry,
-        actions: (() => {
-          const rawActions = entry.actions.map((actionEntry) => ({
+        actions: entry.actions
+          .filter((actionEntry) => !shouldHideActionFromChart(actionEntry.action))
+          .map((actionEntry) => ({
             ...actionEntry,
             action: formatTechnicalLabel(actionEntry.action) || actionEntry.action
-          }));
-          const configuredActions = getConfiguredSubMomentActions(entry.subMoment);
-          if (configuredActions.length === 0) return rawActions;
-
-          const configuredActionKeys = new Set(configuredActions.map((action) => normalizeToken(action)));
-          const actionByName = new Map(rawActions.map((actionEntry) => [normalizeToken(actionEntry.action), actionEntry]));
-          const configuredList = configuredActions.map((actionName) => {
-            const actionKey = normalizeToken(actionName);
-            const existingAction = actionByName.get(actionKey);
-            if (existingAction) return existingAction;
-            return { action: actionName, goals: 0, percent: 0 };
-          });
-          const extraActions = rawActions.filter((actionEntry) => !configuredActionKeys.has(normalizeToken(actionEntry.action)));
-          return [...configuredList, ...extraActions];
-        })()
+          }))
       })),
     [radiography?.subMomentActionBreakdown]
   );
@@ -874,7 +950,7 @@ export default function RadiographyPanel({
         {currentTeam?.emblemPath && (
           <div className="relative h-12 w-12 overflow-hidden rounded-full border border-border/60 bg-slate-900">
             <Image
-              src={currentTeam.emblemPath || defaultImage}
+              src={resolveImageSrc(currentTeam.emblemPath)}
               alt={currentTeam.name}
               fill
               sizes="48px"
@@ -986,16 +1062,21 @@ export default function RadiographyPanel({
                 title="Melhor Marcador"
                 value={bestScorer?.name ?? "—"}
                 subtitle={`${bestScorer?.goals ?? 0} golos`}
+                onClick={() => openRankingModal("Melhor Marcador", scorerRankingItems, "golo", "golos")}
               />
               <TopMetricCard
                 title="Mais Assistências"
                 value={bestAssist?.name ?? "—"}
                 subtitle={`${bestAssist?.assists ?? 0} assistências`}
+                onClick={() => openRankingModal("Mais Assistências", assistRankingItems, "assistência", "assistências")}
               />
               <TopMetricCard
                 title="Mais Participações"
                 value={bestParticipation?.name ?? "—"}
                 subtitle={`${bestParticipation?.involvement ?? 0} participações`}
+                onClick={() =>
+                  openRankingModal("Mais Participações em Golo", participationRankingItems, "participação", "participações")
+                }
               />
               <TopMetricCard
                 title="Total de Golos"
@@ -1121,39 +1202,29 @@ export default function RadiographyPanel({
 
               {shouldShowTopPlayerRankings && (
                 <div className="grid gap-4 lg:grid-cols-3">
-                  <Card className="bg-[#0c1420]/70 border border-border/60">
-                    <CardHeader title="Top Marcadores" />
-                    <CardContent>
-                      <TopPlayersCard
-                        title=""
-                        rows={radiography.topScorers}
-                        valueKey="goals"
-                        valueLabel="G"
-                      />
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-[#0c1420]/70 border border-border/60">
-                    <CardHeader title="Top Assistências" />
-                    <CardContent>
-                      <TopPlayersCard
-                        title=""
-                        rows={radiography.topAssists}
-                        valueKey="assists"
-                        valueLabel="A"
-                      />
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-[#0c1420]/70 border border-border/60">
-                    <CardHeader title="Top Participações" />
-                    <CardContent>
-                      <TopPlayersCard
-                        title=""
-                        rows={radiography.topParticipation}
-                        valueKey="involvement"
-                        valueLabel="Part."
-                      />
-                    </CardContent>
-                  </Card>
+                  <TopPlayersCard
+                    title="Top Marcadores"
+                    rows={radiography.topScorers}
+                    valueKey="goals"
+                    valueLabel="G"
+                    onClick={() => openRankingModal("Top Marcadores", scorerRankingItems, "golo", "golos")}
+                  />
+                  <TopPlayersCard
+                    title="Top Assistências"
+                    rows={radiography.topAssists}
+                    valueKey="assists"
+                    valueLabel="A"
+                    onClick={() => openRankingModal("Top Assistências", assistRankingItems, "assistência", "assistências")}
+                  />
+                  <TopPlayersCard
+                    title="Top Participações"
+                    rows={radiography.topParticipation}
+                    valueKey="involvement"
+                    valueLabel="Part."
+                    onClick={() =>
+                      openRankingModal("Top Participações", participationRankingItems, "participação", "participações")
+                    }
+                  />
                 </div>
               )}
             </>
@@ -1161,6 +1232,16 @@ export default function RadiographyPanel({
 
         </div>
       )}
+      <RankingModal
+        open={Boolean(rankingModal)}
+        title={rankingModal?.title ?? "Ranking"}
+        items={rankingModal?.items ?? []}
+        singularLabel={rankingModal?.singularLabel ?? "valor"}
+        pluralLabel={rankingModal?.pluralLabel ?? "valores"}
+        onOpenChange={(open) => {
+          if (!open) setRankingModal(null);
+        }}
+      />
     </div>
   );
 }

@@ -1,7 +1,15 @@
 import { cn } from "@/lib/utils";
 
-export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("rounded-xl border border-border/60 bg-card/80 glass", className)}>{children}</div>;
+type CardProps = React.HTMLAttributes<HTMLDivElement> & {
+  children: React.ReactNode;
+};
+
+export function Card({ className, children, ...props }: CardProps) {
+  return (
+    <div className={cn("rounded-xl border border-border/60 bg-card/80 glass", className)} {...props}>
+      {children}
+    </div>
+  );
 }
 
 export function CardHeader({ title, description }: { title: string; description?: string }) {
