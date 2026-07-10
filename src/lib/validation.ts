@@ -15,7 +15,7 @@ export const zoneMarkerSchema = z
     sector: z.string().optional()
   })
   .refine((v) => v.x !== undefined || v.y !== undefined || v.label || v.sector, {
-    message: "Fornece coordenadas ou etiqueta da zona"
+    message: "Provide coordinates or an area label"
   });
 
 export const fieldDrawingSchema = pointSchema;
@@ -87,7 +87,7 @@ export const goalInputSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["subMomentSequence"],
-        message: "Fornece subMomentSequence ou subMomentId + actionIds."
+        message: "Provide subMomentSequence or subMomentId + actionIds."
       });
     }
     if (value.subMomentSequence && value.subMomentSequence.length > 0) {
@@ -96,7 +96,7 @@ export const goalInputSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["subMomentSequence"],
-          message: "sequenceOrder duplicado em subMomentSequence."
+          message: "sequenceOrder is duplicated in subMomentSequence."
         });
       }
     }
@@ -105,7 +105,7 @@ export const goalInputSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["attackingSpaceId"],
-        message: "attackingSpaceId ou transitionDrawing obrigatorio para Transicao Ofensiva"
+        message: "attackingSpaceId or transitionDrawing is required for Attacking Transition"
       });
     }
   });

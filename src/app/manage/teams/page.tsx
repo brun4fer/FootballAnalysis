@@ -27,7 +27,7 @@ type Season = { id: number; name: string };
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
-  if (!res.ok) throw new Error((await res.json()).error ?? "Pedido falhou");
+  if (!res.ok) throw new Error((await res.json()).error ?? "Request failed");
   return res.json();
 }
 
@@ -131,15 +131,15 @@ export default function ManageTeamsPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold text-white">Equipas</h1>
-        <p className="text-sm text-muted-foreground">Gerir equipas e plantéis.</p>
+        <h1 className="text-2xl font-semibold text-white">Teams</h1>
+        <p className="text-sm text-muted-foreground">Manage teams and squads.</p>
       </div>
 
       <Card>
-        <CardHeader title={editingId ? "Atualizar Equipa" : "Criar Equipa"} description="Todas as equipas estão ligadas a um campeonato" />
+        <CardHeader title={editingId ? "Update Team" : "Create Team"} description="Every team is linked to a competition" />
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Época</label>
+            <label className="text-xs text-muted-foreground">Season</label>
             <Select
               value={formSeasonId}
               onChange={(e) => {
@@ -148,7 +148,7 @@ export default function ManageTeamsPage() {
                 setForm({ ...form, championshipId: "" });
               }}
             >
-              <option value="">Selecionar Época</option>
+              <option value="">Select Season</option>
               {seasons.map((s) => (
                 <option key={s.id} value={s.id} className="text-black">
                   {s.name}
@@ -157,9 +157,9 @@ export default function ManageTeamsPage() {
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Campeonato</label>
+            <label className="text-xs text-muted-foreground">Competition</label>
             <Select value={form.championshipId} onChange={(e) => setForm({ ...form, championshipId: e.target.value })} disabled={!formSeasonId}>
-              <option value="">Selecionar</option>
+              <option value="">Select</option>
               {filteredChampsForForm.map((c) => (
                 <option key={c.id} value={c.id} className="text-black">
                   {c.name}
@@ -168,17 +168,17 @@ export default function ManageTeamsPage() {
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Nome</label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nome da equipa" />
+            <label className="text-xs text-muted-foreground">Name</label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Team name" />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Treinador</label>
-            <Input value={form.coach} onChange={(e) => setForm({ ...form, coach: e.target.value })} placeholder="Nome do treinador" />
+            <Input value={form.coach} onChange={(e) => setForm({ ...form, coach: e.target.value })} placeholder="Coach name" />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Emblema (upload)</label>
             <FileUpload
-              label={form.emblemPath ? "Atualizar emblema" : "Carregar emblema"}
+              label={form.emblemPath ? "Update badge" : "Upload badge"}
               accept="image/*"
               value={form.emblemPath}
               onChange={(path) => setForm({ ...form, emblemPath: path })}
@@ -188,17 +188,17 @@ export default function ManageTeamsPage() {
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Radiografia Ofensiva (PDF)</label>
             <FileUpload
-              label={form.radiographyPdfUrl ? "Atualizar PDF" : "Carregar PDF"}
+              label={form.radiographyPdfUrl ? "Update PDF" : "Upload PDF"}
               accept="application/pdf"
               value={form.radiographyPdfUrl}
               onChange={(path) => setForm({ ...form, radiographyPdfUrl: path })}
-              helperText="Ficheiro guardado no Vercel Blob com URL pública."
+              helperText="The file will be stored in Vercel Blob with a public URL."
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Relatório Vídeo (MP4)</label>
+            <label className="text-xs text-muted-foreground">Video Report (MP4)</label>
             <FileUpload
-              label={form.videoReportUrl ? "Atualizar vídeo" : "Carregar vídeo"}
+              label={form.videoReportUrl ? "Update video" : "Upload video"}
               accept="video/mp4,video/*"
               value={form.videoReportUrl}
               onChange={(path) => setForm({ ...form, videoReportUrl: path })}
@@ -206,11 +206,11 @@ export default function ManageTeamsPage() {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Estádio</label>
-            <Input value={form.stadium} onChange={(e) => setForm({ ...form, stadium: e.target.value })} placeholder="Estádio" />
+            <label className="text-xs text-muted-foreground">Stadium</label>
+            <Input value={form.stadium} onChange={(e) => setForm({ ...form, stadium: e.target.value })} placeholder="Stadium" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Dimensões do relvado</label>
+            <label className="text-xs text-muted-foreground">Pitch dimensions</label>
             <Input value={form.pitchDimensions} onChange={(e) => setForm({ ...form, pitchDimensions: e.target.value })} placeholder="105 x 68 m" />
           </div>
           <div className="space-y-1">
@@ -220,22 +220,22 @@ export default function ManageTeamsPage() {
           <div className="md:col-span-3 flex justify-end gap-2">
             {editingId && (
               <Button variant="ghost" type="button" onClick={() => setEditingId(null)}>
-                Cancelar
+                Cancel
               </Button>
             )}
             <Button type="button" onClick={() => saveTeam.mutate()} disabled={!form.name || !form.championshipId || saveTeam.isPending}>
-              {saveTeam.isPending ? "A guardar..." : editingId ? "Atualizar" : "Criar"}
+              {saveTeam.isPending ? "Saving..." : editingId ? "Update" : "Create"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader title="Equipas" description="Clubes existentes" />
+        <CardHeader title="Teams" description="Clubes existentes" />
         <CardContent className="space-y-4 text-sm">
           <div className="flex flex-wrap gap-3 rounded-xl border border-border/70 bg-card/60 p-3">
             <div className="flex-1 min-w-[180px] space-y-1">
-              <label className="text-xs text-muted-foreground">Filtrar por Época</label>
+              <label className="text-xs text-muted-foreground">Filtrar por Season</label>
               <Select
                 value={filterSeasonId}
                 onChange={(e) => {
@@ -244,7 +244,7 @@ export default function ManageTeamsPage() {
                   setFilterChampionshipId("");
                 }}
               >
-                <option value="">Selecionar Época</option>
+                <option value="">Select Season</option>
                 {seasons.map((s) => (
                   <option key={s.id} value={s.id} className="text-black">
                     {s.name}
@@ -253,13 +253,13 @@ export default function ManageTeamsPage() {
               </Select>
             </div>
             <div className="flex-1 min-w-[180px] space-y-1">
-              <label className="text-xs text-muted-foreground">Filtrar por campeonato</label>
+              <label className="text-xs text-muted-foreground">Filter by competition</label>
               <Select
                 value={filterChampionshipId}
                 onChange={(e) => setFilterChampionshipId(e.target.value)}
                 disabled={!filterSeasonId}
               >
-                <option value="">Selecionar campeonato</option>
+                <option value="">Select competition</option>
                 {filteredChampsForFilters.map((c) => (
                   <option key={c.id} value={c.id} className="text-black">
                     {c.name}
@@ -271,7 +271,7 @@ export default function ManageTeamsPage() {
 
           {!filterChampionshipId && (
             <div className="rounded-lg border border-dashed border-border/60 bg-card/50 p-4 text-muted-foreground">
-              Selecionar um campeonato para ver as equipas.
+              Select a competition to view its teams.
             </div>
           )}
 
@@ -285,7 +285,7 @@ export default function ManageTeamsPage() {
                       <div className="flex flex-col">
                       <span className="font-medium text-white">{team.name}</span>
                       <span className="text-xs text-muted-foreground">
-                        {champ?.name ?? `Campeonato #${team.championshipId}`}
+                        {champ?.name ?? `Competition #${team.championshipId}`}
                         {champ?.seasonId && seasonMap.get(champ.seasonId) ? ` · ${seasonMap.get(champ.seasonId)}` : ""}
                       </span>
                     </div>
@@ -298,7 +298,7 @@ export default function ManageTeamsPage() {
                       )}
                       {team.videoReportUrl && (
                         <a href={team.videoReportUrl} target="_blank" rel="noreferrer" className="text-xs text-emerald-300 underline">
-                          Ví­deo
+                          Video
                         </a>
                       )}
                       <Button
@@ -321,7 +321,7 @@ export default function ManageTeamsPage() {
                           });
                         }}
                       >
-                        Editar
+                        Edit
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => deleteTeam.mutate(team.id)}>
                         Apagar
@@ -334,11 +334,11 @@ export default function ManageTeamsPage() {
               {teamPageCount > 1 && (
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
                   <span>
-                    Página {teamPage + 1} de {teamPageCount}
+                    Page {teamPage + 1} de {teamPageCount}
                   </span>
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setTeamPage((prev) => Math.max(prev - 1, 0))} disabled={teamPage === 0}>
-                      Anterior
+                      Previous
                     </Button>
                     <Button
                       variant="ghost"
@@ -346,14 +346,14 @@ export default function ManageTeamsPage() {
                       onClick={() => setTeamPage((prev) => Math.min(prev + 1, Math.max(teamPageCount - 1, 0)))}
                       disabled={teamPage >= teamPageCount - 1}
                     >
-                      Seguinte
+                      Next
                     </Button>
                   </div>
                 </div>
               )}
             </>
           ) : filterChampionshipId ? (
-            <div className="text-muted-foreground">Sem equipas para este campeonato.</div>
+            <div className="text-muted-foreground">There are no teams in this competition.</div>
           ) : null}
         </CardContent>
       </Card>

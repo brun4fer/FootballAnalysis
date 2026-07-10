@@ -17,8 +17,8 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  cancelLabel = "Cancelar",
-  confirmLabel = "Confirmar",
+  cancelLabel = "Cancel",
+  confirmLabel = "Confirm",
   loading = false,
   onCancel,
   onConfirm
@@ -42,7 +42,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={loading}
           >
-            {loading ? "A eliminar..." : confirmLabel}
+            {loading ? "Deleting..." : confirmLabel}
           </Button>
         </div>
       </div>

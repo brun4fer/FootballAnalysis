@@ -9,26 +9,26 @@ export default function HomePage() {
       <section className="rounded-2xl border border-border/60 bg-gradient-to-br from-[#0f1729] via-[#0a0f1a] to-[#0f1729] px-8 py-10 shadow-2xl shadow-cyan-500/10">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Análises profissionais</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Professional analysis</p>
             <h1 className="text-3xl font-semibold leading-tight text-white md:text-4xl">
-              Inteligência tática, construída sobre dados de eventos em tempo real.
+              Tactical intelligence built on real-time event data.
             </h1>
             <p className="max-w-2xl text-sm text-muted-foreground">
-              Regista golos com contexto estruturado, gere plantéis e obtém insights de alto valor sem depender de estatísticas pré-computadas.
+              Record goals with structured context, manage squads and gain valuable insights without relying on precomputed statistics.
             </p>
             <div className="flex flex-wrap gap-3">
               <Badge className="bg-emerald-500/20 text-emerald-200">UI Dark Ops</Badge>
-              <Badge className="bg-cyan-500/20 text-cyan-100">Agregação em tempo real</Badge>
+              <Badge className="bg-cyan-500/20 text-cyan-100">Real-time aggregation</Badge>
               <Badge className="bg-white/10 text-white/80">PostgreSQL / Drizzle</Badge>
             </div>
           </div>
           <div className="flex gap-3">
             <Link href="/goals">
-              <Button size="lg">Registar Golo</Button>
+              <Button size="lg">Record Goal</Button>
             </Link>
             <Link href="/teams">
               <Button variant="secondary" size="lg">
-                Estatísticas
+                Statistics
               </Button>
             </Link>
           </div>
@@ -37,9 +37,9 @@ export default function HomePage() {
 
       <div className="grid gap-5 md:grid-cols-2">
         <Card>
-          <CardHeader title="Wizard de Golo" description="Fluxo guiado para registar eventos de forma consistente" />
+          <CardHeader title="Goal Wizard" description="Guided workflow for recording events consistently" />
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>Equipa → marcador → participações → contexto tático → zona da baliza com validação em tempo real.</p>
+            <p>Team → scorer → involvements → tactical context → goal area with real-time validation.</p>
             <Link href="/goals">
               <Button size="sm" className="mt-2">
                 Abrir Wizard
@@ -48,18 +48,18 @@ export default function HomePage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader title="Plantéis" description="Gerir equipas e jogadores" />
+          <CardHeader title="Squads" description="Manage teams and players" />
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>Clubes pré-carregados, entrada rápida de jogadores e pipelines de estatísticas prontos a usar.</p>
+            <p>Preloaded clubs, quick player entry and ready-to-use statistics pipelines.</p>
             <div className="flex gap-2">
               <Link href="/manage/teams">
                 <Button variant="secondary" size="sm">
-                  Equipas
+                  Teams
                 </Button>
               </Link>
               <Link href="/manage/players">
                 <Button variant="ghost" size="sm">
-                  Jogadores
+                  Players
                 </Button>
               </Link>
             </div>

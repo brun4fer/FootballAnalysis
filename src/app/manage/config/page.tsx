@@ -14,7 +14,7 @@ type Championship = { id: number; name: string; country: string; seasonId: numbe
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
-  if (!res.ok) throw new Error((await res.json()).error ?? "Pedido falhou");
+  if (!res.ok) throw new Error((await res.json()).error ?? "Request failed");
   return res.json();
 }
 
@@ -62,7 +62,7 @@ export default function ConfigPage() {
   const saveChamp = useMutation({
     mutationFn: async () => {
       const body = { ...champForm, seasonId: Number(champForm.seasonId) };
-      if (!body.seasonId) throw new Error("Época obrigatória");
+      if (!body.seasonId) throw new Error("Season is required");
       if (editingChamp) {
         await fetchJson(`/api/manage/championships/${editingChamp}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       } else {
@@ -84,38 +84,38 @@ export default function ConfigPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold text-white">Configurações</h1>
-        <p className="text-sm text-muted-foreground">Gestão administrativa de épocas e campeonatos.</p>
+        <h1 className="text-2xl font-semibold text-white">Settings</h1>
+        <p className="text-sm text-muted-foreground">Season and competition administration.</p>
         <div className="flex flex-wrap gap-2">
           <Link href="/goals">
             <Button variant="secondary" size="sm" type="button">
-              Ir para Registar Golo
+              Go to Record Goal
             </Button>
           </Link>
         </div>
       </div>
 
       <Card>
-        <CardHeader title={editingSeason ? "Atualizar Época" : "Adicionar Época"} description="Criar/editar épocas disponíveis para campeonatos." />
+        <CardHeader title={editingSeason ? "Update Season" : "Add Season"} description="Create or edit seasons available to competitions." />
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Nome</label>
+              <label className="text-xs text-muted-foreground">Name</label>
               <Input value={seasonForm.name} onChange={(e) => setSeasonForm({ ...seasonForm, name: e.target.value })} placeholder="2025/2026" />
             </div>
             <div className="md:col-span-2 space-y-1">
-              <label className="text-xs text-muted-foreground">Descrição</label>
-              <Input value={seasonForm.description} onChange={(e) => setSeasonForm({ ...seasonForm, description: e.target.value })} placeholder="Notas ou competições" />
+              <label className="text-xs text-muted-foreground">Description</label>
+              <Input value={seasonForm.description} onChange={(e) => setSeasonForm({ ...seasonForm, description: e.target.value })} placeholder="Notes or competitions" />
             </div>
           </div>
           <div className="flex justify-end gap-2">
             {editingSeason && (
               <Button variant="ghost" type="button" onClick={() => setEditingSeason(null)}>
-                Cancelar
+                Cancel
               </Button>
             )}
             <Button type="button" onClick={() => saveSeason.mutate()} disabled={!seasonForm.name || saveSeason.isPending}>
-              {saveSeason.isPending ? "A guardar..." : editingSeason ? "Atualizar" : "Adicionar"}
+              {saveSeason.isPending ? "Saving..." : editingSeason ? "Update" : "Add"}
             </Button>
           </div>
           <div className="space-y-2 text-sm">
@@ -135,7 +135,7 @@ export default function ConfigPage() {
                         setSeasonForm({ name: s.name, description: s.description || "" });
                       }}
                     >
-                      Editar
+                      Edit
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => deleteSeason.mutate(s.id)}>
                       Apagar
@@ -144,28 +144,28 @@ export default function ConfigPage() {
                 </div>
               ))
             ) : (
-              <div className="text-muted-foreground">Nenhuma época registada.</div>
+              <div className="text-muted-foreground">No seasons have been added.</div>
             )}
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader title={editingChamp ? "Atualizar Campeonato" : "Adicionar Campeonato"} description="Associar campeonatos a épocas." />
+        <CardHeader title={editingChamp ? "Update Competition" : "Add Competition"} description="Link competitions to seasons." />
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-4">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Nome</label>
+              <label className="text-xs text-muted-foreground">Name</label>
               <Input value={champForm.name} onChange={(e) => setChampForm({ ...champForm, name: e.target.value })} placeholder="Liga Portugal 2" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">País</label>
+              <label className="text-xs text-muted-foreground">Country</label>
               <Input value={champForm.country} onChange={(e) => setChampForm({ ...champForm, country: e.target.value })} placeholder="Portugal" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Época</label>
+              <label className="text-xs text-muted-foreground">Season</label>
               <Select value={champForm.seasonId} onChange={(e) => setChampForm({ ...champForm, seasonId: e.target.value })}>
-                <option value="">Selecionar</option>
+                <option value="">Select</option>
                 {seasons.map((s) => (
                   <option key={s.id} value={s.id} className="text-black">
                     {s.name}
@@ -181,11 +181,11 @@ export default function ConfigPage() {
           <div className="flex justify-end gap-2">
             {editingChamp && (
               <Button variant="ghost" type="button" onClick={() => setEditingChamp(null)}>
-                Cancelar
+                Cancel
               </Button>
             )}
             <Button type="button" onClick={() => saveChamp.mutate()} disabled={!champForm.name || !champForm.seasonId || saveChamp.isPending}>
-              {saveChamp.isPending ? "A guardar..." : editingChamp ? "Atualizar" : "Adicionar"}
+              {saveChamp.isPending ? "Saving..." : editingChamp ? "Update" : "Add"}
             </Button>
           </div>
           <div className="space-y-2 text-sm">
@@ -195,7 +195,7 @@ export default function ConfigPage() {
                   <div className="flex flex-col">
                     <span className="font-medium text-white">{c.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {c.country} — {seasons.find((s) => s.id === c.seasonId)?.name ?? `Época #${c.seasonId}`}
+                      {c.country} — {seasons.find((s) => s.id === c.seasonId)?.name ?? `Season #${c.seasonId}`}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -208,7 +208,7 @@ export default function ConfigPage() {
                         setChampForm({ name: c.name, country: c.country, seasonId: String(c.seasonId), logo: c.logo || "" });
                       }}
                     >
-                      Editar
+                      Edit
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => deleteChamp.mutate(c.id)}>
                       Apagar
@@ -217,7 +217,7 @@ export default function ConfigPage() {
                 </div>
               ))
             ) : (
-              <div className="text-muted-foreground">Nenhum campeonato registado.</div>
+              <div className="text-muted-foreground">No competitions have been added.</div>
             )}
           </div>
         </CardContent>

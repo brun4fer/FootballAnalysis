@@ -31,12 +31,12 @@ export function FileUpload({ label, accept, value, onChange, helperText, classNa
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Falha no upload");
+        throw new Error(body.error || "Upload failed");
       }
       const data = (await res.json()) as { path: string };
       onChange?.(data.path);
     } catch (err: any) {
-      setError(err?.message ?? "Falha no upload");
+      setError(err?.message ?? "Upload failed");
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -47,7 +47,7 @@ export function FileUpload({ label, accept, value, onChange, helperText, classNa
     <div className={cn("space-y-1", className)}>
       <div className="flex items-center gap-2">
         <Button type="button" variant="secondary" size="sm" onClick={handleSelect} disabled={uploading}>
-          {uploading ? "A carregar..." : label}
+          {uploading ? "Loading..." : label}
         </Button>
         {value && (
           <span className="text-xs text-muted-foreground break-all">

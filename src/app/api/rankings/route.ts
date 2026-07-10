@@ -7,7 +7,7 @@ function parseIntParam(value: string | null, label: string) {
   if (!value) return undefined;
   const num = Number(value);
   if (!Number.isInteger(num) || num <= 0) {
-    throw new Error(`Parâmetro inválido: ${label}`);
+    throw new Error(`Invalid parameter: ${label}`);
   }
   return num;
 }
@@ -31,9 +31,9 @@ export async function GET(req: Request) {
     const data = await rankingsOverview(seasonId, championshipId);
     return NextResponse.json(data);
   } catch (error: any) {
-    const message = error?.message ?? "Erro inesperado ao carregar rankings";
+    const message = error?.message ?? "An unexpected error occurred while loading rankings";
     console.error("[GET /api/rankings]", message);
-    const status = message.includes("Parâmetro inválido") ? 400 : 500;
+    const status = message.includes("Invalid parameter") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

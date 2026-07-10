@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { displayFootballTerm } from "@/lib/presentation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -57,14 +58,14 @@ const goalProfiles = {
 } as const;
 
 const throwInProfiles = {
-  area: "Área",
-  organizacao: "Organização"
+  area: "Box",
+  organizacao: "Organised Attack"
 } as const;
 
 const goalkeeperOutlets = {
-  organizacao: "Em Organização",
-  curto_para_longo: "Curto para longo",
-  bola_longa: "Bola longa"
+  organizacao: "In Possession",
+  curto_para_longo: "Short to Long",
+  bola_longa: "Long Ball"
 } as const;
 
 function formatProfile(value?: string | null) {
@@ -154,46 +155,46 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
       <div className="flex items-center gap-3">
         <Link href="/stats">
           <Button variant="ghost" size="sm" className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> Voltar
+            <ArrowLeft className="h-4 w-4" /> Back
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold">Golo #{goal.id}</h1>
-          <p className="text-sm text-muted-foreground">Visualização detalhada com vídeo e pinpoints.</p>
+          <h1 className="text-2xl font-semibold">Goal #{goal.id}</h1>
+          <p className="text-sm text-muted-foreground">Detailed view with video and locations.</p>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Vídeo" description={goal.videoPath ? "Replay do lance" : "Sem vídeo disponível"} />
+          <CardHeader title="Video" description={goal.videoPath ? "Replay de the move" : "No video available"} />
           <CardContent>
             {goal.videoPath ? (
               <video controls className="w-full rounded-xl border border-border/60" src={goal.videoPath} />
             ) : (
-              <div className="text-sm text-muted-foreground">Sem vídeo disponível.</div>
+              <div className="text-sm text-muted-foreground">No video available.</div>
             )}
           </CardContent>
         </Card>
         <Card>
-          <CardHeader title="Dados do lance" />
+          <CardHeader title="Move Details" />
           <CardContent className="space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-2">
-              <span className="text-muted-foreground">Equipa</span>
+              <span className="text-muted-foreground">Team</span>
               <span>{goal.teamName ?? goal.teamId}</span>
-              <span className="text-muted-foreground">Adversário</span>
+              <span className="text-muted-foreground">Opponent</span>
               <span>{goal.opponentName ?? goal.opponentTeamId ?? "—"}</span>
-              <span className="text-muted-foreground">Marcador</span>
+              <span className="text-muted-foreground">Scorer</span>
               <span>{goal.scorerName ?? goal.scorerId}</span>
-              <span className="text-muted-foreground">Assistência</span>
+              <span className="text-muted-foreground">Assist</span>
               <span>{goal.assistName ?? goal.assistId ?? "—"}</span>
               <span className="text-muted-foreground">Minuto</span>
               <span>
                 {goal.minute}
                 &apos;
               </span>
-              <span className="text-muted-foreground">Momento</span>
-              <span>{goal.momentName ?? "—"}</span>
-              <span className="text-muted-foreground">Sub-momentos</span>
+              <span className="text-muted-foreground">Phase</span>
+              <span>{displayFootballTerm(goal.momentName) || "—"}</span>
+              <span className="text-muted-foreground">Sub-phases</span>
               <span>
                 {subMomentSequenceLabels.length > 0 ? (
                   <div className="flex flex-col gap-1">
@@ -204,10 +205,10 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
                     ))}
                   </div>
                 ) : (
-                  goal.subMomentName ?? "-"
+                  displayFootballTerm(goal.subMomentName) || "-"
                 )}
               </span>
-              <span className="text-muted-foreground">Ações registadas</span>
+              <span className="text-muted-foreground">Recorded Actions</span>
               <span className="col-span-1">
                 {actionLabels.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
@@ -218,24 +219,24 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
                     ))}
                   </div>
                 ) : (
-                  <span className="text-muted-foreground">Sem ações registadas.</span>
+                  <span className="text-muted-foreground">No actions recorded.</span>
                 )}
               </span>
               {goal.cornerTakerName && (
                 <>
-                  <span className="text-muted-foreground">Marcador do canto</span>
+                  <span className="text-muted-foreground">Corner Taker</span>
                   <span>{goal.cornerTakerName}</span>
                 </>
               )}
               {goal.freekickTakerName && (
                 <>
-                  <span className="text-muted-foreground">Marcador da falta</span>
+                  <span className="text-muted-foreground">Free-kick Taker</span>
                   <span>{goal.freekickTakerName}</span>
                 </>
               )}
               {goal.penaltyTakerName && (
                 <>
-                  <span className="text-muted-foreground">Marcador do penálti</span>
+                  <span className="text-muted-foreground">Penalty Taker</span>
                   <span>{goal.penaltyTakerName}</span>
                 </>
               )}
@@ -247,13 +248,13 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
               )}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <span className="text-muted-foreground">Saída do GR</span>
+              <span className="text-muted-foreground">Goalkeeper Distribution</span>
               <span>{formatOutlet(goal.goalkeeperOutlet)}</span>
-              <span className="text-muted-foreground">Perfil de canto</span>
+              <span className="text-muted-foreground">Corner Type</span>
               <span>{formatProfile(goal.cornerProfile)}</span>
-              <span className="text-muted-foreground">Perfil de livre</span>
+              <span className="text-muted-foreground">Free-kick Type</span>
               <span>{formatProfile(goal.freekickProfile)}</span>
-              <span className="text-muted-foreground">Perfil de lançamento</span>
+              <span className="text-muted-foreground">Throw-in Type</span>
               <span>{formatThrowIn(goal.throwInProfile)}</span>
             </div>
             {goal.notes && (
@@ -268,30 +269,30 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Ponto de entrada na baliza" />
+          <CardHeader title="Goal Entry Point" />
           <CardContent>
             {hydrated ? (
               goalPoint ? (
                 <GoalNet x={goalPoint.x} y={goalPoint.y} />
               ) : (
-                <div className="text-sm text-muted-foreground">Sem coordenadas de baliza.</div>
+                <div className="text-sm text-muted-foreground">No goal coordinates.</div>
               )
             ) : (
-              <div className="text-sm text-muted-foreground">Carregando coordenadas...</div>
+              <div className="text-sm text-muted-foreground">Loading coordinates...</div>
             )}
           </CardContent>
         </Card>
         <Card>
-          <CardHeader title="Zona de Remate" />
+          <CardHeader title="Shot Area" />
           <CardContent>
             {hydrated ? (
               fieldPoint ? (
                 <Pitch x={fieldPoint.x} y={fieldPoint.y} />
               ) : (
-                <div className="text-sm text-muted-foreground">Sem coordenadas de campo.</div>
+                <div className="text-sm text-muted-foreground">No pitch coordinates.</div>
               )
             ) : (
-              <div className="text-sm text-muted-foreground">Carregando coordenadas...</div>
+              <div className="text-sm text-muted-foreground">Loading coordinates...</div>
             )}
           </CardContent>
         </Card>

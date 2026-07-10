@@ -58,7 +58,7 @@ const fetcher = async <T,>(url: string): Promise<T> => {
       /* ignore parse error */
     }
     console.error("[rankings fetcher]", res.status, message);
-    throw new Error(message || `Falha a carregar dados (HTTP ${res.status})`);
+    throw new Error(message || `Could not load data (HTTP ${res.status})`);
   }
   return res.json();
 };
@@ -99,7 +99,7 @@ function RankingCard({
       <CardHeader title={title} />
       <CardContent className="space-y-3">
         {rows.length === 0 ? (
-          <div className="text-sm text-muted-foreground">Sem dados disponíveis.</div>
+          <div className="text-sm text-muted-foreground">No data available.</div>
         ) : (
           <div className="space-y-2">
             {rows.slice(0, 8).map((row, idx) => (
@@ -179,7 +179,7 @@ function TopPlayersCard({
       <CardHeader title={title} />
       <CardContent className="space-y-3">
         {rows.length === 0 ? (
-          <div className="text-sm text-muted-foreground">Sem dados disponíveis.</div>
+          <div className="text-sm text-muted-foreground">No data available.</div>
         ) : (
           <div className="space-y-2">
             {rows.slice(0, 3).map((row, idx) => (
@@ -343,7 +343,7 @@ export default function RankingsPage() {
     if (champName && seasonName) return `${champName} · ${seasonName}`;
     if (champName) return champName;
     if (seasonName) return seasonName;
-    return "Sem contexto";
+    return "No context";
   };
 
   const openRankingModal = (
@@ -392,13 +392,13 @@ export default function RankingsPage() {
   const renderRankings = () => (
     <div className="space-y-6">
       <Card className="border-white/10 bg-gradient-to-br from-[#0a1020] via-[#0d162a] to-[#0a1020]/80">
-        <CardHeader title="Filtros de contexto" description="Escolhe época e campeonato para carregar os rankings." />
+        <CardHeader title="Context Filters" description="Choose a season and competition to load the rankings." />
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Época</label>
+            <label className="text-xs text-muted-foreground">Season</label>
             <Select value={seasonId} onChange={(e) => handleSeasonChange(e.target.value)}>
               <option value="" className="text-black">
-                Selecionar época
+                Select season
               </option>
               {seasons.map((season) => (
                 <option key={season.id} value={season.id} className="text-black">
@@ -408,14 +408,14 @@ export default function RankingsPage() {
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Campeonato</label>
+            <label className="text-xs text-muted-foreground">Competition</label>
             <Select
               value={championshipId}
               onChange={(e) => handleChampionshipChange(e.target.value)}
               disabled={!seasonId}
             >
               <option value="" className="text-black">
-                Selecionar campeonato
+                Select competition
               </option>
               {filteredChamps.map((champ) => (
                 <option key={champ.id} value={champ.id} className="text-black">
@@ -428,7 +428,7 @@ export default function RankingsPage() {
             <div className="rounded-lg border border-dashed border-border/60 bg-white/5 px-3 py-2 text-xs text-muted-foreground">
               {selectedSeason && selectedChampionship
                 ? `${selectedChampionship.name} · ${selectedSeason.name}`
-                : "Seleciona época e campeonato para ver os rankings."}
+                : "Select a season and competition to view the rankings."}
             </div>
           </div>
         </CardContent>
@@ -436,7 +436,7 @@ export default function RankingsPage() {
 
       {!championshipId && (
         <div className="rounded-xl border border-dashed border-border/60 bg-card/60 p-4 text-muted-foreground">
-          Seleciona primeiro a época e o campeonato para carregar os 12 rankings.
+          Select a season and competition first to load the 12 rankings.
         </div>
       )}
 
@@ -444,7 +444,7 @@ export default function RankingsPage() {
         <>
           {rankingsQuery.isLoading && (
             <div className="rounded-xl border border-border/60 bg-card/60 p-4 text-sm text-muted-foreground">
-              A carregar rankings...
+              Loading rankings...
             </div>
           )}
 
@@ -458,7 +458,7 @@ export default function RankingsPage() {
             <div className="space-y-5">
               <div className="grid gap-4 lg:grid-cols-4">
                 <Card className="bg-white/5">
-                  <CardHeader title="Contexto" description="Época · Campeonato" />
+                  <CardHeader title="Context" description="Season · Competition" />
                   <CardContent className="space-y-1 text-sm">
                     <div className="text-white font-semibold">{selectedChampionship?.name}</div>
                     <div className="text-muted-foreground">{selectedSeason?.name}</div>
@@ -471,20 +471,20 @@ export default function RankingsPage() {
                   className="bg-gradient-to-br from-emerald-500/15 via-emerald-500/10 to-cyan-500/10 cursor-pointer transition hover:border-cyan-400/50 hover:bg-emerald-500/20"
                   role="button"
                   tabIndex={0}
-                  onClick={() => openRankingModal("1. Total de Golos", rankingsQuery.data.totalGoals, "goals", "golo", "golos")}
+                  onClick={() => openRankingModal("1. Total Goals", rankingsQuery.data.totalGoals, "goals", "goal", "goals")}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      openRankingModal("1. Total de Golos", rankingsQuery.data.totalGoals, "goals", "golo", "golos");
+                      openRankingModal("1. Total Goals", rankingsQuery.data.totalGoals, "goals", "goal", "goals");
                     }
                   }}
                 >
-                  <CardHeader title="Total de Golos" />
+                  <CardHeader title="Total Goals" />
                   <CardContent>
                     <div className="text-3xl font-semibold text-white">
                       {rankingsQuery.data.totalGoals[0]?.goals ?? 0}
                     </div>
-                    <div className="text-xs text-muted-foreground">Equipa líder</div>
+                    <div className="text-xs text-muted-foreground">Leading Team</div>
                     <div className="text-sm font-medium text-white">
                       {rankingsQuery.data.totalGoals[0]?.team ?? "—"}
                     </div>
@@ -495,21 +495,21 @@ export default function RankingsPage() {
                   role="button"
                   tabIndex={0}
                   onClick={() =>
-                    openRankingModal("2. Golos em Organização", rankingsQuery.data.organization, "goals", "golo", "golos")
+                    openRankingModal("2. Goals from Organised Attack", rankingsQuery.data.organization, "goals", "goal", "goals")
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      openRankingModal("2. Golos em Organização", rankingsQuery.data.organization, "goals", "golo", "golos");
+                      openRankingModal("2. Goals from Organised Attack", rankingsQuery.data.organization, "goals", "goal", "goals");
                     }
                   }}
                 >
-                  <CardHeader title="Organização" />
+                  <CardHeader title="Organised Attack" />
                   <CardContent>
                     <div className="text-3xl font-semibold text-white">
                       {rankingsQuery.data.organization[0]?.goals ?? 0}
                     </div>
-                    <div className="text-xs text-muted-foreground">Melhor em organização</div>
+                    <div className="text-xs text-muted-foreground">Best in Organised Attack</div>
                     <div className="text-sm font-medium text-white">
                       {rankingsQuery.data.organization[0]?.team ?? "—"}
                     </div>
@@ -519,20 +519,20 @@ export default function RankingsPage() {
                   className="bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-amber-500/5 cursor-pointer transition hover:border-cyan-400/50 hover:bg-amber-500/20"
                   role="button"
                   tabIndex={0}
-                  onClick={() => openRankingModal("3. Golos em Transição", rankingsQuery.data.transition, "goals", "golo", "golos")}
+                  onClick={() => openRankingModal("3. Goals in Transition", rankingsQuery.data.transition, "goals", "goal", "goals")}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      openRankingModal("3. Golos em Transição", rankingsQuery.data.transition, "goals", "golo", "golos");
+                      openRankingModal("3. Goals in Transition", rankingsQuery.data.transition, "goals", "goal", "goals");
                     }
                   }}
                 >
-                  <CardHeader title="Transição" />
+                  <CardHeader title="Transition" />
                   <CardContent>
                     <div className="text-3xl font-semibold text-white">
                       {rankingsQuery.data.transition[0]?.goals ?? 0}
                     </div>
-                    <div className="text-xs text-muted-foreground">Melhor em transição</div>
+                    <div className="text-xs text-muted-foreground">Best in Transition</div>
                     <div className="text-sm font-medium text-white">
                       {rankingsQuery.data.transition[0]?.team ?? "—"}
                     </div>
@@ -542,106 +542,106 @@ export default function RankingsPage() {
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <RankingCard
-                  title="1. Total de Golos"
+                  title="1. Total Goals"
                   rows={rankingsQuery.data.totalGoals}
                   valueKey="goals"
-                  valueLabel="golos"
-                  onClick={() => openRankingModal("1. Total de Golos", rankingsQuery.data.totalGoals, "goals", "golo", "golos")}
+                  valueLabel="goals"
+                  onClick={() => openRankingModal("1. Total Goals", rankingsQuery.data.totalGoals, "goals", "goal", "goals")}
                 />
                 <RankingCard
-                  title="2. Golos em Organização"
+                  title="2. Goals from Organised Attack"
                   rows={rankingsQuery.data.organization}
                   valueKey="goals"
-                  valueLabel="golos"
+                  valueLabel="goals"
                   onClick={() =>
-                    openRankingModal("2. Golos em Organização", rankingsQuery.data.organization, "goals", "golo", "golos")
+                    openRankingModal("2. Goals from Organised Attack", rankingsQuery.data.organization, "goals", "goal", "goals")
                   }
                 />
                 <RankingCard
-                  title="3. Golos em Transição"
+                  title="3. Goals in Transition"
                   rows={rankingsQuery.data.transition}
                   valueKey="goals"
-                  valueLabel="golos"
-                  onClick={() => openRankingModal("3. Golos em Transição", rankingsQuery.data.transition, "goals", "golo", "golos")}
+                  valueLabel="goals"
+                  onClick={() => openRankingModal("3. Goals in Transition", rankingsQuery.data.transition, "goals", "goal", "goals")}
                 />
                 <RankingCard
-                  title="4. Total Bola Parada"
+                  title="4. Total Set Pieces"
                   rows={rankingsQuery.data.setPiecesTotal}
                   valueKey="goals"
-                  valueLabel="golos"
+                  valueLabel="goals"
                   onClick={() =>
-                    openRankingModal("4. Total Bola Parada", rankingsQuery.data.setPiecesTotal, "goals", "golo", "golos")
+                    openRankingModal("4. Total Set Pieces", rankingsQuery.data.setPiecesTotal, "goals", "goal", "goals")
                   }
                 />
                 <RankingCard
-                  title="5. Cantos"
+                  title="5. Corners"
                   rows={rankingsQuery.data.corners}
                   valueKey="goals"
-                  valueLabel="golos"
-                  onClick={() => openRankingModal("5. Cantos", rankingsQuery.data.corners, "goals", "golo", "golos")}
+                  valueLabel="goals"
+                  onClick={() => openRankingModal("5. Corners", rankingsQuery.data.corners, "goals", "goal", "goals")}
                 />
                 <RankingCard
-                  title="6. Livres"
+                  title="6. Free Kicks"
                   rows={rankingsQuery.data.freeKicks}
                   valueKey="goals"
-                  valueLabel="golos"
-                  onClick={() => openRankingModal("6. Livres", rankingsQuery.data.freeKicks, "goals", "golo", "golos")}
+                  valueLabel="goals"
+                  onClick={() => openRankingModal("6. Free Kicks", rankingsQuery.data.freeKicks, "goals", "goal", "goals")}
                 />
                 <RankingCard
-                  title="7. Livres Diretos"
+                  title="7. Direct Free Kicks"
                   rows={rankingsQuery.data.freeKicksDirect}
                   valueKey="goals"
-                  valueLabel="golos"
+                  valueLabel="goals"
                   onClick={() =>
-                    openRankingModal("7. Livres Diretos", rankingsQuery.data.freeKicksDirect, "goals", "golo", "golos")
+                    openRankingModal("7. Direct Free Kicks", rankingsQuery.data.freeKicksDirect, "goals", "goal", "goals")
                   }
                 />
                 <RankingCard
-                  title="8. Penáltis"
+                  title="8. Penalties"
                   rows={rankingsQuery.data.penalties}
                   valueKey="goals"
-                  valueLabel="golos"
-                  onClick={() => openRankingModal("8. Penáltis", rankingsQuery.data.penalties, "goals", "golo", "golos")}
+                  valueLabel="goals"
+                  onClick={() => openRankingModal("8. Penalties", rankingsQuery.data.penalties, "goals", "goal", "goals")}
                 />
                 <RankingCard
-                  title="9. Lançamentos Laterais"
+                  title="9. Throw-ins"
                   rows={rankingsQuery.data.throwIns}
                   valueKey="goals"
-                  valueLabel="golos"
+                  valueLabel="goals"
                   onClick={() =>
-                    openRankingModal("9. Lançamentos Laterais", rankingsQuery.data.throwIns, "goals", "golo", "golos")
+                    openRankingModal("9. Throw-ins", rankingsQuery.data.throwIns, "goals", "goal", "goals")
                   }
                 />
                 <TopPlayersCard
-                  title="10. Top Marcadores"
+                  title="10. Top Scorers"
                   rows={rankingsQuery.data.topScorers}
                   valueKey="goals"
-                  valueLabel="golos"
+                  valueLabel="goals"
                   onClick={() =>
-                    openRankingModal("10. Top Marcadores", rankingsQuery.data.topScorers, "goals", "golo", "golos")
+                    openRankingModal("10. Top Scorers", rankingsQuery.data.topScorers, "goals", "goal", "goals")
                   }
                 />
                 <TopPlayersCard
-                  title="11. Assistências"
+                  title="11. Assists"
                   rows={rankingsQuery.data.topAssists}
                   valueKey="assists"
                   valueLabel="assist."
                   onClick={() =>
-                    openRankingModal("11. Assistências", rankingsQuery.data.topAssists, "assists", "assistência", "assistências")
+                    openRankingModal("11. Assists", rankingsQuery.data.topAssists, "assists", "assist", "assists")
                   }
                 />
                 <TopPlayersCard
-                  title="12. Participação em Golos (G+A)"
+                  title="12. Goal Involvements (G+A)"
                   rows={rankingsQuery.data.goalInvolvement}
                   valueKey="involvement"
-                  valueLabel="ações"
+                  valueLabel="actions"
                   onClick={() =>
                     openRankingModal(
-                      "12. Participação em Golos (G+A)",
+                      "12. Goal Involvements (G+A)",
                       rankingsQuery.data.goalInvolvement,
                       "involvement",
-                      "participação",
-                      "participações"
+                      "involvement",
+                      "involvements"
                     )
                   }
                 />
@@ -656,15 +656,15 @@ export default function RankingsPage() {
   const renderComparison = () => (
     <div className="space-y-6">
       <Card className="border-white/10 bg-gradient-to-br from-[#0a1020] via-[#0d162a] to-[#0a1020]/80">
-        <CardHeader title="Comparar campeonatos/épocas" description="Seleciona dois contextos para comparar Organização, Transição e Bola Parada." />
+        <CardHeader title="Compare Competitions/Seasons" description="Select two contexts to compare Organised Attack, Transition and Set Pieces." />
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div className="space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Contexto A</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Context A</div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Época</label>
+              <label className="text-xs text-muted-foreground">Season</label>
               <Select value={seasonA} onChange={(e) => setSeasonA(e.target.value)}>
                 <option value="" className="text-black">
-                  Qualquer época
+                  Any season
                 </option>
                 {seasons.map((season) => (
                   <option key={season.id} value={season.id} className="text-black">
@@ -674,10 +674,10 @@ export default function RankingsPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Campeonato</label>
+              <label className="text-xs text-muted-foreground">Competition</label>
               <Select value={champA} onChange={(e) => setChampA(e.target.value)}>
                 <option value="" className="text-black">
-                  Qualquer campeonato
+                  Any competition
                 </option>
                 {filteredChampsA.map((champ) => (
                   <option key={champ.id} value={champ.id} className="text-black">
@@ -688,12 +688,12 @@ export default function RankingsPage() {
             </div>
           </div>
           <div className="space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Contexto B</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Context B</div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Época</label>
+              <label className="text-xs text-muted-foreground">Season</label>
               <Select value={seasonB} onChange={(e) => setSeasonB(e.target.value)}>
                 <option value="" className="text-black">
-                  Qualquer época
+                  Any season
                 </option>
                 {seasons.map((season) => (
                   <option key={season.id} value={season.id} className="text-black">
@@ -703,10 +703,10 @@ export default function RankingsPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Campeonato</label>
+              <label className="text-xs text-muted-foreground">Competition</label>
               <Select value={champB} onChange={(e) => setChampB(e.target.value)}>
                 <option value="" className="text-black">
-                  Qualquer campeonato
+                  Any competition
                 </option>
                 {filteredChampsB.map((champ) => (
                   <option key={champ.id} value={champ.id} className="text-black">
@@ -721,7 +721,7 @@ export default function RankingsPage() {
 
       {!comparisonReady && (
         <div className="rounded-xl border border-dashed border-border/60 bg-card/60 p-4 text-muted-foreground">
-          Seleciona os dois contextos para ver a comparação lado a lado.
+          Select both contexts to view a side-by-side comparison.
         </div>
       )}
 
@@ -739,49 +739,49 @@ export default function RankingsPage() {
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="bg-white/5">
-              <CardHeader title="Contexto A" />
+              <CardHeader title="Context A" />
               <CardContent className="space-y-1 text-sm">
                 <div className="text-white font-semibold">{nameA}</div>
-                <div className="text-muted-foreground">Total golos: {compareQuery.data.A.totalGoals}</div>
-                <div className="text-muted-foreground">Época ID: {compareQuery.data.A.seasonId ?? "—"}</div>
-                <div className="text-muted-foreground">Campeonato ID: {compareQuery.data.A.championshipId ?? "—"}</div>
+                <div className="text-muted-foreground">Total goals: {compareQuery.data.A.totalGoals}</div>
+                <div className="text-muted-foreground">Season ID: {compareQuery.data.A.seasonId ?? "—"}</div>
+                <div className="text-muted-foreground">Competition ID: {compareQuery.data.A.championshipId ?? "—"}</div>
               </CardContent>
             </Card>
             <Card className="bg-white/5">
-              <CardHeader title="Contexto B" />
+              <CardHeader title="Context B" />
               <CardContent className="space-y-1 text-sm">
                 <div className="text-white font-semibold">{nameB}</div>
-                <div className="text-muted-foreground">Total golos: {compareQuery.data.B.totalGoals}</div>
-                <div className="text-muted-foreground">Época ID: {compareQuery.data.B.seasonId ?? "—"}</div>
-                <div className="text-muted-foreground">Campeonato ID: {compareQuery.data.B.championshipId ?? "—"}</div>
+                <div className="text-muted-foreground">Total goals: {compareQuery.data.B.totalGoals}</div>
+                <div className="text-muted-foreground">Season ID: {compareQuery.data.B.seasonId ?? "—"}</div>
+                <div className="text-muted-foreground">Competition ID: {compareQuery.data.B.championshipId ?? "—"}</div>
               </CardContent>
             </Card>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <ComparisonStat
-              label="Organização"
+              label="Organised Attack"
               valueA={compareQuery.data.A.organization}
               valueB={compareQuery.data.B.organization}
               nameA={nameA}
               nameB={nameB}
             />
             <ComparisonStat
-              label="Transição"
+              label="Transition"
               valueA={compareQuery.data.A.transition}
               valueB={compareQuery.data.B.transition}
               nameA={nameA}
               nameB={nameB}
             />
             <ComparisonStat
-              label="Bola Parada"
+              label="Set Pieces"
               valueA={compareQuery.data.A.setPieces}
               valueB={compareQuery.data.B.setPieces}
               nameA={nameA}
               nameB={nameB}
             />
             <ComparisonStat
-              label="Total de Golos"
+              label="Total Goals"
               valueA={compareQuery.data.A.totalGoals}
               valueB={compareQuery.data.B.totalGoals}
               nameA={nameA}
@@ -798,9 +798,9 @@ export default function RankingsPage() {
       <div className="space-y-6" suppressHydrationWarning>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-white">Rankings e Comparações</h1>
+            <h1 className="text-2xl font-semibold text-white">Rankings and Comparisons</h1>
             <p className="text-sm text-muted-foreground">
-              Analisa rankings por liga ou coloca dois campeonatos/épocas lado a lado sem alterar a base de dados.
+              Analyse rankings by league or compare two competitions/seasons side by side without changing the database.
             </p>
           </div>
           <div className="flex rounded-full border border-border/60 bg-white/5 p-1 text-sm">
@@ -819,9 +819,9 @@ export default function RankingsPage() {
     <div className="space-y-6" suppressHydrationWarning>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Rankings e Comparações</h1>
+          <h1 className="text-2xl font-semibold text-white">Rankings and Comparisons</h1>
           <p className="text-sm text-muted-foreground">
-            Analisa rankings por liga ou coloca dois campeonatos/épocas lado a lado sem alterar a base de dados.
+            Analyse rankings by league or compare two competitions/seasons side by side without changing the database.
           </p>
         </div>
         <div className="flex rounded-full border border-border/60 bg-white/5 p-1 text-sm">

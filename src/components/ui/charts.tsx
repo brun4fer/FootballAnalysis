@@ -11,6 +11,7 @@ import {
   Cell,
   Legend
 } from "recharts";
+import { displayFootballTerm } from "@/lib/presentation";
 
 const BAR_COLOR = "#1e40af";
 const axisStyle = {
@@ -96,7 +97,7 @@ export function SimpleBar({
             {...tooltipStyles}
             formatter={(value: unknown, name: string) => {
               const numericValue = toNumber(value);
-              return [formatValueWithShare(numericValue, total), name];
+              return [formatValueWithShare(numericValue, total), displayFootballTerm(name)];
             }}
           />
           <Bar dataKey={yKey} fill={BAR_COLOR} radius={[0, 10, 10, 0]} barSize={BAR_SIZE} />
@@ -121,13 +122,13 @@ export function SimplePie({ data, labelKey, valueKey }: { data: any[]; labelKey:
           {...tooltipStyles}
           formatter={(value: unknown, name: string) => {
             const numericValue = toNumber(value);
-            return [formatValueWithShare(numericValue, total), name];
+            return [formatValueWithShare(numericValue, total), displayFootballTerm(name)];
           }}
         />
         <Legend
           formatter={(value: string, entry: any) => {
             const numericValue = toNumber(entry?.payload?.[valueKey]);
-            return `${value} - ${formatValueWithShare(numericValue, total)}`;
+            return `${displayFootballTerm(value)} - ${formatValueWithShare(numericValue, total)}`;
           }}
         />
       </PieChart>

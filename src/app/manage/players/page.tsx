@@ -29,7 +29,7 @@ type Championship = { id: number; name: string; seasonId: number };
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
-  if (!res.ok) throw new Error((await res.json()).error ?? "Pedido falhou");
+  if (!res.ok) throw new Error((await res.json()).error ?? "Request failed");
   return res.json();
 }
 
@@ -96,7 +96,7 @@ export default function ManagePlayersPage() {
         heightCm: form.heightCm ? Number(form.heightCm) : undefined,
         weightKg: form.weightKg ? Number(form.weightKg) : undefined
       };
-      if (!body.teamId) throw new Error("Equipa obrigatória");
+      if (!body.teamId) throw new Error("Team is required");
       if (editingId) {
         await fetchJson(`/api/manage/players/${editingId}`, {
           method: "PUT",
@@ -137,7 +137,7 @@ const deletePlayer = useMutation({
 const footballPositions = [
   { group: "Guarda-Redes", positions: ["GR"] },
   { group: "Defesa", positions: ["DC", "DE", "DD", "LBO"] },
-  { group: "Médios", positions: ["MDC", "MC", "MO"] },
+  { group: "Midfielders", positions: ["MDC", "MC", "MO"] },
   { group: "Ataque", positions: ["EE", "ED", "SA", "PL"] },
 ];
 
@@ -148,15 +148,15 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold text-white">Jogadores</h1>
-        <p className="text-sm text-muted-foreground">Gerir equipas e plantéis.</p>
+        <h1 className="text-2xl font-semibold text-white">Players</h1>
+        <p className="text-sm text-muted-foreground">Manage teams and squads.</p>
       </div>
 
       <Card>
-        <CardHeader title={editingId ? "Atualizar Jogador" : "Adicionar Jogador"} description="Os jogadores têm de pertencer a uma equipa" />
+        <CardHeader title={editingId ? "Update Player" : "Add Player"} description="Players must belong to a team" />
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Época</label>
+            <label className="text-xs text-muted-foreground">Season</label>
             <Select
               value={seasonId}
               onChange={(e) => {
@@ -173,7 +173,7 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
                 }
               }}
             >
-              <option value="">Selecionar época</option>
+              <option value="">Select season</option>
               {seasons.map((s) => (
                 <option key={s.id} value={s.id} className="text-black">
                   {s.name}
@@ -182,7 +182,7 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Campeonato</label>
+            <label className="text-xs text-muted-foreground">Competition</label>
             <Select
               value={championshipId}
               onChange={(e) => {
@@ -199,7 +199,7 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
               }}
               disabled={!seasonId}
             >
-              <option value="">Selecionar campeonato</option>
+              <option value="">Select competition</option>
               {filteredChamps.map((c) => (
                 <option key={c.id} value={c.id} className="text-black">
                   {c.name}
@@ -208,7 +208,7 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Equipa</label>
+            <label className="text-xs text-muted-foreground">Team</label>
             <Select
               value={form.teamId}
               onChange={(e) => {
@@ -217,7 +217,7 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
               }}
               disabled={!championshipId}
             >
-              <option value="">Selecionar equipa</option>
+              <option value="">Select team</option>
               {filteredTeams.map((t) => (
                 <option key={t.id} value={t.id} className="text-black">
                   {t.name}
@@ -226,17 +226,17 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Nome</label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nome do jogador" />
+            <label className="text-xs text-muted-foreground">Name</label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Player name" />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Foto</label>
             <FileUpload
-              label={form.photoPath ? "Atualizar foto" : "Carregar foto"}
+              label={form.photoPath ? "Update foto" : "Upload photo"}
               accept="image/*"
               value={form.photoPath}
               onChange={(path) => setForm({ ...form, photoPath: path })}
-              helperText="Use JPG/PNG; guardado no Vercel Blob com URL pública."
+              helperText="Use JPG/PNG; the file will be stored in Vercel Blob with a public URL."
             />
           </div>
           
@@ -244,12 +244,12 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
 <div className="space-y-4">
   {/* Posição Principal */}
   <div className="space-y-1">
-    <label className="text-xs text-muted-foreground">Posição principal</label>
+    <label className="text-xs text-muted-foreground">Primary position</label>
     <Select
       value={form.primaryPosition}
       onChange={(e) => setForm({ ...form, primaryPosition: e.target.value })}
     >
-      <option value="">Selecionar...</option>
+      <option value="">Select...</option>
       {footballPositions.map((grp) => (
         <optgroup key={grp.group} label={grp.group} className="text-black">
           {grp.positions.map((pos) => (
@@ -262,12 +262,12 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
 
   {/* Posição Secundária */}
   <div className="space-y-1">
-    <label className="text-xs text-muted-foreground">Posição secundária</label>
+    <label className="text-xs text-muted-foreground">Secondary position</label>
     <Select
       value={form.secondaryPosition}
       onChange={(e) => setForm({ ...form, secondaryPosition: e.target.value })}
     >
-      <option value="">Nenhuma / Opcional</option>
+      <option value="">None / Optional</option>
       {footballPositions.map((grp) => (
         <optgroup key={grp.group} label={grp.group} className="text-black">
           {grp.positions.map((pos) => (
@@ -280,12 +280,12 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
 
   {/* Posição Terciária */}
   <div className="space-y-1">
-    <label className="text-xs text-muted-foreground">Posição terciária</label>
+    <label className="text-xs text-muted-foreground">Tertiary position</label>
     <Select
       value={form.tertiaryPosition}
       onChange={(e) => setForm({ ...form, tertiaryPosition: e.target.value })}
     >
-      <option value="">Nenhuma / Opcional</option>
+      <option value="">None / Optional</option>
       {footballPositions.map((grp) => (
         <optgroup key={grp.group} label={grp.group} className="text-black">
           {grp.positions.map((pos) => (
@@ -297,12 +297,12 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
   </div>
 </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Pé dominante</label>
+            <label className="text-xs text-muted-foreground">Preferred foot</label>
             <Select 
               value={form.dominantFoot} 
               onChange={(e) => setForm({ ...form, dominantFoot: e.target.value })}
             >
-              <option value="">Selecionar...</option>
+              <option value="">Select...</option>
               <option value="Esquerdo">Esquerdo</option>
               <option value="Direito">Direito</option>
               <option value="Ambos">Ambos</option>
@@ -319,18 +319,18 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
           <div className="md:col-span-3 flex justify-end gap-2">
             {editingId && (
               <Button variant="ghost" type="button" onClick={() => setEditingId(null)}>
-                Cancelar
+                Cancel
               </Button>
             )}
             <Button type="button" onClick={() => savePlayer.mutate()} disabled={!form.name || !form.teamId || !form.primaryPosition || savePlayer.isPending}>
-              {savePlayer.isPending ? "A guardar..." : editingId ? "Atualizar" : "Adicionar"}
+              {savePlayer.isPending ? "Saving..." : editingId ? "Update" : "Add"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader title="Jogadores" description="Vista do plantel" />
+        <CardHeader title="Players" description="Squad view" />
         <CardContent className="space-y-3 text-sm">
           <div className="flex gap-2 items-center">
             <Select
@@ -343,7 +343,7 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
               }}
               className="w-40"
             >
-              <option value="">Época</option>
+              <option value="">Season</option>
               {seasons.map((s) => (
                 <option key={s.id} value={s.id} className="text-black">
                   {s.name}
@@ -360,7 +360,7 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
               disabled={!seasonId}
               className="w-48"
             >
-              <option value="">Campeonato</option>
+              <option value="">Competition</option>
               {filteredChamps.map((c) => (
                 <option key={c.id} value={c.id} className="text-black">
                   {c.name}
@@ -368,7 +368,7 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
               ))}
             </Select>
             <Select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)} disabled={!championshipId} className="w-48">
-              <option value="">Equipa</option>
+              <option value="">Team</option>
               {filteredTeams.map((t) => (
                 <option key={t.id} value={t.id} className="text-black">
                   {t.name}
@@ -411,7 +411,7 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
                       });
                     }}
                   >
-                    Editar
+                    Edit
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => deletePlayer.mutate(player.id)}>
                     Apagar
@@ -420,16 +420,16 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
               </div>
             ))
           ) : (
-            <div className="text-muted-foreground">Ainda não existem jogadores.</div>
+            <div className="text-muted-foreground">No players have been added yet.</div>
           )}
           {playerPageCount > 1 && (
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
               <span>
-                Página {playersPage + 1} de {playerPageCount}
+                Page {playersPage + 1} de {playerPageCount}
               </span>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setPlayersPage((prev) => Math.max(prev - 1, 0))} disabled={playersPage === 0}>
-                  Anterior
+                  Previous
                 </Button>
                 <Button
                   variant="ghost"
@@ -437,7 +437,7 @@ const teamLookup = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [tea
                   onClick={() => setPlayersPage((prev) => Math.min(prev + 1, Math.max(playerPageCount - 1, 0)))}
                   disabled={playersPage >= playerPageCount - 1}
                 >
-                  Seguinte
+                  Next
                 </Button>
               </div>
             </div>

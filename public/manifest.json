@@ -1,7 +1,7 @@
 {
-  "name": "AP - Golos Marcados",
-  "short_name": "AP - Golos Marcados",
-  "description": "Plataforma profissional de golos marcados e analise tactica.",
+  "name": "AP - Goals Scored",
+  "short_name": "AP - Goals Scored",
+  "description": "Professional goalscoring and tactical analysis platform.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

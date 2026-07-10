@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Image from "next/image";
+import { displayFootballTerm } from "@/lib/presentation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { RankingModal, type RankingModalItem } from "@/components/ui/ranking-modal";
@@ -31,10 +32,10 @@ type MomentOption = {
 type BpoCategory = "corners" | "free_kicks" | "direct_free_kicks" | "throw_ins";
 
 const BPO_FILTER_OPTIONS: Array<{ value: BpoCategory; label: string }> = [
-  { value: "corners", label: "Cantos" },
-  { value: "free_kicks", label: "Livres" },
-  { value: "direct_free_kicks", label: "Livres Diretos" },
-  { value: "throw_ins", label: "Lançamentos Laterais" }
+  { value: "corners", label: "Corners" },
+  { value: "free_kicks", label: "Free Kicks" },
+  { value: "direct_free_kicks", label: "Direct Free Kicks" },
+  { value: "throw_ins", label: "Throw-ins" }
 ];
 
 type PlayerRow = {
@@ -104,16 +105,16 @@ const resolveImageSrc = (value?: string | null) => {
 };
 
 const LABEL_OVERRIDES: Record<string, string> = {
-  organizacao: "Organização",
-  curto_para_longo: "Curto para longo",
+  organizacao: "Organised Attack",
+  curto_para_longo: "Short to Long",
   bola_longa: "Bola longa",
-  area: "Área",
+  area: "Box",
   aberto: "Aberto",
   fechado: "Fechado",
   combinado: "Combinado",
   cruzamento: "Cruzamento",
-  "canto aberto": "Canto Aberto",
-  "canto fechado": "Canto Fechado"
+  "canto aberto": "Inswinging Corner",
+  "canto fechado": "Outswinging Corner"
 };
 
 const formatTechnicalLabel = (value?: string | null) => {
@@ -138,7 +139,7 @@ const cleanDataset = <T extends Record<string, any>>(data: T[], labelKey: keyof 
     .filter((entry): entry is T => entry !== null);
 };
 
-const EMPTY_GRAPH_MESSAGE = "Não há golos desta maneira";
+const EMPTY_GRAPH_MESSAGE = "No goals were scored this way";
 const MAP_CARD_CONTENT_CLASS = "min-h-[300px] w-full px-0 py-0";
 const MAP_WRAPPER_CLASS =
   "relative overflow-hidden rounded-2xl border border-border/70 bg-[#0c1322] p-4 shadow-[0_20px_80px_rgba(0,0,0,0.35)]";
@@ -260,7 +261,7 @@ function TopPlayersCard({
       <CardHeader title={title} />
       <CardContent className="space-y-3">
         {rows.length === 0 ? (
-          <div className="text-sm text-muted-foreground">Sem dados suficientes.</div>
+          <div className="text-sm text-muted-foreground">No data suficientes.</div>
         ) : (
           <div className="space-y-2">
             {rows.slice(0, 3).map((row, idx) => (
@@ -342,7 +343,7 @@ function ReferencePlayersCard({ rows }: { rows: PlayerRow[] }) {
 
   return (
     <Card className="bg-[#0c1420]/70 border border-border/60">
-      <CardHeader title="Jogadores Referência" />
+      <CardHeader title="Reference Players" />
       <CardContent className="space-y-3">
         <div className="space-y-2">
           {rows.slice(0, 3).map((row, idx) => (
@@ -382,7 +383,7 @@ function ReferencePlayersCard({ rows }: { rows: PlayerRow[] }) {
 }
 
 function formatPointTooltip(point: MapPoint) {
-  const playerName = point.scorerName?.trim() || "Marcador";
+  const playerName = point.scorerName?.trim() || "Scorer";
   const minuteValue = typeof point.minute === "number" ? point.minute : null;
   return minuteValue !== null ? `${playerName} - ${minuteValue}'` : `${playerName} - --'`;
 }
@@ -508,12 +509,12 @@ function SubMomentActionCard({ row }: { row: SubMomentActionBreakdown }) {
     <Card className="bg-[#0c1420]/70 border border-border/60">
       <CardHeader
         title={row.subMoment}
-        description={`${row.totalGoals.toLocaleString("pt-PT")} golos neste sub-momento`}
+        description={`${row.totalGoals.toLocaleString("en-GB")} goals in this sub-phase`}
       />
       <CardContent>
         {!hasActions ? (
           <div className="rounded-xl border border-border/60 bg-slate-900/40 px-3 py-4 text-xs text-muted-foreground">
-            Sem ações registadas neste sub-momento.
+            No actions recorded for this sub-phase.
           </div>
         ) : (
           <div className="space-y-3">
@@ -539,7 +540,7 @@ function SubMomentActionCard({ row }: { row: SubMomentActionBreakdown }) {
                       style={{ width: `${width}%`, backgroundColor: ACTION_BAR_COLOR }}
                     />
                     <div className="absolute inset-0 flex items-center justify-between px-2 text-[11px] font-medium text-white">
-                      <span>{entry.goals} golos</span>
+                      <span>{entry.goals} goals</span>
                       <span>{formatPercent(entry.percent)}</span>
                     </div>
                   </div>
@@ -573,7 +574,7 @@ function TransitionRecoveryCard({ row }: { row: RecoverySpaceBreakdown }) {
     <Card className="bg-[#0c1420]/70 border border-border/60">
       <CardHeader
         title={row.subMoment}
-        description={`${row.totalGoals.toLocaleString("pt-PT")} golos com recuperação`}
+        description={`${row.totalGoals.toLocaleString("en-GB")} goals involving a recovery`}
       />
       <CardContent className="space-y-3">
         <div className={MAP_WRAPPER_CLASS}>
@@ -642,13 +643,13 @@ function TransitionRecoveryCard({ row }: { row: RecoverySpaceBreakdown }) {
                 key={`${row.subMomentId}-legend-${zone.zoneId}`}
                 className="rounded-md border border-border/60 bg-slate-900/50 px-2 py-1"
               >
-                Zona {zone.zoneId}: {zone.goals} golos ({formatPercent(zone.percent)})
+                Area {zone.zoneId}: {zone.goals} goals ({formatPercent(zone.percent)})
               </div>
             ))}
           </div>
         ) : (
           <div className="rounded-xl border border-border/60 bg-slate-900/40 px-3 py-3 text-xs text-muted-foreground">
-            Sem registos em zonas de recuperação.
+            No records in recovery areas.
           </div>
         )}
       </CardContent>
@@ -721,7 +722,7 @@ export default function RadiographyPanel({
       .then(async (res) => {
         if (!res.ok) {
           const json = await res.json().catch(() => null);
-          throw new Error(json?.error ?? "Falha ao carregar campeonatos");
+          throw new Error(json?.error ?? "Could not load competitions");
         }
         return res.json() as Promise<ChampionshipOption[]>;
       })
@@ -735,7 +736,7 @@ export default function RadiographyPanel({
       .catch((err) => {
         if (!isCancelled) {
           setChampionshipOptions([]);
-          setChampionshipsError(err.message ?? "Erro ao carregar campeonatos");
+          setChampionshipsError(err.message ?? "Could not load competitions");
         }
       })
       .finally(() => {
@@ -751,7 +752,7 @@ export default function RadiographyPanel({
     let isCancelled = false;
     fetch("/api/lookups/moments", { cache: "no-store" })
       .then((res) => {
-        if (!res.ok) throw new Error("Falha ao carregar momentos");
+        if (!res.ok) throw new Error("Could not load phases");
         return res.json();
       })
       .then((payload) => {
@@ -788,7 +789,7 @@ export default function RadiographyPanel({
       .then(async (res) => {
         if (!res.ok) {
           const json = await res.json().catch(() => null);
-          throw new Error(json?.error ?? "Falha ao carregar equipas");
+          throw new Error(json?.error ?? "Could not load teams");
         }
         return res.json() as Promise<TeamOption[]>;
       })
@@ -807,7 +808,7 @@ export default function RadiographyPanel({
       .catch((err) => {
         if (!isCancelled) {
           setTeamOptions([]);
-          setTeamsError(err.message ?? "Erro ao carregar equipas");
+          setTeamsError(err.message ?? "Could not load teams");
         }
       })
       .finally(() => {
@@ -846,7 +847,7 @@ export default function RadiographyPanel({
       .then(async (res) => {
         if (!res.ok) {
           const json = await res.json().catch(() => null);
-          const message = json?.error ?? "Falha ao carregar a radiografia";
+          const message = json?.error ?? "Could not load the team analysis";
           throw new Error(message);
         }
         return res.json() as Promise<RadiographyResponse>;
@@ -855,7 +856,7 @@ export default function RadiographyPanel({
         if (!isCancelled) setRadiography(payload);
       })
       .catch((err) => {
-        if (!isCancelled) setError(err.message ?? "Erro ao carregar dados");
+        if (!isCancelled) setError(err.message ?? "Could not load data");
       })
       .finally(() => {
         if (!isCancelled) setLoading(false);
@@ -878,7 +879,7 @@ export default function RadiographyPanel({
   const isTransitionMomentFilter = Boolean(selectedMoment && isTransitionOffensiveMoment(selectedMoment.name));
   const shouldShowTopPlayerRankings = isAllMomentsFilter;
   const shouldShowReferenceRanking = isTransitionMomentFilter;
-  const selectedFilterLabel = selectedMoment?.name ?? selectedBpoFilter?.label ?? "Filtro";
+  const selectedFilterLabel = displayFootballTerm(selectedMoment?.name) || selectedBpoFilter?.label || "Filter";
   const momentGoalsValue = radiography?.momentGoals ?? 0;
   const teamGoalsValue = radiography?.teamGoals ?? 0;
   const goalShare = teamGoalsValue > 0 ? (momentGoalsValue / teamGoalsValue) * 100 : 0;
@@ -941,7 +942,7 @@ export default function RadiographyPanel({
   );
 
   if (!championshipsLoading && championshipOptions.length === 0) {
-    return <div className="text-sm text-muted-foreground">Sem campeonatos registados.</div>;
+    return <div className="text-sm text-muted-foreground">No competitions have been added.</div>;
   }
 
   return (
@@ -959,24 +960,24 @@ export default function RadiographyPanel({
           </div>
         )}
         <div className="flex-1 min-w-[220px]">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Momentos da Equipa</p>
-          <h1 className="text-2xl font-semibold text-white">{currentTeam?.name ?? "Equipa"}</h1>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Team Phases</p>
+          <h1 className="text-2xl font-semibold text-white">{currentTeam?.name ?? "Team"}</h1>
           <p className="text-xs text-muted-foreground">
             {currentTeam?.coach && `Treinador: ${currentTeam.coach}`}
-            {currentTeam?.stadium && ` · Estádio: ${currentTeam.stadium}`}
+            {currentTeam?.stadium && ` · Stadium: ${currentTeam.stadium}`}
             {currentTeam?.pitchDimensions && ` · Relvado: ${currentTeam.pitchDimensions}`}
           </p>
         </div>
         <div className="w-full max-w-xs">
           <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Campeonato
+            Competition
           </label>
           <Select
             value={championshipId?.toString() ?? ""}
             onChange={(e) => setChampionshipId(e.target.value ? Number(e.target.value) : undefined)}
           >
             <option value="" className="text-black">
-              Selecionar campeonato
+              Select competition
             </option>
             {championshipOptions.map((championship) => (
               <option key={championship.id} value={championship.id} className="text-black">
@@ -987,7 +988,7 @@ export default function RadiographyPanel({
         </div>
         <div className="w-full max-w-xs">
           <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Equipa
+            Team
           </label>
           <Select
             value={teamId?.toString() ?? ""}
@@ -995,7 +996,7 @@ export default function RadiographyPanel({
             disabled={!championshipId || teamsLoading}
           >
             <option value="" className="text-black">
-              {!championshipId ? "Seleciona campeonato primeiro" : "Selecionar equipa"}
+              {!championshipId ? "Select a competition first" : "Select team"}
             </option>
             {teamOptions.map((team) => (
               <option key={team.id} value={team.id} className="text-black">
@@ -1006,7 +1007,7 @@ export default function RadiographyPanel({
         </div>
         <div className="w-full max-w-xs">
           <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Momento
+            Phase
           </label>
           <Select
             value={momentId ? `moment:${momentId}` : bpoCategory ? `bpo:${bpoCategory}` : ""}
@@ -1014,12 +1015,12 @@ export default function RadiographyPanel({
             disabled={!teamId || !selectedTeam}
           >
             <option value="" className="text-black">
-              Todos os momentos
+              All phases
             </option>
-            <optgroup label="Momentos Gerais">
+            <optgroup label="Phases Gerais">
               {momentOptions.map((moment) => (
                 <option key={moment.id} value={`moment:${moment.id}`} className="text-black">
-                  {moment.name}
+                  {displayFootballTerm(moment.name)}
                 </option>
               ))}
             </optgroup>
@@ -1035,17 +1036,17 @@ export default function RadiographyPanel({
       </div>
 
       <div className="space-y-2">
-        {championshipsLoading && <div className="text-sm text-muted-foreground">Carregando campeonatos...</div>}
+        {championshipsLoading && <div className="text-sm text-muted-foreground">Loading competitions...</div>}
         {championshipsError && <div className="text-sm text-destructive">{championshipsError}</div>}
-        {teamsLoading && championshipId && <div className="text-sm text-muted-foreground">Carregando equipas...</div>}
+        {teamsLoading && championshipId && <div className="text-sm text-muted-foreground">Loading teams...</div>}
         {teamsError && <div className="text-sm text-destructive">{teamsError}</div>}
-        {loading && <div className="text-sm text-muted-foreground">Carregando radiografia...</div>}
+        {loading && <div className="text-sm text-muted-foreground">Loading team analysis...</div>}
         {error && <div className="text-sm text-destructive">{error}</div>}
         {championshipId && !teamsLoading && teamOptions.length === 0 && (
-          <div className="text-sm text-muted-foreground">Sem equipas para o campeonato selecionado.</div>
+          <div className="text-sm text-muted-foreground">No teams are available for the selected competition.</div>
         )}
         {!teamId && championshipId && !teamsLoading && teamOptions.length > 0 && (
-          <div className="text-sm text-muted-foreground">Seleciona uma equipa para ver a radiografia.</div>
+          <div className="text-sm text-muted-foreground">Select a team to view its analysis.</div>
         )}
       </div>
 
@@ -1054,33 +1055,33 @@ export default function RadiographyPanel({
           {isSpecificFilterActive ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <TopMetricCard
-                title="Percentagem de Golos"
+                title="Percentage of Goals"
                 value={formattedGoalShare}
-                subtitle={`${momentGoalsValue.toLocaleString("pt-PT")} de ${teamGoalsValue.toLocaleString("pt-PT")} golos`}
+                subtitle={`${momentGoalsValue.toLocaleString("en-GB")} of ${teamGoalsValue.toLocaleString("en-GB")} goals`}
               />
               <TopMetricCard
-                title="Melhor Marcador"
+                title="Top Scorer"
                 value={bestScorer?.name ?? "—"}
-                subtitle={`${bestScorer?.goals ?? 0} golos`}
-                onClick={() => openRankingModal("Melhor Marcador", scorerRankingItems, "golo", "golos")}
+                subtitle={`${bestScorer?.goals ?? 0} goals`}
+                onClick={() => openRankingModal("Top Scorer", scorerRankingItems, "goal", "goals")}
               />
               <TopMetricCard
-                title="Mais Assistências"
+                title="Mais Assists"
                 value={bestAssist?.name ?? "—"}
-                subtitle={`${bestAssist?.assists ?? 0} assistências`}
-                onClick={() => openRankingModal("Mais Assistências", assistRankingItems, "assistência", "assistências")}
+                subtitle={`${bestAssist?.assists ?? 0} assists`}
+                onClick={() => openRankingModal("Mais Assists", assistRankingItems, "assist", "assists")}
               />
               <TopMetricCard
-                title="Mais Participações"
+                title="Mais Participactions"
                 value={bestParticipation?.name ?? "—"}
-                subtitle={`${bestParticipation?.involvement ?? 0} participações`}
+                subtitle={`${bestParticipation?.involvement ?? 0} involvements`}
                 onClick={() =>
-                  openRankingModal("Mais Participações em Golo", participationRankingItems, "participação", "participações")
+                  openRankingModal("Most Goal Involvements", participationRankingItems, "involvement", "involvements")
                 }
               />
               <TopMetricCard
-                title="Total de Golos"
-                value={momentGoalsValue.toLocaleString("pt-PT")}
+                title="Total Goals"
+                value={momentGoalsValue.toLocaleString("en-GB")}
                 subtitle={`Filtro: ${selectedFilterLabel}`}
               />
             </div>
@@ -1088,8 +1089,8 @@ export default function RadiographyPanel({
             <div className="grid gap-4">
               <Card className="bg-[#0c1420]/70 border border-border/60">
                 <CardHeader
-                  title="Momentos de Jogo"
-                  description="Organização, transição e bola parada"
+                  title="Phases de Jogo"
+                  description="Organised attack, transition and set pieces"
                 />
                 <CardContent className="min-h-[300px]">
                   {distribution.length > 0 ? (
@@ -1106,19 +1107,19 @@ export default function RadiographyPanel({
             <>
               <div className="grid gap-4 lg:grid-cols-3">
                 <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Mapa da Baliza" />
+                  <CardHeader title="Goal Map" />
                   <CardContent className={MAP_CARD_CONTENT_CLASS}>
                     <GoalEntryMap points={goalEntryPoints} />
                   </CardContent>
                 </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Mapa de remate" />
+                  <CardHeader title="Shot Map" />
                   <CardContent className={MAP_CARD_CONTENT_CLASS}>
                     <FieldPinMap points={shotZonePoints} pinColor="#22c55e" />
                   </CardContent>
                 </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Zonas de assistência" />
+                  <CardHeader title="Assist Locations" />
                   <CardContent className={MAP_CARD_CONTENT_CLASS}>
                     <FieldPinMap points={assistZonePoints} pinColor="#38bdf8" />
                   </CardContent>
@@ -1127,7 +1128,7 @@ export default function RadiographyPanel({
               {isTransitionMomentFilter ? (
                 <div className="space-y-3">
                   <div className="text-xs uppercase tracking-[0.2em] text-cyan-200/80">
-                    Zonas de Recuperação
+                    Recovery Areas
                   </div>
                   {transitionRecoveryBreakdown.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1137,10 +1138,10 @@ export default function RadiographyPanel({
                     </div>
                   ) : (
                     <Card className="bg-[#0c1420]/70 border border-border/60">
-                      <CardHeader title="Zonas de Recuperação" />
+                      <CardHeader title="Recovery Areas" />
                       <CardContent>
                         <div className="rounded-xl border border-border/60 bg-slate-900/40 px-3 py-4 text-sm text-muted-foreground">
-                          Sem dados de recuperação para este filtro.
+                          No recovery data for this filter.
                         </div>
                       </CardContent>
                     </Card>
@@ -1149,7 +1150,7 @@ export default function RadiographyPanel({
               ) : (
                 <div className="space-y-3">
                   <div className="text-xs uppercase tracking-[0.2em] text-cyan-200/80">
-                    Ações por Sub-momento
+                    Actions por Sub-phase
                   </div>
                   {subMomentActionBreakdown.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1159,10 +1160,10 @@ export default function RadiographyPanel({
                     </div>
                   ) : (
                     <Card className="bg-[#0c1420]/70 border border-border/60">
-                      <CardHeader title="Ações por Sub-momento" />
+                      <CardHeader title="Actions por Sub-phase" />
                       <CardContent>
                         <div className="rounded-xl border border-border/60 bg-slate-900/40 px-3 py-4 text-sm text-muted-foreground">
-                          Sem dados de ações para este filtro.
+                          No action data for this filter.
                         </div>
                       </CardContent>
                     </Card>
@@ -1181,19 +1182,19 @@ export default function RadiographyPanel({
             <>
               <div className="grid gap-4 lg:grid-cols-3">
                 <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Mapa da Baliza" />
+                  <CardHeader title="Goal Map" />
                   <CardContent className={MAP_CARD_CONTENT_CLASS}>
                     <GoalEntryMap points={goalEntryPoints} />
                   </CardContent>
                 </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Mapa de remate" />
+                  <CardHeader title="Shot Map" />
                   <CardContent className={MAP_CARD_CONTENT_CLASS}>
                     <FieldPinMap points={shotZonePoints} pinColor="#22c55e" />
                   </CardContent>
                 </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">
-                  <CardHeader title="Zonas de assistência" />
+                  <CardHeader title="Assist Locations" />
                   <CardContent className={MAP_CARD_CONTENT_CLASS}>
                     <FieldPinMap points={assistZonePoints} pinColor="#38bdf8" />
                   </CardContent>
@@ -1203,26 +1204,26 @@ export default function RadiographyPanel({
               {shouldShowTopPlayerRankings && (
                 <div className="grid gap-4 lg:grid-cols-3">
                   <TopPlayersCard
-                    title="Top Marcadores"
+                    title="Top Scoreres"
                     rows={radiography.topScorers}
                     valueKey="goals"
                     valueLabel="G"
-                    onClick={() => openRankingModal("Top Marcadores", scorerRankingItems, "golo", "golos")}
+                    onClick={() => openRankingModal("Top Scoreres", scorerRankingItems, "goal", "goals")}
                   />
                   <TopPlayersCard
-                    title="Top Assistências"
+                    title="Top Assists"
                     rows={radiography.topAssists}
                     valueKey="assists"
                     valueLabel="A"
-                    onClick={() => openRankingModal("Top Assistências", assistRankingItems, "assistência", "assistências")}
+                    onClick={() => openRankingModal("Top Assists", assistRankingItems, "assist", "assists")}
                   />
                   <TopPlayersCard
-                    title="Top Participações"
+                    title="Top Involvements"
                     rows={radiography.topParticipation}
                     valueKey="involvement"
                     valueLabel="Part."
                     onClick={() =>
-                      openRankingModal("Top Participações", participationRankingItems, "participação", "participações")
+                      openRankingModal("Top Involvements", participationRankingItems, "involvement", "involvements")
                     }
                   />
                 </div>

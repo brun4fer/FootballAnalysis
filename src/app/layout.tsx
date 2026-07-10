@@ -16,16 +16,16 @@ const font = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  applicationName: "AP - Golos Marcados",
+  applicationName: "AP - Goals Scored",
   title: {
-    default: "AP - Golos Marcados",
-    template: "%s | AP - Golos Marcados"
+    default: "AP - Goals Scored",
+    template: "%s | AP - Goals Scored"
   },
-  description: "Plataforma de golos marcados e analise tactica.",
+  description: "Goalscoring and tactical analysis platform.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "AP - Golos Marcados",
+    title: "AP - Goals Scored",
     statusBarStyle: "default"
   },
   icons: {
@@ -44,7 +44,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-PT" className={font.variable}>
+    <html lang="en-GB" className={font.variable}>
       <body className="bg-background text-foreground">
         <ServiceWorkerRegister />
         <QueryProvider>

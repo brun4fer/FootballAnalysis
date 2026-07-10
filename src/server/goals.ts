@@ -654,7 +654,7 @@ async function upsertGoal(
   const isOffensiveOrganizationMoment = isOffensiveOrganizationMomentName(moment.name);
   if (isOffensiveOrganizationMoment) {
     if (orderedSequenceEntries.length > OFFENSIVE_ORGANIZATION_SEQUENCE.length) {
-      throw new Error("Organizacao Ofensiva permite no maximo 4 fases.");
+      throw new Error("Organised Attack allows no more than four phases.");
     }
   }
 
@@ -689,7 +689,7 @@ async function upsertGoal(
   for (const entry of orderedSequenceEntries) {
     const sequenceSubMoment = subMomentById.get(entry.subMomentId);
     const sequenceAction = actionById.get(entry.actionId);
-    if (!sequenceSubMoment || !sequenceAction) throw new Error("Sub-moment/action sequence invalida");
+    if (!sequenceSubMoment || !sequenceAction) throw new Error("Invalid sub-phase/action sequence");
 
     const isRecovery = isOffensiveTransitionMoment && isTransitionRecoverySubMomentName(sequenceSubMoment.name);
     const wrongSubMoment = sequenceAction.subMomentId !== entry.subMomentId;
@@ -700,7 +700,7 @@ async function upsertGoal(
     if (isRecovery) isOffensiveTransitionRecovery = true;
   }
   if (isOffensiveTransitionRecovery && !parsed.attackingSpaceId) {
-    throw new Error("Transicao Ofensiva de recuperacao requer attackingSpaceId.");
+    throw new Error("An Attacking Transition from a recovery requires attackingSpaceId.");
   }
 
   const requiresGoal = requestedActionRows.some(
@@ -708,10 +708,10 @@ async function upsertGoal(
   );
   const requiresField = requestedActionRows.length > 0;
   if (requiresField && !parsed.fieldDrawing) {
-    throw new Error("Esta acao requer marcar o ponto no campo (field drawing obrigatorio).");
+    throw new Error("This action requires a point on the pitch (field drawing is required).");
   }
   if (requiresGoal && !parsed.goalCoordinates) {
-    throw new Error("Esta acao requer selecionar um ponto na baliza.");
+    throw new Error("This action requires a point on the goal.");
   }
 
   const assistFromRoles = parsed.involvements?.filter((i) => i.role === "assist") ?? [];
@@ -748,29 +748,29 @@ async function upsertGoal(
   );
 
   async function validateTaker(playerId: number | null | undefined, label: string) {
-    if (!playerId) throw new Error(`${label} e obrigatorio para esta jogada`);
+    if (!playerId) throw new Error(`${label} is required for this move`);
     const p = await db.query.players.findFirst({ where: eq(players.id, playerId) });
-    if (!p) throw new Error(`${label} nao encontrado`);
-    if (p.teamId !== parsed.teamId) throw new Error(`${label} tem de pertencer a equipa`);
+    if (!p) throw new Error(`${label} was not found`);
+    if (p.teamId !== parsed.teamId) throw new Error(`${label} must belong to the team`);
     return p.id;
   }
 
   const cornerTakerId = hasCornerMarkerAction
-    ? await validateTaker(parsed.cornerTakerId, "Marcador do canto")
+    ? await validateTaker(parsed.cornerTakerId, "Corner taker")
     : parsed.cornerTakerId ?? null;
   const freekickTakerId = hasFreekickMarkerAction
-    ? await validateTaker(parsed.freekickTakerId, "Marcador da falta")
+    ? await validateTaker(parsed.freekickTakerId, "Free-kick taker")
     : parsed.freekickTakerId ?? null;
-  const penaltyTakerId = isPenalty ? await validateTaker(parsed.penaltyTakerId, "Marcador do penalti") : parsed.penaltyTakerId ?? null;
-  const crossAuthorId = isCross ? await validateTaker(parsed.crossAuthorId, "Autor do cruzamento") : parsed.crossAuthorId ?? null;
+  const penaltyTakerId = isPenalty ? await validateTaker(parsed.penaltyTakerId, "Penalty taker") : parsed.penaltyTakerId ?? null;
+  const crossAuthorId = isCross ? await validateTaker(parsed.crossAuthorId, "Cross provider") : parsed.crossAuthorId ?? null;
   const throwInTakerId = supportsThrowInTaker && hasThrowInMarkerAction
-    ? await validateTaker(parsed.throwInTakerId, "Marcador do lancamento")
+    ? await validateTaker(parsed.throwInTakerId, "Throw-in taker")
     : null;
   const referencePlayerId = supportsReferencePlayer && parsed.referencePlayerId
-    ? await validateTaker(parsed.referencePlayerId, "Jogador referencia")
+    ? await validateTaker(parsed.referencePlayerId, "Reference player")
     : null;
   const foulSufferedById = hasFoulSufferedAction
-    ? await validateTaker(parsed.foulSufferedById, "Jogador que sofreu a falta")
+    ? await validateTaker(parsed.foulSufferedById, "Player fouled")
     : null;
   const previousMomentDescription = parsed.previousMomentDescription?.toString().trim() || null;
 

@@ -20,11 +20,11 @@ export function GoalDeleteButton({ goalId }: { goalId: number }) {
     try {
       const res = await fetch(`/api/goals/${goalId}`, { method: "DELETE" });
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error ?? "Erro ao eliminar o golo.");
+      if (!res.ok) throw new Error(json?.error ?? "Could not delete the goal.");
       router.push("/teams");
       router.refresh();
     } catch (error: any) {
-      setMessage(error?.message ?? "Erro ao eliminar o golo.");
+      setMessage(error?.message ?? "Could not delete the goal.");
       setIsDeleting(false);
     }
   };
@@ -40,14 +40,14 @@ export function GoalDeleteButton({ goalId }: { goalId: number }) {
           setOpen(true);
         }}
       >
-        <Trash2 className="mr-2 h-4 w-4" /> Eliminar Golo
+        <Trash2 className="mr-2 h-4 w-4" /> Delete Goal
       </Button>
       <ConfirmDialog
         open={open}
-        title="Eliminar Golo"
-        description="Tem a certeza de que pretende eliminar este golo?"
-        cancelLabel="Cancelar"
-        confirmLabel="Confirmar eliminação"
+        title="Delete Goal"
+        description="Are you sure you want to delete this goal?"
+        cancelLabel="Cancel"
+        confirmLabel="Confirm deletion"
         loading={isDeleting}
         onCancel={() => {
           if (isDeleting) return;

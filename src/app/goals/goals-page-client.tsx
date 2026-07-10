@@ -78,16 +78,16 @@ export function GoalsPageClient() {
     mutationFn: async (goalId: number) => {
       const res = await fetch(`/api/goals/${goalId}`, { method: "DELETE" });
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error ?? "Erro ao eliminar o golo.");
+      if (!res.ok) throw new Error(json?.error ?? "Could not delete the goal.");
       return json;
     },
     onSuccess: () => {
-      setDeleteFeedback("Golo eliminado com sucesso.");
+      setDeleteFeedback("Goal deleted successfully.");
       setPendingDeleteGoalId(null);
       queryClient.invalidateQueries({ queryKey: ["goals-page-history", teamId] });
     },
     onError: (error: any) => {
-      setDeleteFeedback(error?.message ?? "Erro ao eliminar o golo.");
+      setDeleteFeedback(error?.message ?? "Could not delete the goal.");
     }
   });
 
@@ -98,14 +98,14 @@ export function GoalsPageClient() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">Registar Golo</h1>
-        <p className="text-sm text-muted-foreground">Fluxo guiado com seleção de zona da baliza e desenho tático em SVG.</p>
+        <h1 className="text-2xl font-semibold">Record Goal</h1>
+        <p className="text-sm text-muted-foreground">Guided workflow with goal-area selection and SVG tactical drawing.</p>
       </div>
 
       <GoalWizard />
 
       <Card>
-        <CardHeader title="Histórico de Golos" description="5 registos por página" />
+        <CardHeader title="Goal History" description="5 records per page" />
         <CardContent className="space-y-3">
           {deleteFeedback && (
             <div className="rounded-md border border-border/60 bg-card/60 px-3 py-2 text-xs text-muted-foreground">
@@ -121,7 +121,7 @@ export function GoalsPageClient() {
                 setTeamId(undefined);
               }}
             >
-              <option value="">Selecionar época</option>
+              <option value="">Select season</option>
               {seasons.map((season) => (
                 <option key={season.id} value={season.id} className="text-black">
                   {season.name}
@@ -137,7 +137,7 @@ export function GoalsPageClient() {
               }}
               disabled={!seasonId}
             >
-              <option value="">Selecionar campeonato</option>
+              <option value="">Select competition</option>
               {filteredChampionships.map((championship) => (
                 <option key={championship.id} value={championship.id} className="text-black">
                   {championship.name}
@@ -146,7 +146,7 @@ export function GoalsPageClient() {
             </Select>
 
             <Select value={teamId?.toString() ?? ""} onChange={(e) => setTeamId(Number(e.target.value) || undefined)} disabled={!championshipId}>
-              <option value="">Selecionar equipa</option>
+              <option value="">Select team</option>
               {filteredTeams.map((team) => (
                 <option key={team.id} value={team.id} className="text-black">
                   {team.name}
@@ -155,7 +155,7 @@ export function GoalsPageClient() {
             </Select>
           </div>
 
-          {!teamId && <div className="text-sm text-muted-foreground">Seleciona uma equipa para ver o histórico.</div>}
+          {!teamId && <div className="text-sm text-muted-foreground">Select a team to view its history.</div>}
 
           {teamId && (goals.length > 0 ? (
             paginatedGoals.map((goal) => (
@@ -166,7 +166,7 @@ export function GoalsPageClient() {
                     &apos;
                   </span>
                   <span className="font-medium text-white">{goal.scorerName ?? `#${goal.scorerId}`}</span>
-                  <Badge className="bg-slate-700/60 text-slate-50">vs {goal.opponentName ?? "Adversário indefinido"}</Badge>
+                  <Badge className="bg-slate-700/60 text-slate-50">vs {goal.opponentName ?? "Opponent indefinido"}</Badge>
                   {goal.goalCoordinates && (
                     <Badge className="bg-cyan-500/10 text-cyan-100">
                       ({goal.goalCoordinates.x.toFixed(2)}, {goal.goalCoordinates.y.toFixed(2)})
@@ -185,22 +185,22 @@ export function GoalsPageClient() {
                     setPendingDeleteGoalId(goal.id);
                   }}
                 >
-                  <Trash2 className="mr-1 h-4 w-4" /> Eliminar
+                  <Trash2 className="mr-1 h-4 w-4" /> Delete
                 </Button>
               </div>
             ))
           ) : (
-            <div className="text-sm text-muted-foreground">Ainda sem golos para este contexto.</div>
+            <div className="text-sm text-muted-foreground">There are no goals for this context yet.</div>
           ))}
 
           {teamId && totalPages > 1 && (
             <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground">
               <span>
-                Página {currentPage + 1} de {totalPages}
+                Page {currentPage + 1} de {totalPages}
               </span>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))} disabled={currentPage === 0}>
-                  Anterior
+                  Previous
                 </Button>
                 <Button
                   variant="ghost"
@@ -208,7 +208,7 @@ export function GoalsPageClient() {
                   onClick={() => setCurrentPage((prev) => Math.min(prev + 1, Math.max(totalPages - 1, 0)))}
                   disabled={currentPage >= totalPages - 1}
                 >
-                  Seguinte
+                  Next
                 </Button>
               </div>
             </div>
@@ -217,10 +217,10 @@ export function GoalsPageClient() {
       </Card>
       <ConfirmDialog
         open={pendingDeleteGoalId !== null}
-        title="Eliminar Golo"
-        description="Tem a certeza de que pretende eliminar este golo?"
-        cancelLabel="Cancelar"
-        confirmLabel="Confirmar eliminação"
+        title="Delete Goal"
+        description="Are you sure you want to delete this goal?"
+        cancelLabel="Cancel"
+        confirmLabel="Confirm deletion"
         loading={deleteGoalMutation.isPending}
         onCancel={() => {
           if (deleteGoalMutation.isPending) return;

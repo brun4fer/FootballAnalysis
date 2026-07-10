@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { displayFootballTerm } from "@/lib/presentation";
 
 import { getGoalById } from "@/server/goals";
 
@@ -153,14 +154,14 @@ export default async function GoalDetail({ params }: { params: { id: string } })
       <div className="flex items-center gap-3">
         <Link href="/teams">
           <Button variant="ghost" size="sm" className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> Voltar
+            <ArrowLeft className="h-4 w-4" /> Back
           </Button>
         </Link>
         <div>
 
-          <h1 className="text-2xl font-semibold">Golo #{id}</h1>
+          <h1 className="text-2xl font-semibold">Goal #{id}</h1>
 
-          <p className="text-sm text-muted-foreground">Visualização detalhada com vídeo e pinpoints.</p>
+          <p className="text-sm text-muted-foreground">Detailed view with video and locations.</p>
 
         </div>
 
@@ -169,7 +170,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
         <Card>
 
-          <CardHeader title="Vídeo" description={goal.videoPath ? "Replay do lance" : "Sem vídeo disponível"} />
+          <CardHeader title="Video" description={goal.videoPath ? "Replay de the move" : "No video available"} />
 
           <CardContent>
 
@@ -179,7 +180,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
             ) : (
 
-              <div className="text-sm text-muted-foreground">Sem URL de vídeo.</div>
+              <div className="text-sm text-muted-foreground">No video URL.</div>
 
             )}
 
@@ -187,7 +188,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
               <div className="mt-4 space-y-2">
 
-                <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Jogadores envolventes</div>
+                <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Players envolventes</div>
 
                 <div className="space-y-2">
 
@@ -209,7 +210,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
                         <div className="text-sm font-semibold">{inv.playerName ?? inv.playerId}</div>
 
-                        <div className="text-xs text-muted-foreground">{inv.role === "assist" ? "Assistência" : "Envolvimento"}</div>
+                        <div className="text-xs text-muted-foreground">{inv.role === "assist" ? "Assist" : "Involvement"}</div>
 
                       </div>
 
@@ -229,82 +230,82 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
         <Card>
 
-          <CardHeader title="Dados do Lance" />
+          <CardHeader title="Move Details" />
 
           <CardContent className="space-y-3 text-sm">
 
             <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
               {goal.teamCoach && <span>Treinador: {goal.teamCoach}</span>}
-              {goal.teamStadium && <span>Estádio: {goal.teamStadium}</span>}
+              {goal.teamStadium && <span>Stadium: {goal.teamStadium}</span>}
               {goal.teamPitchDimensions && <span>Relvado: {goal.teamPitchDimensions}</span>}
             </div>
             <div className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Ações registadas</span>
+              <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Recorded Actions</span>
               <div className="flex flex-wrap gap-2">
                 {goal.actions && goal.actions.length > 0 ? (
                   goal.actions.map((action) => (
                     <Badge key={`goal-action-${action.actionId}`} className="bg-emerald-500/10 text-emerald-100">
-                      {action.actionName ?? `#${action.actionId}`}
+                      {displayFootballTerm(action.actionName) || `#${action.actionId}`}
                     </Badge>
                   ))
                 ) : goal.actionName ? (
-                  <Badge className="bg-emerald-500/10 text-emerald-100">{goal.actionName}</Badge>
+                  <Badge className="bg-emerald-500/10 text-emerald-100">{displayFootballTerm(goal.actionName)}</Badge>
                 ) : (
-                  <span className="text-xs text-muted-foreground">Sem ações registadas.</span>
+                  <span className="text-xs text-muted-foreground">No actions recorded.</span>
                 )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
 
-              <span className="text-muted-foreground">Equipa</span>
+              <span className="text-muted-foreground">Team</span>
 
               <span>{goal.teamName ?? goal.teamId}</span>
 
-              <span className="text-muted-foreground">Adversário</span>
+              <span className="text-muted-foreground">Opponent</span>
 
               <span>{goal.opponentName ?? goal.opponentTeamId ?? "-"}</span>
 
-              <span className="text-muted-foreground">Marcador</span>
+              <span className="text-muted-foreground">Scorer</span>
 
               <span>{goal.scorerName ?? goal.scorerId}</span>
 
-              <span className="text-muted-foreground">Assistência</span>
+              <span className="text-muted-foreground">Assist</span>
 
               <span>{goal.assistName ?? goal.assistId ?? "-"}</span>
 
-              <span className="text-muted-foreground">Ponto da assistencia</span>
+              <span className="text-muted-foreground">Assist Location</span>
 
               <span>{assistDrawing ? `(${assistDrawing.x.toFixed(2)}, ${assistDrawing.y.toFixed(2)})` : "-"}</span>
 
               {isTransitionGoal && (
                 <>
-                  <span className="text-muted-foreground">Ponto de recuperacao</span>
+                  <span className="text-muted-foreground">Recovery Point</span>
                   <span>{transitionDrawing ? `(${transitionDrawing.x.toFixed(2)}, ${transitionDrawing.y.toFixed(2)})` : "-"}</span>
                 </>
               )}
 
               {throwInTakerDisplay && (
                 <div className="col-span-2 grid grid-cols-2">
-                  <span className="text-muted-foreground">Marcador do lançamento</span>
+                  <span className="text-muted-foreground">Throw-in Taker</span>
                   <span className="text-right font-medium">{throwInTakerDisplay}</span>
                 </div>
               )}
               {referencePlayerName && (
                 <div className="col-span-2 grid grid-cols-2">
-                  <span className="text-muted-foreground">Jogador Referência</span>
+                  <span className="text-muted-foreground">Reference Player</span>
                   <span className="text-right font-medium">{referencePlayerName}</span>
                 </div>
               )}
               {foulVictimName && (
                 <div className="col-span-2 grid grid-cols-2">
-                  <span className="text-muted-foreground">Falta sobre</span>
+                  <span className="text-muted-foreground">Player Fouled</span>
                   <span className="text-right font-medium">{foulVictimName}</span>
                 </div>
               )}
               {previousMomentDescription && (
                 <div className="col-span-2 mt-2 border-t pt-2">
-                  <span className="text-muted-foreground mb-1 block text-xs uppercase">Momento Anterior</span>
+                  <span className="text-muted-foreground mb-1 block text-xs uppercase">Phase Previous</span>
                   <p className="text-sm italic text-white/90">&apos;{previousMomentDescription}&apos;</p>
                 </div>
               )}
@@ -316,11 +317,11 @@ export default async function GoalDetail({ params }: { params: { id: string } })
                 &apos;
               </span>
 
-              <span className="text-muted-foreground">Momento</span>
+              <span className="text-muted-foreground">Phase</span>
 
-              <span>{goal.momentName ?? goal.momentId}</span>
+              <span>{displayFootballTerm(goal.momentName) || goal.momentId}</span>
 
-              <span className="text-muted-foreground">Sub-momentos</span>
+              <span className="text-muted-foreground">Sub-phases</span>
 
               <span>
                 {subMomentSequenceLines.length > 0 ? (
@@ -332,7 +333,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
                     ))}
                   </div>
                 ) : (
-                  goal.subMomentName ?? goal.subMomentId
+                  displayFootballTerm(goal.subMomentName) || goal.subMomentId
                 )}
               </span>
 
@@ -341,7 +342,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
                 <>
 
-                  <span className="text-muted-foreground">Marcador do canto</span>
+                  <span className="text-muted-foreground">Corner Taker</span>
 
                   <span>{goal.cornerTakerName ?? goal.cornerTakerId}</span>
 
@@ -353,7 +354,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
                 <>
 
-                  <span className="text-muted-foreground">Marcador da falta</span>
+                  <span className="text-muted-foreground">Free-kick Taker</span>
 
                   <span>{goal.freekickTakerName ?? goal.freekickTakerId}</span>
 
@@ -365,7 +366,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
                 <>
 
-                  <span className="text-muted-foreground">Marcador do penálti</span>
+                  <span className="text-muted-foreground">Penalty Taker</span>
 
                   <span>{goal.penaltyTakerName ?? goal.penaltyTakerId}</span>
 
@@ -399,14 +400,14 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
         <Card>
 
-          <CardHeader title="Ponto da Assistencia no Campo" />
+          <CardHeader title="Assist Location on the Pitch" />
 
           <CardContent>
 
             {hasAssistDrawing && assistDrawing ? (
               <Pitch x={assistDrawing.x} y={assistDrawing.y} pinColor="#38bdf8" />
             ) : (
-              <div className="text-sm text-muted-foreground">Sem coordenadas de assistencia.</div>
+              <div className="text-sm text-muted-foreground">No assist coordinates.</div>
             )}
 
           </CardContent>
@@ -415,12 +416,12 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
         {isTransitionGoal && (
           <Card>
-            <CardHeader title="Ponto de Recuperacao" />
+            <CardHeader title="Recovery Point" />
             <CardContent>
               {hasTransitionDrawing && transitionDrawing ? (
                 <Pitch x={transitionDrawing.x} y={transitionDrawing.y} pinColor="#eab308" />
               ) : (
-                <div className="text-sm text-muted-foreground">Sem coordenadas de recuperacao.</div>
+                <div className="text-sm text-muted-foreground">No recovery coordinates.</div>
               )}
             </CardContent>
           </Card>
@@ -428,7 +429,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
         <Card>
 
-          <CardHeader title="Zona de Remate" />
+          <CardHeader title="Shot Area" />
 
           <CardContent>
 
@@ -438,7 +439,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
             ) : (
 
-              <div className="text-sm text-muted-foreground">Sem coordenadas de campo.</div>
+              <div className="text-sm text-muted-foreground">No pitch coordinates.</div>
 
             )}
 
@@ -448,7 +449,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
         <Card>
 
-          <CardHeader title="Ponto de Entrada na Baliza" />
+          <CardHeader title="Ponto de Entrada na Goal" />
 
           <CardContent>
 
@@ -458,7 +459,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
             ) : (
 
-              <div className="text-sm text-muted-foreground">Sem coordenadas de baliza.</div>
+              <div className="text-sm text-muted-foreground">No goal coordinates.</div>
 
             )}
 

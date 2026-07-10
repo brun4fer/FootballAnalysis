@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     const file = formData.get("file");
 
     if (!file || typeof file === "string") {
-      return NextResponse.json({ error: "Ficheiro em falta" }, { status: 400 });
+      return NextResponse.json({ error: "File is required" }, { status: 400 });
     }
 
     const originalName = file.name || "upload";
@@ -31,6 +31,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ path: blob.url, url: blob.url, pathname: blob.pathname });
   } catch (error: any) {
     console.error("[upload]", error);
-    return NextResponse.json({ error: "Falha no upload" }, { status: 500 });
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }

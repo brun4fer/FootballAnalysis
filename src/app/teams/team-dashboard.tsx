@@ -87,7 +87,7 @@ function GoalNetPinMap({ goals }: { goals: GoalEvent[] }) {
                 onMouseEnter={(e) => {
                   const rect = svgRef.current?.getBoundingClientRect();
                   if (!rect) return;
-                  const label = `${g.scorerName ?? "Marcador"} —`;
+                  const label = `${g.scorerName ?? "Scorer"} —`;
                   setTooltip({
                     x: e.clientX - rect.left,
                     y: e.clientY - rect.top,
@@ -243,11 +243,11 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
     mutationFn: async (goalId: number) => {
       const res = await fetch(`/api/goals/${goalId}`, { method: "DELETE" });
       const json = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(json?.error ?? "Erro ao eliminar o golo.");
+      if (!res.ok) throw new Error(json?.error ?? "Could not delete the goal.");
       return json;
     },
     onSuccess: (_data, goalId) => {
-      setDeleteFeedback("Golo eliminado com sucesso.");
+      setDeleteFeedback("Goal deleted successfully.");
       setPendingDeleteGoalId(null);
       if (editingGoalId === goalId) {
         setEditingGoalId(null);
@@ -256,7 +256,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
       refreshAll();
     },
     onError: (error: any) => {
-      setDeleteFeedback(error?.message ?? "Erro ao eliminar o golo.");
+      setDeleteFeedback(error?.message ?? "Could not delete the goal.");
     }
   });
 
@@ -284,25 +284,25 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold">Análises da Equipa</h1>
+          <h1 className="text-2xl font-semibold">Team Analysis</h1>
           <p className="text-sm text-muted-foreground">
             {seasonId && championshipId
-              ? `${seasons.find((s) => s.id === Number(seasonId))?.name ?? "Época"} · ${
-                  championships.find((c) => c.id === Number(championshipId))?.name ?? "Campeonato"
+              ? `${seasons.find((s) => s.id === Number(seasonId))?.name ?? "Season"} · ${
+                  championships.find((c) => c.id === Number(championshipId))?.name ?? "Competition"
                 }`
-              : "Seleciona época > campeonato > equipa para carregar as estatísticas."}
+              : "Select season > competition > team to load statistics."}
           </p>
         </div>
         <Button variant="secondary" size="sm">
-          <Link href="/teams/radiografia">Momentos da Equipa</Link>
+          <Link href="/teams/radiografia">Team Phases</Link>
         </Button>
       </div>
 
       <Card>
-        <CardHeader title="Filtros" description="Seleciona o contexto antes de ver as métricas" />
+        <CardHeader title="Filtros" description="Select a context before viewing metrics" />
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Época</label>
+            <label className="text-xs text-muted-foreground">Season</label>
             <Select
               value={seasonId}
               onChange={(e) => {
@@ -311,7 +311,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                 setTeamId(undefined);
               }}
             >
-              <option value="">Selecionar época</option>
+              <option value="">Select season</option>
               {seasons.map((s) => (
                 <option key={s.id} value={s.id} className="text-black">
                   {s.name}
@@ -320,7 +320,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Campeonato</label>
+            <label className="text-xs text-muted-foreground">Competition</label>
             <Select
               value={championshipId}
               onChange={(e) => {
@@ -329,7 +329,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
               }}
               disabled={!seasonId}
             >
-              <option value="">Selecionar campeonato</option>
+              <option value="">Select competition</option>
               {filteredChamps.map((c) => (
                 <option key={c.id} value={c.id} className="text-black">
                   {c.name}
@@ -338,9 +338,9 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Equipa</label>
+            <label className="text-xs text-muted-foreground">Team</label>
             <Select value={teamId?.toString() ?? ""} onChange={(e) => setTeamId(Number(e.target.value) || undefined)} disabled={!championshipId}>
-              <option value="">Selecionar equipa</option>
+              <option value="">Select team</option>
               {filteredTeams.map((team) => (
                 <option key={team.id} value={team.id} className="text-black">
                   {team.name}
@@ -354,7 +354,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
      
 
       {!teamId && (
-        <div className="rounded-lg border border-dashed border-border/60 bg-card/50 p-4 text-muted-foreground">Seleciona uma equipa para ver as estatísticas.</div>
+        <div className="rounded-lg border border-dashed border-border/60 bg-card/50 p-4 text-muted-foreground">Select a team to view its statistics.</div>
       )}
 
       {teamId && (
@@ -372,7 +372,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
               {selectedTeam.videoReportUrl && (
                 <Button variant="ghost" size="sm" className="gap-2">
                   <a href={selectedTeam.videoReportUrl} target="_blank" rel="noreferrer">
-                    <PlayCircle className="h-4 w-4" /> Vídeo de Análise
+                    <PlayCircle className="h-4 w-4" /> Analysis Video
                   </a>
                 </Button>
               )}
@@ -380,27 +380,27 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
           )}
 
           <div className="flex items-center justify-between gap-3">
-            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Contexto pronto</div>
+            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Context pronto</div>
             <Button variant="secondary" onClick={refreshAll} disabled={goalsQuery.isFetching}>
-              Atualizar
+              Update
             </Button>
           </div>
 
           <div className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-5">
               <Card className="border-border/60 bg-slate-900/55">
-                <CardHeader title="Emblema da Equipa" />
+                <CardHeader title="Team Badge" />
                 <CardContent className="flex items-start gap-3">
                   <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-slate-800/60">
                     {selectedTeam?.emblemPath ? (
                       <img src={selectedTeam.emblemPath} alt={`Emblema ${selectedTeam.name}`} className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-xs text-muted-foreground">Sem imagem</span>
+                      <span className="text-xs text-muted-foreground">No image</span>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="line-clamp-2 text-sm font-semibold leading-snug text-white break-words whitespace-normal">
-                      {selectedTeam?.name ?? "Equipa"}
+                      {selectedTeam?.name ?? "Team"}
                     </div>
                   </div>
                 </CardContent>
@@ -410,20 +410,20 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                 className="border-border/60 bg-slate-900/55 cursor-pointer transition hover:border-cyan-400/50 hover:bg-slate-900/70"
                 role="button"
                 tabIndex={0}
-                onClick={() => openRankingModal("Melhor Marcador", scorerRankingItems, "golo", "golos")}
+                onClick={() => openRankingModal("Top Scorer", scorerRankingItems, "goal", "goals")}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    openRankingModal("Melhor Marcador", scorerRankingItems, "golo", "golos");
+                    openRankingModal("Top Scorer", scorerRankingItems, "goal", "goals");
                   }
                 }}
               >
-                <CardHeader title="Melhor Marcador" />
+                <CardHeader title="Top Scorer" />
                 <CardContent>
                   <div className="line-clamp-2 text-sm font-semibold leading-snug text-white break-words whitespace-normal">
-                    {topScorer?.name ?? "Sem dados"}
+                    {topScorer?.name ?? "No data"}
                   </div>
-                  <div className="text-xs text-muted-foreground">{topScorer ? `${topScorer.goals} golos` : "Sem registos"}</div>
+                  <div className="text-xs text-muted-foreground">{topScorer ? `${topScorer.goals} goals` : "No records"}</div>
                 </CardContent>
               </Card>
 
@@ -431,20 +431,20 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                 className="border-border/60 bg-slate-900/55 cursor-pointer transition hover:border-cyan-400/50 hover:bg-slate-900/70"
                 role="button"
                 tabIndex={0}
-                onClick={() => openRankingModal("Mais Assistências", assistRankingItems, "assistência", "assistências")}
+                onClick={() => openRankingModal("Mais Assists", assistRankingItems, "assist", "assists")}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    openRankingModal("Mais Assistências", assistRankingItems, "assistência", "assistências");
+                    openRankingModal("Mais Assists", assistRankingItems, "assist", "assists");
                   }
                 }}
               >
-                <CardHeader title="Mais Assistencias" />
+                <CardHeader title="Mais Assists" />
                 <CardContent>
                   <div className="line-clamp-2 text-sm font-semibold leading-snug text-white break-words whitespace-normal">
-                    {topAssistant?.name ?? "Sem dados"}
+                    {topAssistant?.name ?? "No data"}
                   </div>
-                  <div className="text-xs text-muted-foreground">{topAssistant ? `${topAssistant.assists} assistencias` : "Sem registos"}</div>
+                  <div className="text-xs text-muted-foreground">{topAssistant ? `${topAssistant.assists} assists` : "No records"}</div>
                 </CardContent>
               </Card>
 
@@ -453,26 +453,26 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                 role="button"
                 tabIndex={0}
                 onClick={() =>
-                  openRankingModal("Mais Participações em Golo", involvementRankingItems, "participação", "participações")
+                  openRankingModal("Most Goal Involvements", involvementRankingItems, "involvement", "involvements")
                 }
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    openRankingModal("Mais Participações em Golo", involvementRankingItems, "participação", "participações");
+                    openRankingModal("Most Goal Involvements", involvementRankingItems, "involvement", "involvements");
                   }
                 }}
               >
-                <CardHeader title="Mais Participacoes em Golo" />
+                <CardHeader title="Most Goal Involvements" />
                 <CardContent>
                   <div className="line-clamp-2 text-sm font-semibold leading-snug text-white break-words whitespace-normal">
-                    {topParticipation?.name ?? "Sem dados"}
+                    {topParticipation?.name ?? "No data"}
                   </div>
-                  <div className="text-xs text-muted-foreground">{topParticipation ? `${topParticipation.involvement} participacoes` : "Sem registos"}</div>
+                  <div className="text-xs text-muted-foreground">{topParticipation ? `${topParticipation.involvement} participacoes` : "No records"}</div>
                 </CardContent>
               </Card>
 
               <Card className="border-border/60 bg-slate-900/55">
-                <CardHeader title="Total de Golos" />
+                <CardHeader title="Total Goals" />
                 <CardContent>
                   <div className="text-3xl font-semibold text-white">{totalGoals}</div>
                   <div className="text-xs text-muted-foreground">{goalEvents.length} registos</div>
@@ -482,7 +482,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
 
             <div className="grid gap-4 lg:grid-cols-5">
               <Card className="border-border/60 bg-slate-900/55 lg:col-span-3">
-                <CardHeader title="Estadio e Dimensoes do Relvado" />
+                <CardHeader title="Stadium and Pitch Dimensions" />
                 <CardContent className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1">
                     <div className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Estadio</div>
@@ -507,7 +507,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-white">{selectedTeam?.coach?.trim() || "Treinador por definir"}</div>
-                    <div className="text-xs text-muted-foreground">Espaco reservado para foto</div>
+                    <div className="text-xs text-muted-foreground">Photo placeholder</div>
                   </div>
                 </CardContent>
               </Card>
@@ -516,18 +516,18 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
-              <CardHeader title="Mapa da Baliza" description="Pinpoints de todos os golos" />
-              <CardContent>{goalEvents.length ? <GoalNetPinMap goals={goalEvents} /> : <div className="text-sm text-muted-foreground">Sem dados</div>}</CardContent>
+              <CardHeader title="Goal Map" description="Locations of all goals" />
+              <CardContent>{goalEvents.length ? <GoalNetPinMap goals={goalEvents} /> : <div className="text-sm text-muted-foreground">No data</div>}</CardContent>
             </Card>
             <Card>
-              <CardHeader title="Momentos do Golo" />
+              <CardHeader title="Goal Phases" />
               <CardContent>
-                {momentsQuery.data ? <SimpleBar data={momentsQuery.data} xKey="moment" yKey="goals" /> : <div className="text-sm text-muted-foreground">Sem dados</div>}
+                {momentsQuery.data ? <SimpleBar data={momentsQuery.data} xKey="moment" yKey="goals" /> : <div className="text-sm text-muted-foreground">No data</div>}
               </CardContent>
             </Card>
           </div>
           <Card>
-            <CardHeader title="Histórico de Golos" description="Editar rapidamente qualquer golo" />
+            <CardHeader title="Goal History" description="Quickly edit any goal" />
             <CardContent className="space-y-2 text-sm">
               {deleteFeedback && (
                 <div className="rounded-md border border-border/60 bg-card/60 px-3 py-2 text-xs text-muted-foreground">
@@ -543,7 +543,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                         &apos;
                       </span>
                       <span className="font-medium">{g.scorerName ?? `#${g.scorerId}`}</span>
-                      <Badge className="bg-slate-700/60 text-slate-50">vs {g.opponentName ?? "Adversário indefinido"}</Badge>
+                      <Badge className="bg-slate-700/60 text-slate-50">vs {g.opponentName ?? "Opponent indefinido"}</Badge>
                       {g.goalCoordinates && (
                         <Badge className="bg-cyan-500/10 text-cyan-100">
                           ({g.goalCoordinates.x.toFixed(2)}, {g.goalCoordinates.y.toFixed(2)})
@@ -557,7 +557,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                         </Link>
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => loadGoalForEdit(g.id)}>
-                        Editar
+                        Edit
                       </Button>
                       <Button
                         variant="ghost"
@@ -568,22 +568,22 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                           setPendingDeleteGoalId(g.id);
                         }}
                       >
-                        <Trash2 className="mr-1 h-4 w-4" /> Eliminar
+                        <Trash2 className="mr-1 h-4 w-4" /> Delete
                       </Button>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-muted-foreground">Ainda sem eventos.</div>
+                <div className="text-muted-foreground">There are no events yet.</div>
               )}
               {goalPageCount > 1 && (
                 <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground">
                   <span>
-                    Página {goalPage + 1} de {goalPageCount}
+                    Page {goalPage + 1} de {goalPageCount}
                   </span>
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setGoalPage((prev) => Math.max(prev - 1, 0))} disabled={goalPage === 0}>
-                      Anterior
+                      Previous
                     </Button>
                     <Button
                       variant="ghost"
@@ -591,7 +591,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                       onClick={() => setGoalPage((prev) => Math.min(prev + 1, Math.max(goalPageCount - 1, 0)))}
                       disabled={goalPage >= goalPageCount - 1}
                     >
-                      Seguinte
+                      Next
                     </Button>
                   </div>
                 </div>
@@ -600,10 +600,10 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
           </Card>
           <ConfirmDialog
             open={pendingDeleteGoalId !== null}
-            title="Eliminar Golo"
-            description="Tem a certeza de que pretende eliminar este golo?"
-            cancelLabel="Cancelar"
-            confirmLabel="Confirmar eliminação"
+            title="Delete Goal"
+            description="Are you sure you want to delete this goal?"
+            cancelLabel="Cancel"
+            confirmLabel="Confirm deletion"
             loading={deleteGoalMutation.isPending}
             onCancel={() => {
               if (deleteGoalMutation.isPending) return;
@@ -675,7 +675,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                       />
                     ) : (
                       <div className="rounded-xl border border-border/60 bg-card/70 p-6 text-center text-white">
-                        A carregar golo #{editingGoalId}...
+                        Loading goal #{editingGoalId}...
                       </div>
                     )}
                   </div>

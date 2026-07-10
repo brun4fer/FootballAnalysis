@@ -39,7 +39,7 @@ export function RankingModal({
             <div className="space-y-1">
               <Dialog.Title className="text-base font-semibold text-white">{title}</Dialog.Title>
               <Dialog.Description className="text-sm text-muted-foreground">
-                Ranking completo ordenado por desempenho.
+                Full ranking ordered by performance.
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
@@ -52,7 +52,7 @@ export function RankingModal({
           <div className="mt-4 max-h-[65vh] overflow-y-auto pr-1">
             {items.length === 0 ? (
               <div className="rounded-xl border border-border/60 bg-white/5 px-3 py-4 text-sm text-muted-foreground">
-                Sem dados para este ranking.
+                No data is available for this ranking.
               </div>
             ) : (
               <div className="space-y-2">

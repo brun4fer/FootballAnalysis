@@ -5,6 +5,7 @@
 
 
 import { useMemo, useRef, useState, useEffect, type ReactNode } from "react";
+import { displayFootballTerm } from "@/lib/presentation";
 
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -107,8 +108,10 @@ const deriveFreekickProfileFromActions = (actions: LookupAction[]) => {
 const hiddenActionNames = new Set([
   "marcador",
   "assistencia",
+  "assist",
   "assistência",
   "marcador & assistencia",
+  "marcador & assist",
   "marcador & assistência",
   "unidades de ligacao",
   "unidades de ligação"
@@ -153,14 +156,14 @@ const cornerProfiles = [
 const freekickProfiles = cornerProfiles;
 
 const throwInProfiles = [
-  { value: "area", label: "Área" },
-  { value: "organizacao", label: "Organização" }
+  { value: "area", label: "Box" },
+  { value: "organizacao", label: "Organised Attack" }
 ] as const;
 
 const goalkeeperOutlets = [
-  { value: "organizacao", label: "Em Organização" },
-  { value: "curto_para_longo", label: "Curto para longo" },
-  { value: "bola_longa", label: "Bola longa" }
+  { value: "organizacao", label: "In Possession" },
+  { value: "curto_para_longo", label: "Short to Long" },
+  { value: "bola_longa", label: "Long Ball" }
 ] as const;
 
 const labelFromOption = (
@@ -178,34 +181,34 @@ const labelFromOption = (
 const wizardStepDefinitions = [
 
 
-  { id: "season", label: "Época" },
+  { id: "season", label: "Season" },
 
 
-  { id: "championship", label: "Campeonato" },
+  { id: "championship", label: "Competition" },
 
 
-  { id: "team", label: "Equipa" },
+  { id: "team", label: "Team" },
 
 
-  { id: "scorer", label: "Marcador & Assistência" },
+  { id: "scorer", label: "Scorer & Assist" },
 
 
-  { id: "context", label: "Momentos" },
+  { id: "context", label: "Phases" },
 
 
-  { id: "transition", label: "Espaço Recuperação" },
+  { id: "transition", label: "Recovery Area" },
 
 
-  { id: "assist", label: "Zona Assistencia" },
+  { id: "assist", label: "Assist Area" },
 
 
-  { id: "field", label: "Zona Remate" },
+  { id: "field", label: "Shot Area" },
 
 
-  { id: "zone", label: "Baliza" },
+  { id: "zone", label: "Goal" },
 
 
-  { id: "review", label: "Revisão" }
+  { id: "review", label: "Review" }
 
 
 ] as const;
@@ -226,7 +229,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
 
 
-  if (!res.ok) throw new Error((await res.json()).error ?? "Pedido falhou");
+  if (!res.ok) throw new Error((await res.json()).error ?? "Request failed");
 
 
   return res.json();
@@ -451,7 +454,7 @@ function RecoverySpaceGrid({
       </InteractiveMapFrame>
       {showHelperText && (
         <p className="text-xs text-muted-foreground">
-          Selecione uma zona para guardar em <code className="font-mono text-cyan-300">attacking_space_id</code>.
+          Select an area to save to <code className="font-mono text-cyan-300">attacking_space_id</code>.
         </p>
       )}
     </div>
@@ -618,7 +621,7 @@ function GoalNetPinpoint({ value, onChange }: { value: Point | null; onChange: (
       </InteractiveMapFrame>
 
 
-      <p className="text-xs text-muted-foreground">Clique para colocar a bola em qualquer ponto da baliza.</p>
+      <p className="text-xs text-muted-foreground">Click to place the ball anywhere on the goal.</p>
 
 
     </div>
@@ -785,7 +788,7 @@ function PitchPinpoint({
       <p className="text-xs text-muted-foreground">
 
 
-        Apenas um ponto é guardado em <code className="font-mono text-emerald-300">{storageField}</code> com coordenadas normalizadas (0-1).
+        Only one point is saved to <code className="font-mono text-emerald-300">{storageField}</code> with normalised coordinates (0-1).
 
 
       </p>
@@ -884,16 +887,16 @@ function CreateItemModal({
             <div className="space-y-1">
 
 
-              <label className="text-xs text-muted-foreground">Contexto da ação</label>
+              <label className="text-xs text-muted-foreground">Action Context</label>
 
 
               <Select value={context} onChange={(e) => setContext((e.target.value as "field" | "field_goal") ?? "field")}>
 
 
-                <option value="field">Campo (sem baliza obrigatória)</option>
+                <option value="field">Pitch (goal point not required)</option>
 
 
-                <option value="field_goal">Campo + Baliza</option>
+                <option value="field_goal">Pitch + Goal</option>
 
 
               </Select>
@@ -911,7 +914,7 @@ function CreateItemModal({
             <Button variant="ghost" onClick={onClose} type="button">
 
 
-              Cancelar
+              Cancel
 
 
             </Button>
@@ -956,7 +959,7 @@ function CreateItemModal({
             >
 
 
-              {saving ? "A guardar..." : "Criar"}
+              {saving ? "Saving..." : "Create"}
 
 
             </Button>
@@ -1115,15 +1118,15 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       : resolvedSubMomentId;
 
     if (!teamId || !opponentTeamId || !scorerId || !momentId || !effectiveSubMomentId || effectiveActionIds.length === 0) {
-      throw new Error("Campos obrigatórios em falta");
+      throw new Error("Required fields are missing");
     }
     if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationCatalogue) {
-      throw new Error("Sub-momentos de Organização Ofensiva não encontrados no catálogo.");
+      throw new Error("Organised Attack sub-phases were not found in the catalogue.");
     }
     if (isOffensiveOrganizationMoment && !hasAnyOffensiveOrganizationSelection) {
-      throw new Error("Seleciona pelo menos uma fase da Organização Ofensiva.");
+      throw new Error("Select at least one Organised Attack phase.");
     }
-    if (!seasonId || !championshipId) throw new Error("Selecione época e campeonato.");
+    if (!seasonId || !championshipId) throw new Error("Select a season and competition.");
 
     const selectedActions = lookupsQuery.data?.actions.filter((a) => effectiveActionIds.includes(a.id)) ?? [];
     const requiresGoal = selectedActions.some((a) => a.name.toLowerCase().includes("marcador") || a.context === "field_goal");
@@ -1131,10 +1134,10 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     const derivedFreekickProfile = deriveFreekickProfileFromActions(selectedActions);
     const resolvedFreekickProfile = derivedFreekickProfile || freekickProfile;
 
-    if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
-    if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
+    if (requiresGoal && !goalPoint) throw new Error("This action requires a point on the goal.");
+    if (requiresField && !fieldPoint) throw new Error("A point on the pitch is required for this action.");
     if (shouldShowTransitionStep && !attackingSpaceId) {
-      throw new Error("Seleciona o espaço de recuperação.");
+      throw new Error("Select the recovery area.");
     }
     const hasFoulSufferedAction = selectedActions.some((a) => {
       const normalized = normalizeActionName(a.name);
@@ -1145,7 +1148,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       );
     });
     if (hasFoulSufferedAction && !foulSufferedById) {
-      throw new Error("Seleciona o jogador que sofreu a falta.");
+      throw new Error("Select the player who was fouled.");
     }
     const selectedSubMomentName = normalizeActionName(
       lookupsQuery.data?.subMoments.find((s) => s.id === effectiveSubMomentId)?.name ?? ""
@@ -1159,7 +1162,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       normalizeActionName(a.name).includes("momento anterior")
     );
     if (hasPreviousMomentAction && isDirectFreekickOrPenalty && !previousMomentDescription.trim()) {
-      throw new Error("Descreve o momento anterior.");
+      throw new Error("Describe the previous phase.");
     }
 
     const payload = {
@@ -1204,7 +1207,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     return res.json();
   },
   onSuccess: () => {
-    setMessage("Golo gravado com sucesso.");
+    setMessage("Goal saved successfully.");
     setStep("team");
     setScorerId(undefined);
     setAssistId(undefined);
@@ -1234,7 +1237,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     setFoulSufferedById(undefined);
     setPreviousMomentDescription("");
   },
-  onError: (err: any) => setMessage(err.message ?? "Erro ao gravar o golo")
+  onError: (err: any) => setMessage(err.message ?? "Could not save the goal")
 });
 
 const updateMutation = useMutation({
@@ -1255,25 +1258,25 @@ const updateMutation = useMutation({
       : resolvedSubMomentId;
 
     if (!teamId || !opponentTeamId || !scorerId || !momentId || !effectiveSubMomentId || effectiveActionIds.length === 0) {
-      throw new Error("Campos obrigatórios em falta");
+      throw new Error("Required fields are missing");
     }
     if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationCatalogue) {
-      throw new Error("Sub-momentos de Organização Ofensiva não encontrados no catálogo.");
+      throw new Error("Organised Attack sub-phases were not found in the catalogue.");
     }
     if (isOffensiveOrganizationMoment && !hasAnyOffensiveOrganizationSelection) {
-      throw new Error("Seleciona pelo menos uma fase da Organização Ofensiva.");
+      throw new Error("Select at least one Organised Attack phase.");
     }
-    if (!seasonId || !championshipId) throw new Error("Selecione época e campeonato.");
+    if (!seasonId || !championshipId) throw new Error("Select a season and competition.");
 
     const selectedActions = lookupsQuery.data?.actions.filter((a) => effectiveActionIds.includes(a.id)) ?? [];
     const requiresGoal = selectedActions.some((a) => a.name.toLowerCase().includes("marcador") || a.context === "field_goal");
     const requiresField = selectedActions.length > 0;
     const derivedFreekickProfile = deriveFreekickProfileFromActions(selectedActions);
     const resolvedFreekickProfile = derivedFreekickProfile || freekickProfile;
-    if (requiresGoal && !goalPoint) throw new Error("Esta ação requer um ponto na baliza.");
-    if (requiresField && !fieldPoint) throw new Error("Ponto no campo obrigatório para esta ação.");
+    if (requiresGoal && !goalPoint) throw new Error("This action requires a point on the goal.");
+    if (requiresField && !fieldPoint) throw new Error("A point on the pitch is required for this action.");
     if (shouldShowTransitionStep && !attackingSpaceId) {
-      throw new Error("Seleciona o espaço de recuperação.");
+      throw new Error("Select the recovery area.");
     }
     const hasFoulSufferedAction = selectedActions.some((a) => {
       const normalized = normalizeActionName(a.name);
@@ -1284,7 +1287,7 @@ const updateMutation = useMutation({
       );
     });
     if (hasFoulSufferedAction && !foulSufferedById) {
-      throw new Error("Seleciona o jogador que sofreu a falta.");
+      throw new Error("Select the player who was fouled.");
     }
     const selectedSubMomentName = normalizeActionName(
       lookupsQuery.data?.subMoments.find((s) => s.id === effectiveSubMomentId)?.name ?? ""
@@ -1298,7 +1301,7 @@ const updateMutation = useMutation({
       normalizeActionName(a.name).includes("momento anterior")
     );
     if (hasPreviousMomentAction && isDirectFreekickOrPenalty && !previousMomentDescription.trim()) {
-      throw new Error("Descreve o momento anterior.");
+      throw new Error("Describe the previous phase.");
     }
 
     const payload = {
@@ -1344,10 +1347,10 @@ const updateMutation = useMutation({
     return res.json();
   },
   onSuccess: () => {
-    setMessage("Golo atualizado.");
+    setMessage("Goal updated.");
     onSaved?.();
   },
-  onError: (err: any) => setMessage(err.message ?? "Erro ao atualizar o golo")
+  onError: (err: any) => setMessage(err.message ?? "Could not update the goal")
 });
 
 const filteredChampionships = useMemo(() => {
@@ -1500,10 +1503,10 @@ const filteredChampionships = useMemo(() => {
   const isTransitionRecoverySubMoment = isRecoveryDefensiveSubMoment || isRecoveryOffensiveSubMoment;
   const isOffensiveTransitionRecovery = isOffensiveTransitionMoment && isTransitionRecoverySubMoment;
   const transitionRecoveryZoneLabel = isRecoveryDefensiveSubMoment
-    ? "Recuperação no Meio Campo Defensivo"
+    ? "Recovery in the Defensive Half"
     : isRecoveryOffensiveSubMoment
-      ? "Recuperação no Meio Campo Ofensivo"
-      : "Seleciona o sub-momento de recuperação";
+      ? "Recovery in the Attacking Half"
+      : "Select the recovery sub-phase";
   const recoveryGridVariant: RecoveryGridVariant = isRecoveryOffensiveSubMoment ? "offensive" : "defensive";
   const shouldShowTransitionStep = isOffensiveTransitionRecovery;
   const visibleSteps = useMemo(
@@ -2006,7 +2009,7 @@ const filteredChampionships = useMemo(() => {
     } else if (kind === "submoment") {
 
 
-      if (!momentId) throw new Error("Selecione um momento antes de criar sub-momento.");
+      if (!momentId) throw new Error("Select a phase before creating a sub-phase.");
 
 
       await fetchJson("/api/lookups/sub-moments", {
@@ -2027,7 +2030,7 @@ const filteredChampionships = useMemo(() => {
     } else {
 
 
-      if (!subMomentId) throw new Error("Selecione um sub-momento antes de criar ação.");
+      if (!subMomentId) throw new Error("Select a sub-phase before creating an action.");
 
 
       await fetchJson("/api/lookups/actions", {
@@ -2063,7 +2066,7 @@ const filteredChampionships = useMemo(() => {
       <Card className="border border-border/70 bg-gradient-to-br from-[#0b1220] via-[#0c1527] to-[#0b1220] shadow-[0_30px_120px_rgba(14,165,233,0.08)]">
 
 
-        <CardHeader title="Wizard de Registo de Golo" description="Fluxo estruturado para guardar eventos de golo em tempo real." />
+        <CardHeader title="Goal Recording Wizard" description="Structured workflow for saving goal events in real time." />
 
 
         <CardContent className="space-y-6 pb-28 md:pb-6">
@@ -2084,7 +2087,7 @@ const filteredChampionships = useMemo(() => {
               <div className="space-y-2">
 
 
-                <label className="text-sm font-medium">Época</label>
+                <label className="text-sm font-medium">Season</label>
 
 
                 <Select
@@ -2141,7 +2144,7 @@ const filteredChampionships = useMemo(() => {
                 >
 
 
-                  <option value="">Selecionar época</option>
+                  <option value="">Select season</option>
 
 
                   {lookupsQuery.data?.seasons.map((s) => (
@@ -2150,7 +2153,7 @@ const filteredChampionships = useMemo(() => {
                     <option key={s.id} value={s.id} className="text-black">
 
 
-                      {s.name}
+                      {displayFootballTerm(s.name)}
 
 
                     </option>
@@ -2168,7 +2171,7 @@ const filteredChampionships = useMemo(() => {
               <div className="text-xs text-muted-foreground">
 
 
-                Precisa criar uma época? <a href="/manage/config" className="text-cyan-300 underline">Abrir Configurações</a>
+                Need to create a season? <a href="/manage/config" className="text-cyan-300 underline">Open Settings</a>
 
 
               </div>
@@ -2192,7 +2195,7 @@ const filteredChampionships = useMemo(() => {
               <div className="space-y-2">
 
 
-                <label className="text-sm font-medium">Campeonato</label>
+                <label className="text-sm font-medium">Competition</label>
 
 
                 <Select
@@ -2249,7 +2252,7 @@ const filteredChampionships = useMemo(() => {
                 >
 
 
-                  <option value="">Selecionar campeonato</option>
+                  <option value="">Select competition</option>
 
 
                   {filteredChampionships.map((c) => (
@@ -2276,7 +2279,7 @@ const filteredChampionships = useMemo(() => {
               <div className="text-xs text-muted-foreground">
 
 
-                Precisa criar um campeonato? <a href="/manage/config" className="text-cyan-300 underline">Abrir Configurações</a>
+                Need to create a competition? <a href="/manage/config" className="text-cyan-300 underline">Open Settings</a>
 
 
               </div>
@@ -2302,7 +2305,7 @@ const filteredChampionships = useMemo(() => {
               <div className="md:col-span-2 space-y-2">
 
 
-                <label className="text-sm font-medium">Equipa</label>
+                <label className="text-sm font-medium">Team</label>
 
 
                 <Select
@@ -2335,7 +2338,7 @@ const filteredChampionships = useMemo(() => {
                 >
 
 
-                  <option value="">Selecionar equipa</option>
+                  <option value="">Select team</option>
 
 
                   {filteredTeams.map((team) => (
@@ -2362,7 +2365,7 @@ const filteredChampionships = useMemo(() => {
               <div className="space-y-2">
 
 
-                <label className="text-sm font-medium">Equipa Adversária</label>
+                <label className="text-sm font-medium">Opposing Team</label>
 
 
                 <Select
@@ -2383,7 +2386,7 @@ const filteredChampionships = useMemo(() => {
                 >
 
 
-                  <option value="">Selecionar adversário</option>
+                  <option value="">Select opponent</option>
 
 
                   {opponentOptions.map((team) => (
@@ -2407,7 +2410,7 @@ const filteredChampionships = useMemo(() => {
                 <p className="text-xs text-muted-foreground">
 
 
-                  Lista filtrada para o mesmo campeonato/época (Premier League 25/26) e sem a equipa selecionada.
+                  Filtered to the same competition/season (Premier League 25/26), excluding the selected team.
 
 
                 </p>
@@ -2434,7 +2437,7 @@ const filteredChampionships = useMemo(() => {
               <div className="space-y-2">
 
 
-                <label className="text-sm font-medium">Marcador</label>
+                <label className="text-sm font-medium">Scorer</label>
 
 
                 <Select
@@ -2452,7 +2455,7 @@ const filteredChampionships = useMemo(() => {
                 >
 
 
-                  <option value="">Selecionar jogador</option>
+                  <option value="">Select player</option>
 
 
                   {currentPlayers.map((p) => (
@@ -2479,7 +2482,7 @@ const filteredChampionships = useMemo(() => {
               <div className="space-y-2">
 
 
-                <label className="text-sm font-medium">Assistência (opcional)</label>
+                <label className="text-sm font-medium">Assist (optional)</label>
 
 
                 <Select
@@ -2497,7 +2500,7 @@ const filteredChampionships = useMemo(() => {
                 >
 
 
-                  <option value="">Sem assistência</option>
+                  <option value="">No assist</option>
 
 
                   {currentPlayers
@@ -2536,10 +2539,10 @@ const filteredChampionships = useMemo(() => {
                   <div>
 
 
-                    <div className="text-sm font-medium">Involvimentos secundários</div>
+                    <div className="text-sm font-medium">Secondary Involvements</div>
 
 
-                    <p className="text-xs text-muted-foreground">Marcar jogadores que participaram na jogada para a métrica ‘Mais interveniente’.</p>
+                    <p className="text-xs text-muted-foreground">Select players involved in the move for the ‘Most Involved’ metric.</p>
 
 
                   </div>
@@ -2584,7 +2587,7 @@ const filteredChampionships = useMemo(() => {
                         >
 
 
-                          {isInvolved ? "Remover" : "Adicionar"}
+                          {isInvolved ? "Remover" : "Add"}
 
 
                         </Button>
@@ -2620,7 +2623,7 @@ const filteredChampionships = useMemo(() => {
                         <Badge key={`${inv.playerId}-${inv.role}`} className="bg-emerald-500/10 text-emerald-100">
 
 
-                          {player?.name ?? inv.playerId} / {inv.role === "assist" ? "assistência" : "envolvimento"}
+                          {player?.name ?? inv.playerId} / {inv.role === "assist" ? "assist" : "involvement"}
 
 
                           <button className="ml-2" onClick={() => removeInvolvement(inv.playerId, inv.role)}>
@@ -2680,7 +2683,7 @@ const filteredChampionships = useMemo(() => {
               <div className="space-y-2">
 
 
-                <label className="text-sm font-medium">Momento</label>
+                <label className="text-sm font-medium">Phase</label>
 
 
                 <Select
@@ -2732,10 +2735,10 @@ const filteredChampionships = useMemo(() => {
                 >
 
 
-                  <option value="">Selecionar momento</option>
+                  <option value="">Select phase</option>
 
 
-                  <option value="__create__">+ Criar novo...</option>
+                  <option value="__create__">+ Create novo...</option>
 
 
                   {lookupsQuery.data?.moments.map((m) => (
@@ -2744,7 +2747,7 @@ const filteredChampionships = useMemo(() => {
                     <option key={m.id} value={m.id} className="text-black">
 
 
-                      {m.name}
+                      {displayFootballTerm(m.name)}
 
 
                     </option>
@@ -2763,9 +2766,9 @@ const filteredChampionships = useMemo(() => {
                 <div className="md:col-span-2 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <label className="text-sm font-medium">Sequência de Organização Ofensiva</label>
+                      <label className="text-sm font-medium">Organised Attack Sequence</label>
                       <p className="text-xs text-muted-foreground">
-                        Seleciona apenas as fases observadas (cada fase é opcional).
+                        Select only the phases observed (each phase is optional).
                       </p>
                     </div>
                     <Badge className="bg-cyan-500/10 text-cyan-100">
@@ -2774,7 +2777,7 @@ const filteredChampionships = useMemo(() => {
                   </div>
                   {!hasCompleteOffensiveOrganizationCatalogue ? (
                     <div className="rounded-xl border border-dashed border-amber-400/40 bg-amber-500/10 p-3 text-xs text-amber-100">
-                      A configuração de sub-momentos da Organização Ofensiva não está completa.
+                      The Organised Attack sub-phase configuration is incomplete.
                     </div>
                   ) : (
                     <div className="grid gap-3 md:grid-cols-4">
@@ -2791,11 +2794,11 @@ const filteredChampionships = useMemo(() => {
                               {offensiveSequenceActionBySubMoment[row.subMoment.id] ? "Definida" : "Por definir"}
                             </span>
                           </div>
-                          <div className="mb-3 text-sm font-semibold text-white">{row.subMoment.name}</div>
+                          <div className="mb-3 text-sm font-semibold text-white">{displayFootballTerm(row.subMoment.name)}</div>
                           <div className="space-y-2">
                             {row.actions.length === 0 ? (
                               <div className="rounded-lg border border-dashed border-border/60 bg-card/50 px-2 py-2 text-[11px] text-muted-foreground">
-                                Sem ações disponíveis para este sub-momento.
+                                No actions available for this sub-phase.
                               </div>
                             ) : (
                               row.actions.map((action) => {
@@ -2824,9 +2827,9 @@ const filteredChampionships = useMemo(() => {
                                         : "border-border/50 bg-card/60 text-muted-foreground hover:border-cyan-400/40 hover:text-white"
                                     )}
                                   >
-                                    <div className="font-medium">{action.name}</div>
+                                    <div className="font-medium">{displayFootballTerm(action.name)}</div>
                                     <div className="mt-1 text-[10px] opacity-80">
-                                      {action.context === "field_goal" ? "Campo + Baliza" : "Campo"}
+                                      {action.context === "field_goal" ? "Pitch + Goal" : "Pitch"}
                                     </div>
                                   </button>
                                 );
@@ -2841,7 +2844,7 @@ const filteredChampionships = useMemo(() => {
               ) : (
                 <>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Sub-momento</label>
+                    <label className="text-sm font-medium">Sub-phase</label>
                     <Select
                       value={subMomentId?.toString() ?? ""}
                       onChange={(e) => {
@@ -2862,13 +2865,13 @@ const filteredChampionships = useMemo(() => {
                       }}
                       disabled={!momentId}
                     >
-                      <option value="">Selecionar sub-momento</option>
+                      <option value="">Select sub-phase</option>
                       <option value="__create__" disabled={!momentId}>
-                        + Criar novo...
+                        + Create novo...
                       </option>
                       {filteredSubMoments.map((s) => (
                         <option key={s.id} value={s.id} className="text-black">
-                          {s.name}
+                          {displayFootballTerm(s.name)}
                         </option>
                       ))}
                     </Select>
@@ -2876,19 +2879,19 @@ const filteredChampionships = useMemo(() => {
 
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">Ações</label>
+                      <label className="text-sm font-medium">Actions</label>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-xs"
                         onClick={() => setModal({ kind: "action", open: true })}
                       >
-                        + Criar novo...
+                        + Create novo...
                       </Button>
                     </div>
                     {filteredActions.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-border/60 bg-card/60 p-3 text-xs text-muted-foreground">
-                        Seleciona um sub-momento para ver as ações disponíveis.
+                        Select a sub-phase to view the available actions.
                       </div>
                     ) : (
                       <div className="grid gap-2 md:grid-cols-2">
@@ -2915,13 +2918,13 @@ const filteredChampionships = useMemo(() => {
                                 }
                               />
                               <div>
-                                <span className="font-medium text-white">{action.name}</span>
+                                <span className="font-medium text-white">{displayFootballTerm(action.name)}</span>
                                 <p className="text-[11px] text-muted-foreground">
-                                  {action.context === "field_goal" ? "Campo + Baliza" : "Campo"}
+                                  {action.context === "field_goal" ? "Pitch + Goal" : "Pitch"}
                                 </p>
                               </div>
                               <span className="rounded-full border border-current px-2 py-0.5 text-[11px] font-semibold">
-                                {isSelected ? "Selecionado" : "Selecionar"}
+                                {isSelected ? "Selected" : "Select"}
                               </span>
                             </label>
                           );
@@ -2932,7 +2935,7 @@ const filteredChampionships = useMemo(() => {
                       <div className="flex flex-wrap gap-2">
                         {selectedActions.map((action) => (
                           <Badge key={action.id} className="bg-emerald-500/10 text-emerald-100">
-                            {action.name}
+                            {displayFootballTerm(action.name)}
                           </Badge>
                         ))}
                       </div>
@@ -2943,14 +2946,14 @@ const filteredChampionships = useMemo(() => {
 
               {hasReferencePlayersAction && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Quem foi o jogador referência?</label>
+                  <label className="text-sm font-medium">Who was the reference player?</label>
                   <Select
                     value={referencePlayerId?.toString() ?? ""}
                     onChange={(e) => setReferencePlayerId(e.target.value ? Number(e.target.value) : undefined)}
                     disabled={!teamId || playersQuery.isLoading}
                     className="bg-card/70 border-border/60 text-white"
                   >
-                    <option value="">Selecionar jogador</option>
+                    <option value="">Select player</option>
                     {currentPlayers.map((p) => (
                       <option key={p.id} value={p.id} className="text-black">
                         {p.name}
@@ -2961,14 +2964,14 @@ const filteredChampionships = useMemo(() => {
               )}
               {hasThrowInMarkerAction && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Quem efetuou o lançamento?</label>
+                  <label className="text-sm font-medium">Who took the throw-in?</label>
                   <Select
                     value={throwInTakerId?.toString() ?? ""}
                     onChange={(e) => setThrowInTakerId(e.target.value ? Number(e.target.value) : undefined)}
                     disabled={!teamId || playersQuery.isLoading}
                     className="bg-card/70 border-border/60 text-white"
                   >
-                    <option value="">Selecionar jogador</option>
+                    <option value="">Select player</option>
                     {currentPlayers.map((p) => (
                       <option key={p.id} value={p.id} className="text-black">
                         {p.name}
@@ -2979,14 +2982,14 @@ const filteredChampionships = useMemo(() => {
               )}
               {hasFoulSufferedAction && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Quem sofreu a falta?</label>
+                  <label className="text-sm font-medium">Who was fouled?</label>
                   <Select
                     value={foulSufferedById?.toString() ?? ""}
                     onChange={(e) => setFoulSufferedById(e.target.value ? Number(e.target.value) : undefined)}
                     disabled={!teamId || playersQuery.isLoading}
                     className="bg-card/70 border-border/60 text-white"
                   >
-                    <option value="">Selecionar jogador</option>
+                    <option value="">Select player</option>
                     {currentPlayers.map((p) => (
                       <option key={p.id} value={p.id} className="text-black">
                         {p.name}
@@ -3009,7 +3012,7 @@ const filteredChampionships = useMemo(() => {
                     <div className="space-y-2">
 
 
-                      <label className="text-sm font-medium">Marcador do Canto</label>
+                      <label className="text-sm font-medium">Corner Taker</label>
 
 
                       <Select
@@ -3027,7 +3030,7 @@ const filteredChampionships = useMemo(() => {
                       >
 
 
-                        <option value="">Selecionar jogador</option>
+                        <option value="">Select player</option>
 
 
                         {currentPlayers.map((p) => (
@@ -3057,7 +3060,7 @@ const filteredChampionships = useMemo(() => {
                     <div className="rounded-xl border border-dashed border-border/60 bg-card/30 px-3 py-2 text-xs text-muted-foreground">
 
 
-                    Seleciona a ação &ldquo;Marcador do canto&rdquo; para indicar o jogador responsável.
+                    Select the &ldquo;Corner Taker&rdquo; action to identify the player responsible.
 
 
                     </div>
@@ -3067,9 +3070,9 @@ const filteredChampionships = useMemo(() => {
 
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Perfil do canto</label>
+                    <label className="text-sm font-medium">Corner Type</label>
                     <Select value={cornerProfile} onChange={(e) => setCornerProfile(e.target.value)}>
-                      <option value="">Sem perfil</option>
+                      <option value="">No type</option>
                       {cornerProfiles.map((option) => (
                         <option key={option.value} value={option.value} className="text-black">
                           {option.label}
@@ -3097,7 +3100,7 @@ const filteredChampionships = useMemo(() => {
                     <div className="space-y-2">
 
 
-                      <label className="text-sm font-medium">Marcador da Falta</label>
+                      <label className="text-sm font-medium">Free-kick Taker</label>
 
 
                       <Select
@@ -3115,7 +3118,7 @@ const filteredChampionships = useMemo(() => {
                       >
 
 
-                        <option value="">Selecionar jogador</option>
+                        <option value="">Select player</option>
 
 
                         {currentPlayers.map((p) => (
@@ -3145,7 +3148,7 @@ const filteredChampionships = useMemo(() => {
                     <div className="rounded-xl border border-dashed border-border/60 bg-card/30 px-3 py-2 text-xs text-muted-foreground">
 
 
-                      Escolhe a ação &ldquo;Marcador da falta&rdquo; para desbloquear o seletor de jogador.
+                      Select the &ldquo;Free-kick Taker&rdquo; action to enable the player selector.
 
 
                     </div>
@@ -3155,7 +3158,7 @@ const filteredChampionships = useMemo(() => {
 
 
                   <p className="text-xs text-muted-foreground">
-                    O perfil do livre (Aberto, Fechado ou Combinado) segue o cartão de ação selecionado no passo anterior.
+                    The free-kick type (Inswinging, Outswinging or Routine) follows the action card selected in the previous step.
                   </p>
 
 
@@ -3171,7 +3174,7 @@ const filteredChampionships = useMemo(() => {
                 <div className="space-y-2">
 
 
-                  <label className="text-sm font-medium">Marcador do Penálti</label>
+                  <label className="text-sm font-medium">Penalty Taker</label>
 
 
                   <Select
@@ -3189,7 +3192,7 @@ const filteredChampionships = useMemo(() => {
                   >
 
 
-                    <option value="">Selecionar jogador</option>
+                    <option value="">Select player</option>
 
 
                     {currentPlayers.map((p) => (
@@ -3240,7 +3243,7 @@ const filteredChampionships = useMemo(() => {
                   >
 
 
-                    <option value="">Selecionar jogador</option>
+                    <option value="">Select player</option>
 
 
                     {currentPlayers.map((p) => (
@@ -3271,9 +3274,9 @@ const filteredChampionships = useMemo(() => {
 
               {hasThrowInAction && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Perfil do lançamento</label>
+                  <label className="text-sm font-medium">Throw-in Type</label>
                   <Select value={throwInProfile} onChange={(e) => setThrowInProfile(e.target.value)}>
-                    <option value="">Sem perfil</option>
+                    <option value="">No type</option>
                     {throwInProfiles.map((option) => (
                       <option key={option.value} value={option.value} className="text-black">
                         {option.label}
@@ -3284,11 +3287,11 @@ const filteredChampionships = useMemo(() => {
               )}
               {shouldShowPreviousMomentDescription && (
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-sm font-medium">Momento anterior</label>
+                  <label className="text-sm font-medium">Previous Phase</label>
                   <Input
                     value={previousMomentDescription}
                     onChange={(e) => setPreviousMomentDescription(e.target.value)}
-                    placeholder="Descreve o momento anterior ao lance"
+                    placeholder="Describe the phase before the move"
                   />
                 </div>
               )}
@@ -3298,7 +3301,7 @@ const filteredChampionships = useMemo(() => {
                 <label className="text-sm font-medium">Notas (opcional)</label>
 
 
-                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Contexto tático ou observações" />
+                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Tactical context or notes" />
 
 
               </div>
@@ -3307,13 +3310,13 @@ const filteredChampionships = useMemo(() => {
               <div className="md:col-span-2 space-y-2">
 
 
-                <label className="text-sm font-medium">Vídeo do golo</label>
+                <label className="text-sm font-medium">Video do goal</label>
 
 
                 <FileUpload
 
 
-                  label={videoPath ? "Atualizar vídeo" : "Carregar vídeo"}
+                  label={videoPath ? "Update video" : "Upload video"}
 
 
                   accept="video/mp4,video/*"
@@ -3325,7 +3328,7 @@ const filteredChampionships = useMemo(() => {
                   onChange={(path) => setVideoPath(path)}
 
 
-                  helperText="O ficheiro será guardado no Vercel Blob com URL pública."
+                  helperText="The file will be stored in Vercel Blob with a public URL."
 
 
                 />
@@ -3352,7 +3355,7 @@ const filteredChampionships = useMemo(() => {
               <div className="flex items-center justify-between">
 
 
-                <label className="text-sm font-medium">Espaço de Recuperação</label>
+                <label className="text-sm font-medium">Recovery Area</label>
 
 
                 <span className="text-xs text-muted-foreground">{transitionRecoveryZoneLabel}</span>
@@ -3386,11 +3389,11 @@ const filteredChampionships = useMemo(() => {
               <div className="flex items-center justify-between">
 
 
-                <label className="text-sm font-medium">Zona de Assistencia</label>
+                <label className="text-sm font-medium">Assist Area</label>
 
 
                 <span className="text-xs text-muted-foreground">
-                  {requiresField ? "Obrigatorio para esta acao." : "Opcional para referencia tatica."}
+                  {requiresField ? "Required for this action." : "Optional tactical reference."}
                 </span>
 
 
@@ -3418,19 +3421,19 @@ const filteredChampionships = useMemo(() => {
               <div className="flex items-center justify-between">
 
 
-                <label className="text-sm font-medium">Ponto na Baliza</label>
+                <label className="text-sm font-medium">Ponto na Goal</label>
 
 
                 {requiresGoal ? (
 
 
-                  <span className="text-xs text-muted-foreground">Obrigatório para ações com baliza.</span>
+                  <span className="text-xs text-muted-foreground">Required for actions involving a goal point.</span>
 
 
                 ) : (
 
 
-                  <span className="text-xs text-emerald-300">Opcional para esta ação (só Campo).</span>
+                  <span className="text-xs text-emerald-300">Optional for this action (pitch only).</span>
 
 
                 )}
@@ -3460,13 +3463,13 @@ const filteredChampionships = useMemo(() => {
               <div className="flex items-center justify-between">
 
 
-                <div className="text-sm font-medium">Zona de Remate</div>
+                <div className="text-sm font-medium">Shot Area</div>
 
 
                 <span className="text-xs text-muted-foreground">
 
 
-                  {requiresField ? "Obrigatório para esta ação." : "Opcional para referência tática."}
+                  {requiresField ? "Required for this action." : "Optional tactical reference."}
 
 
                 </span>
@@ -3497,37 +3500,37 @@ const filteredChampionships = useMemo(() => {
               <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/70 bg-card/70 p-4 sm:grid-cols-2">
 
 
-                <span className="text-muted-foreground">Época</span>
+                <span className="text-muted-foreground">Season</span>
 
 
                 <span>{lookupsQuery.data?.seasons.find((s) => s.id === seasonId)?.name ?? "-"}</span>
 
 
-                <span className="text-muted-foreground">Campeonato</span>
+                <span className="text-muted-foreground">Competition</span>
 
 
                 <span>{lookupsQuery.data?.championships.find((c) => c.id === championshipId)?.name ?? "-"}</span>
 
 
-                <span className="text-muted-foreground">Equipa</span>
+                <span className="text-muted-foreground">Team</span>
 
 
                 <span>{teamsQuery.data?.find((t) => t.id === teamId)?.name ?? "-"}</span>
 
 
-                <span className="text-muted-foreground">Adversário</span>
+                <span className="text-muted-foreground">Opponent</span>
 
 
                 <span>{lookupsQuery.data?.teams.find((t) => t.id === opponentTeamId)?.name ?? "-"}</span>
 
 
-                <span className="text-muted-foreground">Marcador</span>
+                <span className="text-muted-foreground">Scorer</span>
 
 
                 <span>{currentPlayers.find((p) => p.id === scorerId)?.name ?? "-"}</span>
 
 
-                <span className="text-muted-foreground">Assistência</span>
+                <span className="text-muted-foreground">Assist</span>
 
 
                 <span>{currentPlayers.find((p) => p.id === assistId)?.name ?? "-"}</span>
@@ -3539,33 +3542,33 @@ const filteredChampionships = useMemo(() => {
                 <span>{minute}&rsquo;</span>
 
 
-                <span className="text-muted-foreground">Momento</span>
+                <span className="text-muted-foreground">Phase</span>
 
 
-                <span>{lookupsQuery.data?.moments.find((m) => m.id === momentId)?.name ?? "-"}</span>
+                <span>{displayFootballTerm(lookupsQuery.data?.moments.find((m) => m.id === momentId)?.name) || "-"}</span>
 
 
-                <span className="text-muted-foreground">Sub-momento</span>
+                <span className="text-muted-foreground">Sub-phase</span>
 
 
-                <span>{lookupsQuery.data?.subMoments.find((s) => s.id === resolvedSubMomentId)?.name ?? "-"}</span>
+                <span>{displayFootballTerm(lookupsQuery.data?.subMoments.find((s) => s.id === resolvedSubMomentId)?.name) || "-"}</span>
 
 
-                <span className="text-muted-foreground">Ações</span>
+                <span className="text-muted-foreground">Actions</span>
 
 
                 <span>
                   {selectedActions.length > 0
-                    ? selectedActions.map((action) => action.name).join(", ")
+                    ? selectedActions.map((action) => displayFootballTerm(action.name)).join(", ")
                     : "-"}
                 </span>
                 {isOffensiveOrganizationMoment && (
                   <>
-                    <span className="text-muted-foreground">Sequência OO</span>
+                    <span className="text-muted-foreground">Organised Attack Sequence</span>
                     <span>
                       {offensiveSequenceSummary.length > 0
                         ? offensiveSequenceSummary
-                            .map((entry) => `${entry.sequenceOrder}. ${entry.subMomentName}: ${entry.actionName ?? "—"}`)
+                            .map((entry) => `${entry.sequenceOrder}. ${displayFootballTerm(entry.subMomentName)}: ${displayFootballTerm(entry.actionName) || "—"}`)
                             .join(" | ")
                         : "-"}
                     </span>
@@ -3573,39 +3576,39 @@ const filteredChampionships = useMemo(() => {
                 )}
                 {hasReferencePlayersAction && (
                   <>
-                    <span className="text-muted-foreground">Jogador referência</span>
+                    <span className="text-muted-foreground">Reference Player</span>
                     <span>{currentPlayers.find((p) => p.id === referencePlayerId)?.name ?? "-"}</span>
                   </>
                 )}
                 {hasThrowInMarkerAction && (
                   <>
-                    <span className="text-muted-foreground">Marcador do lançamento</span>
+                    <span className="text-muted-foreground">Throw-in Taker</span>
                     <span>{currentPlayers.find((p) => p.id === throwInTakerId)?.name ?? "-"}</span>
                   </>
                 )}
 
                 {hasFoulSufferedAction && (
                   <>
-                    <span className="text-muted-foreground">Falta sobre</span>
+                    <span className="text-muted-foreground">Player Fouled</span>
                     <span>{currentPlayers.find((p) => p.id === foulSufferedById)?.name ?? "-"}</span>
                   </>
                 )}
                 {shouldShowPreviousMomentDescription && (
                   <>
-                    <span className="text-muted-foreground">Momento anterior</span>
+                    <span className="text-muted-foreground">Previous Phase</span>
                     <span>{previousMomentDescription || "-"}</span>
                   </>
                 )}
 
-                <span className="text-muted-foreground">Saída do GR</span>
+                <span className="text-muted-foreground">Goalkeeper Distribution</span>
                 <span>{labelFromOption(goalkeeperOutlets, goalkeeperOutlet)}</span>
 
 
 
-                <span className="text-muted-foreground">Contexto</span>
+                <span className="text-muted-foreground">Context</span>
 
 
-                <span>{requiresGoal ? "Campo + Baliza" : "Campo"}</span>
+                <span>{requiresGoal ? "Pitch + Goal" : "Campo"}</span>
 
 
                 {isCorner && (
@@ -3614,13 +3617,13 @@ const filteredChampionships = useMemo(() => {
                   <>
 
 
-                    <span className="text-muted-foreground">Marcador do canto</span>
+                    <span className="text-muted-foreground">Corner Taker</span>
 
 
                     <span>{currentPlayers.find((p) => p.id === cornerTakerId)?.name ?? "-"}</span>
 
 
-                    <span className="text-muted-foreground">Perfil do canto</span>
+                    <span className="text-muted-foreground">Corner Type</span>
 
 
                     <span>{labelFromOption(cornerProfiles, cornerProfile)}</span>
@@ -3638,13 +3641,13 @@ const filteredChampionships = useMemo(() => {
                   <>
 
 
-                    <span className="text-muted-foreground">Marcador da falta</span>
+                    <span className="text-muted-foreground">Free-kick Taker</span>
 
 
                     <span>{currentPlayers.find((p) => p.id === freekickTakerId)?.name ?? "-"}</span>
 
 
-                    <span className="text-muted-foreground">Perfil do livre</span>
+                    <span className="text-muted-foreground">Free-kick Type</span>
 
 
                     <span>{labelFromOption(freekickProfiles, freekickProfile)}</span>
@@ -3662,7 +3665,7 @@ const filteredChampionships = useMemo(() => {
                   <>
 
 
-                    <span className="text-muted-foreground">Marcador do penálti</span>
+                    <span className="text-muted-foreground">Penalty Taker</span>
 
 
                     <span>{currentPlayers.find((p) => p.id === penaltyTakerId)?.name ?? "-"}</span>
@@ -3698,7 +3701,7 @@ const filteredChampionships = useMemo(() => {
                   <>
 
 
-                    <span className="text-muted-foreground">Perfil do lançamento</span>
+                    <span className="text-muted-foreground">Throw-in Type</span>
 
 
                     <span>{labelFromOption(throwInProfiles, throwInProfile)}</span>
@@ -3710,30 +3713,30 @@ const filteredChampionships = useMemo(() => {
                 )}
 
 
-                <span className="text-muted-foreground">Zona de assistencia</span>
+                <span className="text-muted-foreground">Assist Area</span>
 
 
                 <span>{assistDrawingPoint ? `(${assistDrawingPoint.x.toFixed(2)}, ${assistDrawingPoint.y.toFixed(2)})` : "N/A"}</span>
 
                 {shouldShowTransitionStep && (
                   <>
-                    <span className="text-muted-foreground">Espaço de recuperação</span>
-                    <span>{attackingSpaceId ? `Zona ${attackingSpaceId}` : "N/A"}</span>
+                    <span className="text-muted-foreground">Recovery Area</span>
+                    <span>{attackingSpaceId ? `Area ${attackingSpaceId}` : "N/A"}</span>
                   </>
                 )}
 
 
-                <span className="text-muted-foreground">Baliza</span>
+                <span className="text-muted-foreground">Goal</span>
 
 
                 <span>{goalPoint ? `(${goalPoint.x.toFixed(2)}, ${goalPoint.y.toFixed(2)})` : "N/A"}</span>
 
 
-                <span className="text-muted-foreground">Zona de Remate</span>
+                <span className="text-muted-foreground">Shot Area</span>
 
 
                 <span>{fieldPoint ? `(${fieldPoint.x.toFixed(2)}, ${fieldPoint.y.toFixed(2)})` : "N/A"}</span>
-                <span className="text-muted-foreground">Vídeo</span>
+                <span className="text-muted-foreground">Video</span>
 
 
                 <span>{videoPath ? "Anexado" : "—"}</span>
@@ -3757,7 +3760,7 @@ const filteredChampionships = useMemo(() => {
                       {currentPlayers.find((p) => p.id === inv.playerId)?.name ?? inv.playerId} /{" "}
 
 
-                      {inv.role === "assist" ? "assistência" : "envolvimento"}
+                      {inv.role === "assist" ? "assist" : "involvement"}
 
 
                     </Badge>
@@ -3778,7 +3781,7 @@ const filteredChampionships = useMemo(() => {
                 <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
 
 
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Assistencia</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Assist</div>
 
 
                   <div className="rounded-lg border border-border/50 bg-slate-950/60 p-2">
@@ -3834,7 +3837,7 @@ const filteredChampionships = useMemo(() => {
 
                 {shouldShowTransitionStep && (
                   <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Espaço de Recuperação</div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Recovery Area</div>
                     <div className="rounded-lg border border-border/50 bg-slate-950/60 p-2">
                       <RecoverySpaceGrid
                         variant={recoveryGridVariant}
@@ -3850,7 +3853,7 @@ const filteredChampionships = useMemo(() => {
                 <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
 
 
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Zona de Remate</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Shot Area</div>
 
 
                   <div className="rounded-lg border border-border/50 bg-slate-950/60 p-2">
@@ -3907,7 +3910,7 @@ const filteredChampionships = useMemo(() => {
                 <div className="space-y-1 rounded-xl border border-border/60 bg-card/60 p-3">
 
 
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Baliza</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Goal</div>
 
 
                   <div className="rounded-lg border border-border/50 bg-slate-950/60 p-2">
@@ -3993,12 +3996,12 @@ const filteredChampionships = useMemo(() => {
 
               <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
                 <Button className="w-full sm:w-auto" variant="ghost" type="button" onClick={movePrev} disabled={currentIndex === 0}>
-                  Voltar
+                  Back
                 </Button>
 
                 {currentIndex < visibleSteps.length - 1 && (
                   <Button className="w-full sm:w-auto" type="button" onClick={moveNext} disabled={!canNext(step)}>
-                    Seguinte
+                    Next
                   </Button>
                 )}
 
@@ -4012,8 +4015,8 @@ const filteredChampionships = useMemo(() => {
                     {createMutation.isPending || updateMutation.isPending
                       ? "A gravar..."
                       : existingGoal
-                        ? "Atualizar Golo"
-                        : "Gravar Golo"}
+                        ? "Update Goal"
+                        : "Save Goal"}
                   </Button>
                 )}
               </div>
@@ -4042,10 +4045,10 @@ const filteredChampionships = useMemo(() => {
         open={modal.open && modal.kind === "moment"}
 
 
-        title="Criar Momento"
+        title="Create Phase"
 
 
-        placeholder="Nome do momento"
+        placeholder="Phase name"
 
 
         onClose={() => setModal({ ...modal, open: false })}
@@ -4063,10 +4066,10 @@ const filteredChampionships = useMemo(() => {
         open={modal.open && modal.kind === "submoment"}
 
 
-        title="Criar Sub-momento"
+        title="Create Sub-phase"
 
 
-        placeholder="Nome do sub-momento"
+        placeholder="Sub-phase name"
 
 
         onClose={() => setModal({ ...modal, open: false })}
@@ -4084,10 +4087,10 @@ const filteredChampionships = useMemo(() => {
         open={modal.open && modal.kind === "action"}
 
 
-        title="Criar Ação"
+        title="Create Action"
 
 
-        placeholder="Nome da ação"
+        placeholder="Action name"
 
 
         onClose={() => setModal({ ...modal, open: false })}
