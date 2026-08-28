@@ -1,6 +1,7 @@
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "../db/client";
 import { moments, subMoments, actions, championships, teams, seasons } from "../schema/schema";
+import { getWorkspaceId } from "@/lib/auth";
 
 const normalizeToken = (value: string) =>
   value
@@ -46,12 +47,13 @@ async function ensureOffensiveOrganizationLaunchAction(params: {
 }
 
 export async function getLookups() {
+  const workspaceId = await getWorkspaceId();
   const [momentsRows, subMomentRows, championshipRows, teamRows, seasonRows] = await Promise.all([
     db.select().from(moments).orderBy(asc(moments.name)),
     db.select().from(subMoments).orderBy(asc(subMoments.name)),
-    db.select().from(championships).orderBy(asc(championships.name)),
-    db.select().from(teams).orderBy(asc(teams.name)),
-    db.select().from(seasons).orderBy(asc(seasons.name))
+    db.select().from(championships).where(eq(championships.workspaceId, workspaceId)).orderBy(asc(championships.name)),
+    db.select().from(teams).where(eq(teams.workspaceId, workspaceId)).orderBy(asc(teams.name)),
+    db.select().from(seasons).where(eq(seasons.workspaceId, workspaceId)).orderBy(asc(seasons.name))
   ]);
 
   await ensureOffensiveOrganizationLaunchAction({ momentsRows, subMomentRows });

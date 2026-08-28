@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { goalInvolvements, goals, moments, actions, subMoments, players, goalActions } from "../schema/schema";
+import { requireOwnedTeam } from "./workspace";
 
 const normalizeActionLabel = (value: string) =>
   value
@@ -26,6 +27,7 @@ function shouldHideFromActionChart(actionName: string) {
 }
 
 export async function topScorers(teamId: number) {
+  await requireOwnedTeam(teamId);
   const result = await db.execute<{ id: number; name: string; goals: number; assists: number }>(sql`
     WITH goal_counts AS (
       SELECT scorer_id, COUNT(*)::int AS goals
@@ -53,6 +55,7 @@ export async function topScorers(teamId: number) {
 }
 
 export async function topAssists(teamId: number) {
+  await requireOwnedTeam(teamId);
   const result = await db.execute<{ id: number; name: string; assists: number; goals: number }>(sql`
     WITH goal_counts AS (
       SELECT scorer_id, COUNT(*)::int AS goals
@@ -80,6 +83,7 @@ export async function topAssists(teamId: number) {
 }
 
 export async function mostInvolved(teamId: number) {
+  await requireOwnedTeam(teamId);
   const result = await db.execute<{ id: number; name: string; involvement: number }>(sql`
     WITH goal_counts AS (
       SELECT scorer_id, COUNT(*)::int AS goals
@@ -117,6 +121,7 @@ export async function mostInvolved(teamId: number) {
 }
 
 export async function zoneDistribution(teamId: number) {
+  await requireOwnedTeam(teamId);
   const result = await db.execute<{ name: string; goals: number }>(sql`
     SELECT
       CASE
@@ -143,6 +148,7 @@ export async function zoneDistribution(teamId: number) {
 }
 
 export async function momentsBreakdown(teamId: number) {
+  await requireOwnedTeam(teamId);
   const result = await db.execute<{ moment: string; goals: number }>(sql`
     SELECT m.name AS moment, COUNT(*)::int AS goals
     FROM ${goals} g
@@ -155,6 +161,7 @@ export async function momentsBreakdown(teamId: number) {
 }
 
 export async function actionsBreakdown(teamId: number) {
+  await requireOwnedTeam(teamId);
   const result = await db.execute<{ action: string; goals: number }>(sql`
     SELECT a.name AS action, COUNT(*)::int AS goals
     FROM ${goalActions} ga
@@ -168,6 +175,7 @@ export async function actionsBreakdown(teamId: number) {
 }
 
 export async function penaltiesByZone(teamId: number) {
+  await requireOwnedTeam(teamId);
   const result = await db.execute<{ zone: string; goals: number }>(sql`
     SELECT
       CASE

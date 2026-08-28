@@ -1,6 +1,7 @@
 ﻿import { sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { goals, teams, championships, moments, subMoments, players, goalInvolvements } from "../schema/schema";
+import { getWorkspaceId } from "@/lib/auth";
 
 type Clause = ReturnType<typeof sql>;
 
@@ -18,8 +19,8 @@ const setPieceCase = sql`
   END
 `;
 
-function buildFilters(seasonId?: number, championshipId?: number): Clause[] {
-  const clauses: Clause[] = [];
+function buildFilters(workspaceId: number, seasonId?: number, championshipId?: number): Clause[] {
+  const clauses: Clause[] = [sql`c.workspace_id = ${workspaceId}`];
   if (seasonId) clauses.push(sql`c.season_id = ${seasonId}`);
   if (championshipId) clauses.push(sql`c.id = ${championshipId}`);
   return clauses;
@@ -61,7 +62,8 @@ async function groupGoalsByTeam(label: string, filters: Clause[], extra: Clause)
 }
 
 export async function rankingsOverview(seasonId?: number, championshipId?: number) {
-  const filters = buildFilters(seasonId, championshipId);
+  const workspaceId = await getWorkspaceId();
+  const filters = buildFilters(workspaceId, seasonId, championshipId);
 
   const totalGoals = db.execute<{ teamId: number; team: string; goals: number; emblemPath: string | null }>(sql`
     ${scopedGoalsCte(filters)}
@@ -250,8 +252,9 @@ export async function rankingsOverview(seasonId?: number, championshipId?: numbe
 }
 
 export async function compareRankings(champA?: number, champB?: number, seasonA?: number, seasonB?: number) {
+  const workspaceId = await getWorkspaceId();
   const aggregate = async (champ?: number, season?: number) => {
-    const filters = buildFilters(season, champ);
+    const filters = buildFilters(workspaceId, season, champ);
 
     const totalPromise = db.execute<{ goals: number }>(sql`
       SELECT COUNT(*)::int AS goals

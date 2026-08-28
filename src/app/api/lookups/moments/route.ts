@@ -4,10 +4,12 @@ import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { db } from "@/db/client";
 import { moments } from "@/schema/schema";
+import { requireUser } from "@/lib/auth";
 
 const schema = z.object({ name: z.string().min(2) });
 
 export async function GET() {
+  await requireUser();
   const rows = await db.query.moments.findMany({
     columns: { id: true, name: true },
     orderBy: (fields, { asc }) => [asc(fields.name)]
@@ -17,6 +19,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    await requireUser();
     const body = schema.parse(await req.json());
     const existing = await db.query.moments.findFirst({ where: (fields, { eq }) => eq(fields.name, body.name) });
     if (existing) return NextResponse.json(existing);

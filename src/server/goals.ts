@@ -3,6 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "../db/client";
 import { actions, goalActions, goals, goalInvolvements, goalSubMomentActions, moments, players, subMoments, teams } from "../schema/schema";
 import { goalInputSchema } from "../lib/validation";
+import { requireOwnedGoal, requireOwnedTeam } from "./workspace";
 
 type RawGoalPayload = Record<string, unknown>;
 
@@ -251,6 +252,7 @@ function isOffensiveOrganizationMomentName(value: string) {
 }
 
 export async function getGoalsByTeam(teamId: number) {
+  await requireOwnedTeam(teamId);
   const [supportsAssistDrawing, supportsTransitionDrawing, supportsAttackingSpace, supportsGoalSubMomentActions] = await Promise.all([
     hasGoalsColumn("assist_drawing"),
     hasGoalsColumn("transition_drawing"),
@@ -410,6 +412,7 @@ export async function getGoalsByTeam(teamId: number) {
 }
 
 export async function getGoalById(goalId: number) {
+  await requireOwnedGoal(goalId);
   const [supportsAssistDrawing, supportsTransitionDrawing, supportsAttackingSpace, supportsGoalSubMomentActions] = await Promise.all([
     hasGoalsColumn("assist_drawing"),
     hasGoalsColumn("transition_drawing"),
@@ -608,14 +611,15 @@ async function upsertGoal(
       ? await db.query.goals.findFirst({ where: eq(goals.id, existingGoalId) })
       : null;
   if (mode === "update") {
+    await requireOwnedGoal(existingGoalId as number);
     if (!existingGoal) throw new Error("Goal not found");
     if (existingGoal.teamId !== parsed.teamId) throw new Error("Cannot move goal to another team");
   }
 
   const [team, scorer, opponent, moment] = await Promise.all([
-    db.query.teams.findFirst({ where: eq(teams.id, parsed.teamId) }),
+    requireOwnedTeam(parsed.teamId),
     db.query.players.findFirst({ where: eq(players.id, parsed.scorerId) }),
-    db.query.teams.findFirst({ where: eq(teams.id, parsed.opponentTeamId) }),
+    requireOwnedTeam(parsed.opponentTeamId),
     db.query.moments.findFirst({ where: eq(moments.id, parsed.momentId) })
   ]);
 
@@ -876,6 +880,7 @@ export async function updateGoal(id: number, payload: unknown) {
 }
 
 export async function deleteGoal(goalId: number) {
+  await requireOwnedGoal(goalId);
   const existingGoal = await db.query.goals.findFirst({
     where: eq(goals.id, goalId),
     columns: { id: true }

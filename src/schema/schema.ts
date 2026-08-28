@@ -77,9 +77,16 @@ export const seasons = pgTable(
   "seasons",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    name: text("name").notNull().unique(),
-    description: text("description")
-  }
+    name: text("name").notNull(),
+    description: text("description"),
+    workspaceId: bigint("workspace_id", { mode: "number" })
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    workspaceIdx: index("idx_seasons_workspace").on(table.workspaceId),
+    nameWorkspaceUnique: uniqueIndex("seasons_name_workspace_unique").on(table.name, table.workspaceId)
+  })
 );
 
 export const championships = pgTable(
@@ -88,12 +95,16 @@ export const championships = pgTable(
     id: bigserial("id", { mode: "number" }).primaryKey(),
     seasonId: bigint("season_id", { mode: "number" })
       .references(() => seasons.id, { onDelete: "cascade" }),
+    workspaceId: bigint("workspace_id", { mode: "number" })
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
     country: text("country").notNull(),
     name: text("name").notNull(),
     logo: text("logo")
   },
   (table) => ({
-    idxSeason: index("idx_championships_season").on(table.seasonId)
+    idxSeason: index("idx_championships_season").on(table.seasonId),
+    idxWorkspace: index("idx_championships_workspace").on(table.workspaceId)
   })
 );
 
@@ -103,6 +114,9 @@ export const teams = pgTable(
     id: bigserial("id", { mode: "number" }).primaryKey(),
     championshipId: bigint("championship_id", { mode: "number" })
       .references(() => championships.id, { onDelete: "cascade" }),
+    workspaceId: bigint("workspace_id", { mode: "number" })
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     emblemPath: text("emblem_path"),
     radiographyPdfUrl: text("radiography_pdf_url"),
@@ -115,7 +129,8 @@ export const teams = pgTable(
   },
   (table) => ({
     idxChampionship: index("idx_teams_championship").on(table.championshipId),
-    uniqueName: uniqueIndex("teams_name_key").on(table.name)
+    idxWorkspace: index("idx_teams_workspace").on(table.workspaceId),
+    uniqueName: uniqueIndex("teams_name_workspace_unique").on(table.name, table.workspaceId)
   })
 );
 

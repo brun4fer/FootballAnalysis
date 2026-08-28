@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/actions/auth";
 import { getCurrentUser } from "@/lib/auth";
@@ -24,7 +25,12 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
             Use the account assigned to your workspace. Your data is kept separate from every other client.
           </p>
         </div>
-        {searchParams.error && (
+        {searchParams.error === "setup" && (
+          <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+            The database update is still pending. Please contact the administrator and try again shortly.
+          </p>
+        )}
+        {searchParams.error && searchParams.error !== "setup" && (
           <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
             The username or password is incorrect.
           </p>
@@ -40,6 +46,12 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
         <button className="h-11 w-full rounded-lg bg-primary px-4 font-semibold text-primary-foreground transition hover:bg-primary/90">
           Sign in
         </button>
+        <p className="text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link href="/register" className="font-semibold text-cyan-300 hover:text-cyan-200">
+            Create one
+          </Link>
+        </p>
       </form>
     </main>
   );

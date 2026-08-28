@@ -1,8 +1,11 @@
 import { db } from "../db/client";
 import { championships, players, teams } from "../schema/schema";
-import { eq, asc } from "drizzle-orm";
+import { and, eq, asc } from "drizzle-orm";
+import { getWorkspaceId } from "@/lib/auth";
+import { requireOwnedTeam } from "./workspace";
 
 export async function listChampionships() {
+  const workspaceId = await getWorkspaceId();
   return db
     .select({
       id: championships.id,
@@ -10,10 +13,12 @@ export async function listChampionships() {
       seasonId: championships.seasonId
     })
     .from(championships)
+    .where(eq(championships.workspaceId, workspaceId))
     .orderBy(asc(championships.name));
 }
 
 export async function listTeams(championshipId?: number) {
+  const workspaceId = await getWorkspaceId();
   const base = db
     .select({
       id: teams.id,
@@ -26,12 +31,17 @@ export async function listTeams(championshipId?: number) {
     })
     .from(teams);
 
-  const scoped = championshipId ? base.where(eq(teams.championshipId, championshipId)) : base;
+  const scoped = base.where(
+    championshipId
+      ? and(eq(teams.championshipId, championshipId), eq(teams.workspaceId, workspaceId))
+      : eq(teams.workspaceId, workspaceId)
+  );
 
   return scoped.orderBy(asc(teams.name));
 }
 
 export async function listPlayers(teamId: number) {
+  await requireOwnedTeam(teamId);
   return db
     .select({
       id: players.id,

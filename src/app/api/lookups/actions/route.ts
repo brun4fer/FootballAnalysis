@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 import { db } from "@/db/client";
 import { actions } from "@/schema/schema";
+import { requireUser } from "@/lib/auth";
 
 const schema = z.object({
   subMomentId: z.number().int().positive(),
@@ -13,6 +14,7 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
+    await requireUser();
     const body = schema.parse(await req.json());
     const existing = await db.query.actions.findFirst({
       where: (fields, { and, eq }) => and(eq(fields.subMomentId, body.subMomentId), eq(fields.name, body.name))

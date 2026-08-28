@@ -2,11 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
+    const user = await requireUser();
     const formData = await req.formData();
     const file = formData.get("file");
 
@@ -19,7 +21,7 @@ export async function POST(req: Request) {
     const ext = extMatch?.[0] ?? "";
     const baseName = ext ? originalName.slice(0, -ext.length) : originalName;
     const base = baseName.replace(/[^a-zA-Z0-9-_]/g, "_") || "upload";
-    const filename = `uploads/${Date.now()}-${base}${ext}`;
+    const filename = `workspaces/${user.workspaceId}/uploads/${Date.now()}-${base}${ext}`;
 
     const blob = await put(filename, file, {
       access: "public",

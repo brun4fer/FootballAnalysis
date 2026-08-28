@@ -11,6 +11,7 @@ import {
   goalSubMomentActions,
   actions
 } from "../schema/schema";
+import { requireOwnedTeam } from "./workspace";
 
 const lowerSm = sql`lower(coalesce(sm.name, ''))`;
 const lowerM = sql`lower(coalesce(m.name, ''))`;
@@ -67,6 +68,7 @@ type RadiographyFilters = {
 };
 
 export async function getRadiography(teamId: number, filters?: RadiographyFilters) {
+  await requireOwnedTeam(teamId);
   const momentId = filters?.momentId;
   const bpoCategory = filters?.bpoCategory;
   const shouldComputeSubMomentBreakdown = Boolean(momentId || bpoCategory);
