@@ -1,8 +1,77 @@
-import { pgTable, bigserial, bigint, serial, smallint, integer, text, date, jsonb, index, uniqueIndex, check } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  bigserial,
+  bigint,
+  serial,
+  smallint,
+  integer,
+  text,
+  date,
+  jsonb,
+  boolean,
+  timestamp,
+  uuid,
+  varchar,
+  index,
+  uniqueIndex,
+  check
+} from "drizzle-orm/pg-core";
 import { desc, sql } from "drizzle-orm";
 
 export type CoordinatePoint = { x: number; y: number };
 export type ZoneMarker = { x?: number; y?: number; label?: string; sector?: string };
+
+export const workspaces = pgTable(
+  "workspaces",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    slug: varchar("slug", { length: 80 }).notNull()
+  },
+  (table) => ({
+    slugUnique: uniqueIndex("workspaces_slug_unique").on(table.slug)
+  })
+);
+
+export const users = pgTable(
+  "users",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    username: varchar("username", { length: 80 }).notNull(),
+    passwordHash: text("password_hash").notNull(),
+    workspaceId: bigint("workspace_id", { mode: "number" })
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    mustChangePassword: boolean("must_change_password").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow()
+  },
+  (table) => ({
+    usernameUnique: uniqueIndex("users_username_unique").on(sql`lower(${table.username})`),
+    workspaceIdx: index("users_workspace_id_idx").on(table.workspaceId)
+  })
+);
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: uuid("id").primaryKey(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow()
+  },
+  (table) => ({
+    tokenUnique: uniqueIndex("sessions_token_hash_unique").on(table.tokenHash),
+    userIdx: index("sessions_user_id_idx").on(table.userId),
+    expiresIdx: index("sessions_expires_at_idx").on(table.expiresAt)
+  })
+);
 
 export const seasons = pgTable(
   "seasons",
@@ -252,6 +321,9 @@ export const goalInvolvements = pgTable(
 );
 
 export type Season = typeof seasons.$inferSelect;
+export type Workspace = typeof workspaces.$inferSelect;
+export type User = typeof users.$inferSelect;
+export type Session = typeof sessions.$inferSelect;
 export type Championship = typeof championships.$inferSelect;
 export type Team = typeof teams.$inferSelect;
 export type Player = typeof players.$inferSelect;
