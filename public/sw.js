@@ -1,6 +1,5 @@
-const CACHE_VERSION = "ap-goals-scored-v2";
+const CACHE_VERSION = "ap-goals-scored-v3";
 const ASSETS = [
-  "/",
   "/offline.html",
   "/manifest.json",
   "/favicon.ico",
@@ -44,18 +43,8 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put("/", copy));
-          return response;
-        })
         .catch(async () => {
           const cache = await caches.open(CACHE_VERSION);
-          const cachedRoot = await cache.match("/");
-          if (cachedRoot) {
-            return cachedRoot;
-          }
-
           return cache.match("/offline.html");
         })
     );

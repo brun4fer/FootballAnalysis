@@ -2,9 +2,6 @@ import "./globals.css";
 import { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
 import { QueryProvider } from "@/components/ui/query-provider";
-import { AppProvider } from "@/components/ui/app-context";
-import { Header } from "@/components/ui/header";
-import { Sidebar } from "@/components/ui/sidebar";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { Space_Grotesk } from "next/font/google";
 
@@ -47,17 +44,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en-GB" className={font.variable}>
       <body className="bg-background text-foreground">
         <ServiceWorkerRegister />
-        <QueryProvider>
-          <AppProvider>
-            <div className="min-h-screen">
-              <Header />
-              <div className="mx-auto flex w-full max-w-6xl gap-4 px-4 py-4 md:gap-6 md:px-6 md:py-6">
-                <Sidebar />
-                <main className="min-w-0 flex-1">{children}</main>
-              </div>
-            </div>
-          </AppProvider>
-        </QueryProvider>
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );

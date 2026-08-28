@@ -12,6 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
+    "db:bootstrap:users": "tsx scripts/bootstrap-workspace-users.ts",
     "db:seed:taxonomy": "node scripts/seed-moments.js",
     "db:seed": "tsx src/db/seed.ts",
     "db:reset:taxonomy": "tsx src/db/reset-moments.ts"

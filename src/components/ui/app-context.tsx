@@ -19,11 +19,17 @@ type AppContextValue = {
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
-const STORAGE_KEY = "fa.selection";
-
-export function AppProvider({ children }: { children: React.ReactNode }) {
+export function AppProvider({
+  children,
+  storageNamespace = "default"
+}: {
+  children: React.ReactNode;
+  storageNamespace?: string;
+}) {
+  const storageKey = `fa.selection.${storageNamespace}`;
   // Start empty on both server and client to keep SSR/CSR markup aligned; then hydrate from localStorage.
   const [selection, setSelectionState] = useState<Selection>({});
+  const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(null);
 
   const setSelection = (sel: Selection) => {
     setSelectionState(sel);
@@ -36,23 +42,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+      const raw = window.localStorage.getItem(storageKey);
       if (raw) {
         setSelectionState(JSON.parse(raw) as Selection);
+      } else {
+        setSelectionState({});
       }
     } catch {
-      /* ignore */
+      setSelectionState({});
+    } finally {
+      setHydratedStorageKey(storageKey);
     }
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || hydratedStorageKey !== storageKey) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(selection));
+      window.localStorage.setItem(storageKey, JSON.stringify(selection));
     } catch {
       /* ignore */
     }
-  }, [selection]);
+  }, [hydratedStorageKey, selection, storageKey]);
 
   const value = useMemo(() => ({ selection, setSelection, updatePartial }), [selection]);
 
