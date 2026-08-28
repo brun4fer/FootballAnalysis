@@ -32,6 +32,7 @@ type GoalDetailProps = {
     actions?: GoalActionDto[];
     subMomentSequence?: GoalSubMomentSequenceDto[];
     videoPath?: string | null;
+    videoPlaybackUrl?: string | null;
     fieldDrawing?: Coordinate | null;
     goalCoordinates?: Coordinate | null;
     assistCoordinates?: { x?: number; y?: number; label?: string } | null;
@@ -166,10 +167,10 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Video" description={goal.videoPath ? "Replay de the move" : "No video available"} />
+          <CardHeader title="Video" description={goal.videoPlaybackUrl || goal.videoPath ? "Replay de the move" : "No video available"} />
           <CardContent>
-            {goal.videoPath ? (
-              <video controls className="w-full rounded-xl border border-border/60" src={goal.videoPath} />
+            {goal.videoPlaybackUrl || goal.videoPath ? (
+              <video controls className="w-full rounded-xl border border-border/60" src={goal.videoPlaybackUrl || goal.videoPath || undefined} />
             ) : (
               <div className="text-sm text-muted-foreground">No video available.</div>
             )}

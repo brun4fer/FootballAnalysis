@@ -659,6 +659,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                           transitionDrawing: editingGoal.transitionDrawing,
                           notes: editingGoal.notes,
                           videoPath: editingGoal.videoPath,
+                          mediaAssetId: editingGoal.mediaAssetId,
                           involvements: editingGoal.involvements,
                           cornerTakerId: editingGoal.cornerTakerId,
                           freekickTakerId: editingGoal.freekickTakerId,

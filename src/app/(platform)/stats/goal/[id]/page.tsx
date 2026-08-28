@@ -170,13 +170,13 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
         <Card>
 
-          <CardHeader title="Video" description={goal.videoPath ? "Replay de the move" : "No video available"} />
+          <CardHeader title="Video" description={goal.videoPlaybackUrl || goal.videoPath ? "Replay de the move" : "No video available"} />
 
           <CardContent>
 
-            {goal.videoPath ? (
+            {goal.videoPlaybackUrl || goal.videoPath ? (
 
-              <video controls className="w-full rounded-xl border border-border/60" src={goal.videoPath} />
+              <video controls className="w-full rounded-xl border border-border/60" src={goal.videoPlaybackUrl || goal.videoPath || undefined} />
 
             ) : (
 

@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAppContext } from "@/components/ui/app-context";
 
 
-import { FileUpload } from "@/components/ui/file-upload";
+import { GoalVideoPicker } from "@/components/goal-video-picker";
 import { cn } from "@/lib/utils";
 
 
@@ -1025,6 +1025,7 @@ type ExistingGoal = {
   goalkeeperOutlet?: string | null;
   notes: string | null;
   videoPath: string | null;
+  mediaAssetId?: string | null;
   involvements?: Involvement[];
 };
 
@@ -1073,6 +1074,7 @@ const [transitionDrawingPoint, setTransitionDrawingPoint] = useState<Point | nul
 const [attackingSpaceId, setAttackingSpaceId] = useState<number | undefined>();
 const [notes, setNotes] = useState("");
 const [videoPath, setVideoPath] = useState("");
+const [mediaAssetId, setMediaAssetId] = useState<string | null>(null);
 const [involvements, setInvolvements] = useState<Involvement[]>([]);
 const [fieldPoint, setFieldPoint] = useState<Point | null>(null);
 const [message, setMessage] = useState<string | null>(null);
@@ -1185,6 +1187,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       foulSufferedById,
       goalCoordinates: goalPoint ?? undefined,
       videoPath: videoPath || undefined,
+      mediaAssetId: mediaAssetId || undefined,
       fieldDrawing: fieldPoint ?? undefined,
       assistDrawing: assistDrawingPoint ?? undefined,
       transitionDrawing: transitionDrawingPoint ?? undefined,
@@ -1226,6 +1229,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     setAttackingSpaceId(undefined);
     setNotes("");
     setVideoPath("");
+    setMediaAssetId(null);
     setInvolvements([]);
     setFieldPoint(null);
     setCornerTakerId(undefined);
@@ -1324,6 +1328,7 @@ const updateMutation = useMutation({
       foulSufferedById,
       goalCoordinates: goalPoint ?? undefined,
       videoPath: videoPath || undefined,
+      mediaAssetId: mediaAssetId || undefined,
       fieldDrawing: fieldPoint ?? undefined,
       assistDrawing: assistDrawingPoint ?? undefined,
       transitionDrawing: transitionDrawingPoint ?? undefined,
@@ -1785,6 +1790,7 @@ const filteredChampionships = useMemo(() => {
     setGoalkeeperOutlet(existingGoal.goalkeeperOutlet ?? "");
     setNotes(existingGoal.notes ?? "");
     setVideoPath(existingGoal.videoPath ?? "");
+    setMediaAssetId(existingGoal.mediaAssetId ?? null);
     setInvolvements(existingGoal.involvements ?? []);
     setCornerTakerId(existingGoal.cornerTakerId ?? undefined);
     setFreekickTakerId(existingGoal.freekickTakerId ?? undefined);
@@ -3313,24 +3319,13 @@ const filteredChampionships = useMemo(() => {
                 <label className="text-sm font-medium">Video do goal</label>
 
 
-                <FileUpload
-
-
-                  label={videoPath ? "Update video" : "Upload video"}
-
-
-                  accept="video/mp4,video/*"
-
-
-                  value={videoPath}
-
-
-                  onChange={(path) => setVideoPath(path)}
-
-
-                  helperText="The file will be stored in Vercel Blob with a public URL."
-
-
+                <GoalVideoPicker
+                  mediaAssetId={mediaAssetId}
+                  legacyPath={videoPath}
+                  onChange={(selection) => {
+                    setMediaAssetId(selection.mediaAssetId);
+                    setVideoPath(selection.legacyPath);
+                  }}
                 />
 
 
@@ -3739,7 +3734,7 @@ const filteredChampionships = useMemo(() => {
                 <span className="text-muted-foreground">Video</span>
 
 
-                <span>{videoPath ? "Anexado" : "—"}</span>
+                <span>{videoPath || mediaAssetId ? "Anexado" : "—"}</span>
 
 
               </div>

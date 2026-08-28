@@ -230,6 +230,7 @@ export const goals = pgTable(
       .notNull()
       .references(() => actions.id),
     videoPath: text("video_path"),
+    mediaAssetId: text("media_asset_id"),
     goalZoneId: smallint("goal_zone_id").references(() => goalkeeperZones.id),
     cornerTakerId: bigint("corner_taker_id", { mode: "number" }).references(() => players.id),
     freekickTakerId: bigint("freekick_taker_id", { mode: "number" }).references(() => players.id),
@@ -262,6 +263,7 @@ export const goals = pgTable(
     idxAssist: index("idx_goals_assist").on(table.assistId),
     idxMoment: index("idx_goals_moment").on(table.momentId),
     idxAction: index("idx_goals_action").on(table.actionId),
+    idxMediaAsset: index("idx_goals_media_asset").on(table.mediaAssetId),
     idxZone: index("idx_goals_zone").on(table.goalZoneId),
     idxCornerTaker: index("idx_goals_corner_taker").on(table.cornerTakerId),
     idxFreekickTaker: index("idx_goals_freekick_taker").on(table.freekickTakerId),

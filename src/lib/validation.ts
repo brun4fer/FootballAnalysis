@@ -61,6 +61,7 @@ export const goalInputSchema = z
     previousMomentDescription: z.string().optional().or(z.literal("")).nullable(),
     goalCoordinates: pointSchema.optional().nullable(),
     videoPath: z.string().optional().or(z.literal("")).nullable(),
+    mediaAssetId: z.string().max(120).optional().or(z.literal("")).nullable(),
     fieldDrawing: fieldDrawingSchema.optional(),
     assistCoordinates: zoneMarkerSchema.optional().nullable(),
     assistDrawing: pointSchema.optional().nullable(),

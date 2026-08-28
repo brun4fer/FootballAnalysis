@@ -4,6 +4,9 @@ import { db } from "../db/client";
 import { actions, goalActions, goals, goalInvolvements, goalSubMomentActions, moments, players, subMoments, teams } from "../schema/schema";
 import { goalInputSchema } from "../lib/validation";
 import { requireOwnedGoal, requireOwnedTeam } from "./workspace";
+import { requireUser } from "@/lib/auth";
+import { getMediaAsset, removeGoalMediaReference, setGoalMediaReference } from "@/lib/media-library";
+import { ensureMediaWorkspace } from "@/lib/media-workspace";
 
 type RawGoalPayload = Record<string, unknown>;
 
@@ -443,6 +446,7 @@ export async function getGoalById(goalId: number) {
       subMomentName: subMoments.name,
       actionName: actions.name,
       videoPath: goals.videoPath,
+      mediaAssetId: goals.mediaAssetId,
       fieldDrawing: goals.fieldDrawing,
       goalCoordinates: goals.goalCoordinates,
       assistCoordinates: goals.assistCoordinates,
@@ -563,6 +567,9 @@ export async function getGoalById(goalId: number) {
 
   return {
     ...row[0],
+    videoPlaybackUrl: row[0].mediaAssetId
+      ? `/api/media/assets/${encodeURIComponent(row[0].mediaAssetId)}/playback`
+      : row[0].videoPath,
     referencePlayerId,
     referencePlayerName,
     throwInTakerId,
@@ -614,6 +621,17 @@ async function upsertGoal(
     await requireOwnedGoal(existingGoalId as number);
     if (!existingGoal) throw new Error("Goal not found");
     if (existingGoal.teamId !== parsed.teamId) throw new Error("Cannot move goal to another team");
+  }
+
+  let selectedMediaWorkspaceId: string | null = null;
+  if (parsed.mediaAssetId) {
+    const account = await requireUser();
+    const { mediaWorkspace } = await ensureMediaWorkspace(account);
+    const mediaAsset = await getMediaAsset(mediaWorkspace.id, parsed.mediaAssetId);
+    if (!mediaAsset || mediaAsset.storageStatus !== "READY") {
+      throw new Error("The selected cloud video is not available in this workspace");
+    }
+    selectedMediaWorkspaceId = mediaWorkspace.id;
   }
 
   const [team, scorer, opponent, moment] = await Promise.all([
@@ -810,6 +828,7 @@ async function upsertGoal(
       goalZoneId: null,
       goalCoordinates: parsed.goalCoordinates ?? null,
       videoPath: parsed.videoPath || null,
+      mediaAssetId: parsed.mediaAssetId || null,
       fieldDrawing: parsed.fieldDrawing ?? null,
       assistCoordinates: parsed.assistDrawing ?? parsed.assistCoordinates ?? null,
       cornerProfile: isCorner ? parsed.cornerProfile ?? null : null,
@@ -868,6 +887,20 @@ async function upsertGoal(
     return currentGoalId;
   });
 
+  try {
+    if (parsed.mediaAssetId && selectedMediaWorkspaceId) {
+      await setGoalMediaReference({
+        mediaWorkspaceId: selectedMediaWorkspaceId,
+        mediaAssetId: parsed.mediaAssetId,
+        goalId
+      });
+    } else if (mode === "update" && existingGoal?.mediaAssetId) {
+      await removeGoalMediaReference(goalId);
+    }
+  } catch (error) {
+    console.error("[goal-media-reference]", error);
+  }
+
   return goalId;
 }
 
@@ -898,6 +931,12 @@ export async function deleteGoal(goalId: number) {
     await tx.delete(goalInvolvements).where(eq(goalInvolvements.goalId, goalId));
     await tx.delete(goals).where(eq(goals.id, goalId));
   });
+
+  try {
+    await removeGoalMediaReference(goalId);
+  } catch (error) {
+    console.error("[goal-media-reference-delete]", error);
+  }
 
   return goalId;
 }

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { logoutAction, updateCredentialsAction } from "@/actions/auth";
 import { requireUser } from "@/lib/auth";
+import { MediaLibraryLinkPanel } from "@/components/media-library-link-panel";
 
 const errorMessages: Record<string, string> = {
   username: "The username must contain 3 to 40 letters, numbers or the characters . _ -",
@@ -58,6 +59,7 @@ export default async function AccountPage({ searchParams }: { searchParams: { er
             Save and continue
           </button>
         </form>
+        {!user.mustChangePassword && <MediaLibraryLinkPanel />}
         <form action={logoutAction} className="text-center">
           <button className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
             Sign out and use another account
