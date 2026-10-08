@@ -19,6 +19,20 @@ function databaseErrorCode(error: unknown): string | undefined {
   return databaseErrorCode(candidate.cause);
 }
 
+const unavailableDatabaseCodes = new Set([
+  "28P01", // invalid_password
+  "3D000", // invalid_catalog_name
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+  "EHOSTUNREACH"
+]);
+
+function isDatabaseUnavailable(error: unknown) {
+  const code = databaseErrorCode(error);
+  return Boolean(code && unavailableDatabaseCodes.has(code));
+}
+
 function workspaceSlug(name: string) {
   const base = name
     .normalize("NFD")
@@ -54,6 +68,7 @@ export async function loginAction(formData: FormData) {
     await createSession(user.id);
   } catch (error) {
     if (databaseErrorCode(error) === "42P01") redirect("/login?error=setup");
+    if (isDatabaseUnavailable(error)) redirect("/login?error=database");
     throw error;
   }
 
@@ -111,6 +126,7 @@ export async function registerAction(formData: FormData) {
   } catch (error) {
     const code = databaseErrorCode(error);
     if (code === "42P01") redirect("/register?error=setup");
+    if (isDatabaseUnavailable(error)) redirect("/register?error=database");
     if (code === "23505" || code === "USERNAME_TAKEN") redirect("/register?error=taken");
     throw error;
   }

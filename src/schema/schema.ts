@@ -181,7 +181,9 @@ export const subMoments = pgTable(
     momentId: bigint("moment_id", { mode: "number" })
       .notNull()
       .references(() => moments.id, { onDelete: "cascade" }),
-    name: text("name").notNull()
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true)
   },
   (table) => ({
     uniqueMomentName: uniqueIndex("sub_moments_moment_name_key").on(table.momentId, table.name)
@@ -223,12 +225,8 @@ export const goals = pgTable(
     momentId: bigint("moment_id", { mode: "number" })
       .notNull()
       .references(() => moments.id),
-    subMomentId: bigint("sub_moment_id", { mode: "number" })
-      .notNull()
-      .references(() => subMoments.id),
-    actionId: bigint("action_id", { mode: "number" })
-      .notNull()
-      .references(() => actions.id),
+    subMomentId: bigint("sub_moment_id", { mode: "number" }).references(() => subMoments.id),
+    actionId: bigint("action_id", { mode: "number" }).references(() => actions.id),
     videoPath: text("video_path"),
     mediaAssetId: text("media_asset_id"),
     goalZoneId: smallint("goal_zone_id").references(() => goalkeeperZones.id),
@@ -291,8 +289,11 @@ export const goalSubMomentActions = pgTable(
     sequenceOrder: integer("sequence_order").notNull()
   },
   (table) => ({
-    uniqGoalSequenceOrder: uniqueIndex("goal_sub_moment_actions_goal_sequence_key").on(table.goalId, table.sequenceOrder),
-    uniqGoalSubMoment: uniqueIndex("goal_sub_moment_actions_goal_sub_moment_key").on(table.goalId, table.subMomentId),
+    uniqGoalSubMomentAction: uniqueIndex("goal_sub_moment_actions_goal_sub_moment_action_key").on(
+      table.goalId,
+      table.subMomentId,
+      table.actionId
+    ),
     idxGoal: index("idx_goal_sub_moment_actions_goal").on(table.goalId),
     idxSubMoment: index("idx_goal_sub_moment_actions_sub_moment").on(table.subMomentId),
     idxAction: index("idx_goal_sub_moment_actions_action").on(table.actionId),

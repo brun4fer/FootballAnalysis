@@ -46,11 +46,15 @@ async function ensureOffensiveOrganizationLaunchAction(params: {
     .onConflictDoNothing({ target: [actions.subMomentId, actions.name] });
 }
 
-export async function getLookups() {
+export async function getLookups(options: { includeInactive?: boolean } = {}) {
   const workspaceId = await getWorkspaceId();
   const [momentsRows, subMomentRows, championshipRows, teamRows, seasonRows] = await Promise.all([
     db.select().from(moments).orderBy(asc(moments.name)),
-    db.select().from(subMoments).orderBy(asc(subMoments.name)),
+    db
+      .select()
+      .from(subMoments)
+      .where(options.includeInactive ? undefined : eq(subMoments.isActive, true))
+      .orderBy(asc(subMoments.momentId), asc(subMoments.sortOrder), asc(subMoments.name)),
     db.select().from(championships).where(eq(championships.workspaceId, workspaceId)).orderBy(asc(championships.name)),
     db.select().from(teams).where(eq(teams.workspaceId, workspaceId)).orderBy(asc(teams.name)),
     db.select().from(seasons).where(eq(seasons.workspaceId, workspaceId)).orderBy(asc(seasons.name))

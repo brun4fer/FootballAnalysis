@@ -42,7 +42,7 @@ type LookupResponse = {
   moments: Array<{ id: number; name: string }>;
 
 
-  subMoments: Array<{ id: number; name: string; momentId: number }>;
+  subMoments: Array<{ id: number; name: string; momentId: number; sortOrder: number; isActive: boolean }>;
 
 
   actions: Array<{ id: number; name: string; subMomentId: number; context: "field" | "field_goal" }>;
@@ -132,13 +132,6 @@ const recoveryActionOrder = [
   "profundidade",
   "remate fora de area",
   "jogador referencia"
-] as const;
-
-const offensiveOrganizationSequenceNames = [
-  "saida do gr",
-  "construcao",
-  "criacao",
-  "finalizacao"
 ] as const;
 
 const normalizeRecoveryAction = (name: string) => {
@@ -650,6 +643,7 @@ function PitchPinpoint({
 
 
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const attackArrowId = `attack-arrow-${storageField}`;
 
 
   const normalize = (clientX: number, clientY: number) => {
@@ -738,11 +732,20 @@ function PitchPinpoint({
 
         >
 
+          <defs>
+            <marker id={attackArrowId} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#22d3ee" />
+            </marker>
+          </defs>
+
 
           <rect x="4" y="6" width="112" height="68" rx="6" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
 
 
           <rect x="8" y="10" width="104" height="60" rx="4" fill="url(#pitchGradient)" stroke="rgba(148,163,184,0.35)" strokeWidth="0.8" />
+
+          <line x1="45" y1="75" x2="75" y2="75" stroke="#22d3ee" strokeWidth="1.2" markerEnd={`url(#${attackArrowId})`} />
+          <text x="60" y="73" textAnchor="middle" fill="#67e8f9" fontSize="3.2" fontWeight="700">ATTACK</text>
 
 
           <line x1="60" y1="10" x2="60" y2="70" stroke="rgba(148,163,184,0.35)" strokeWidth="0.8" strokeDasharray="3 3" />
@@ -1055,7 +1058,7 @@ const [minute, setMinute] = useState(0);
 const [momentId, setMomentId] = useState<number | undefined>();
 const [subMomentId, setSubMomentId] = useState<number | undefined>();
 const [actionIds, setActionIds] = useState<number[]>([]);
-const [offensiveSequenceActionBySubMoment, setOffensiveSequenceActionBySubMoment] = useState<Record<number, number>>({});
+const [offensiveSequenceActionBySubMoment, setOffensiveSequenceActionBySubMoment] = useState<Record<number, number[]>>({});
 const [cornerProfile, setCornerProfile] = useState<string>("");
 const [freekickProfile, setFreekickProfile] = useState<string>("");
 const [throwInProfile, setThrowInProfile] = useState<string>("");
@@ -1105,28 +1108,32 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
 
   const createMutation = useMutation({
   mutationFn: async () => {
-    const subMomentSequencePayload = isOffensiveOrganizationMoment
+    const subMomentSequencePayload = isPhaseSequenceMoment
       ? [...offensiveOrganizationSequenceSelection]
           .sort((a, b) => a.sequenceOrder - b.sequenceOrder)
           .map((entry) => ({ ...entry }))
       : resolvedSubMomentId && resolvedActionIds.length > 0
         ? [{ subMomentId: resolvedSubMomentId, actionId: resolvedActionIds[0], sequenceOrder: 1 }]
         : [];
-    const effectiveActionIds = isOffensiveOrganizationMoment
+    const effectiveActionIds = isPhaseSequenceMoment
       ? subMomentSequencePayload.map((entry) => entry.actionId)
       : resolvedActionIds;
-    const effectiveSubMomentId = isOffensiveOrganizationMoment
-      ? subMomentSequencePayload[subMomentSequencePayload.length - 1]?.subMomentId
-      : resolvedSubMomentId;
+    const effectiveSubMomentId = isOffensiveTransitionMoment
+      ? subMomentId
+      : isOffensiveOrganizationMoment
+        ? subMomentSequencePayload[subMomentSequencePayload.length - 1]?.subMomentId
+        : resolvedSubMomentId;
 
-    if (!teamId || !opponentTeamId || !scorerId || !momentId || !effectiveSubMomentId || effectiveActionIds.length === 0) {
+    const hasTacticalContext = isOffensiveOrganizationMoment
+      ? hasCompleteOffensiveOrganizationCatalogue
+      : isOffensiveTransitionMoment
+        ? Boolean(subMomentId && hasCompleteOffensiveOrganizationCatalogue)
+        : Boolean(effectiveSubMomentId && effectiveActionIds.length > 0);
+    if (!teamId || !opponentTeamId || !scorerId || !momentId || !hasTacticalContext) {
       throw new Error("Required fields are missing");
     }
-    if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationCatalogue) {
-      throw new Error("Organised Attack sub-phases were not found in the catalogue.");
-    }
-    if (isOffensiveOrganizationMoment && !hasAnyOffensiveOrganizationSelection) {
-      throw new Error("Select at least one Organised Attack phase.");
+    if (isPhaseSequenceMoment && !hasCompleteOffensiveOrganizationCatalogue) {
+      throw new Error("The phase configuration is incomplete.");
     }
     if (!seasonId || !championshipId) throw new Error("Select a season and competition.");
 
@@ -1247,28 +1254,32 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
 const updateMutation = useMutation({
   mutationFn: async () => {
     if (!existingGoal) return;
-    const subMomentSequencePayload = isOffensiveOrganizationMoment
+    const subMomentSequencePayload = isPhaseSequenceMoment
       ? [...offensiveOrganizationSequenceSelection]
           .sort((a, b) => a.sequenceOrder - b.sequenceOrder)
           .map((entry) => ({ ...entry }))
       : resolvedSubMomentId && resolvedActionIds.length > 0
         ? [{ subMomentId: resolvedSubMomentId, actionId: resolvedActionIds[0], sequenceOrder: 1 }]
         : [];
-    const effectiveActionIds = isOffensiveOrganizationMoment
+    const effectiveActionIds = isPhaseSequenceMoment
       ? subMomentSequencePayload.map((entry) => entry.actionId)
       : resolvedActionIds;
-    const effectiveSubMomentId = isOffensiveOrganizationMoment
-      ? subMomentSequencePayload[subMomentSequencePayload.length - 1]?.subMomentId
-      : resolvedSubMomentId;
+    const effectiveSubMomentId = isOffensiveTransitionMoment
+      ? subMomentId
+      : isOffensiveOrganizationMoment
+        ? subMomentSequencePayload[subMomentSequencePayload.length - 1]?.subMomentId
+        : resolvedSubMomentId;
 
-    if (!teamId || !opponentTeamId || !scorerId || !momentId || !effectiveSubMomentId || effectiveActionIds.length === 0) {
+    const hasTacticalContext = isOffensiveOrganizationMoment
+      ? hasCompleteOffensiveOrganizationCatalogue
+      : isOffensiveTransitionMoment
+        ? Boolean(subMomentId && hasCompleteOffensiveOrganizationCatalogue)
+        : Boolean(effectiveSubMomentId && effectiveActionIds.length > 0);
+    if (!teamId || !opponentTeamId || !scorerId || !momentId || !hasTacticalContext) {
       throw new Error("Required fields are missing");
     }
-    if (isOffensiveOrganizationMoment && !hasCompleteOffensiveOrganizationCatalogue) {
-      throw new Error("Organised Attack sub-phases were not found in the catalogue.");
-    }
-    if (isOffensiveOrganizationMoment && !hasAnyOffensiveOrganizationSelection) {
-      throw new Error("Select at least one Organised Attack phase.");
+    if (isPhaseSequenceMoment && !hasCompleteOffensiveOrganizationCatalogue) {
+      throw new Error("The phase configuration is incomplete.");
     }
     if (!seasonId || !championshipId) throw new Error("Select a season and competition.");
 
@@ -1424,89 +1435,93 @@ const filteredChampionships = useMemo(() => {
   const selectedMoment = momentId ? lookupsQuery.data?.moments.find((m) => m.id === momentId) : undefined;
   const normalizedMomentName = normalizeActionName(selectedMoment?.name ?? "");
   const isOffensiveOrganizationMoment = normalizedMomentName === "organizacao ofensiva";
+  const isOffensiveTransitionMoment = normalizedMomentName === "transicao ofensiva";
+  const isPhaseSequenceMoment = isOffensiveOrganizationMoment || isOffensiveTransitionMoment;
+
+  const selectedRecoverySubMoment = subMomentId
+    ? lookupsQuery.data?.subMoments.find((subMoment) => subMoment.id === subMomentId)
+    : undefined;
+  const normalizedRecoverySubMomentName = normalizeActionName(selectedRecoverySubMoment?.name ?? "");
+  const isRecoveryDefensiveSubMoment =
+    normalizedRecoverySubMomentName.includes("recuperacao") && normalizedRecoverySubMomentName.includes("meio campo defensivo");
+  const isRecoveryOffensiveSubMoment =
+    normalizedRecoverySubMomentName.includes("recuperacao") && normalizedRecoverySubMomentName.includes("meio campo ofensivo");
+  const isTransitionRecoverySubMoment = isRecoveryDefensiveSubMoment || isRecoveryOffensiveSubMoment;
+  const isOffensiveTransitionRecovery = isOffensiveTransitionMoment && isTransitionRecoverySubMoment;
+
+  const organizationPhases = useMemo(() => {
+    if (!lookupsQuery.data) return [];
+    const organizationMoment = lookupsQuery.data.moments.find(
+      (entry) => normalizeActionName(entry.name) === "organizacao ofensiva"
+    );
+    if (!organizationMoment) return [];
+    return lookupsQuery.data.subMoments
+      .filter((subMoment) => subMoment.momentId === organizationMoment.id)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+      .slice(0, 4);
+  }, [lookupsQuery.data]);
+
+  const requiredPhaseRows = useMemo(() => {
+    if (isOffensiveOrganizationMoment || isRecoveryDefensiveSubMoment) return organizationPhases;
+    if (isOffensiveTransitionMoment && isRecoveryOffensiveSubMoment) return organizationPhases.slice(2, 4);
+    return [];
+  }, [isOffensiveOrganizationMoment, isOffensiveTransitionMoment, isRecoveryDefensiveSubMoment, isRecoveryOffensiveSubMoment, organizationPhases]);
 
   const offensiveOrganizationSubMomentRows = useMemo(() => {
-    if (!isOffensiveOrganizationMoment || !lookupsQuery.data) return [];
-    const byNormalizedName = new Map(filteredSubMoments.map((subMoment) => [normalizeActionName(subMoment.name), subMoment]));
-    return offensiveOrganizationSequenceNames
-      .map((name, index) => {
-        const subMoment = byNormalizedName.get(name);
-        if (!subMoment) return null;
+    if (!isPhaseSequenceMoment || !lookupsQuery.data || requiredPhaseRows.length === 0) return [];
+    return requiredPhaseRows
+      .map((subMoment) => {
+        const sequenceOrder = organizationPhases.findIndex((phase) => phase.id === subMoment.id) + 1;
         const availableActions = lookupsQuery.data.actions.filter((action) => {
           if (action.subMomentId !== subMoment.id) return false;
           return !hiddenActionNames.has(normalizeActionName(action.name));
         });
         return {
-          sequenceOrder: index + 1,
+          sequenceOrder,
           subMoment,
           actions: availableActions
         };
-      })
-      .filter(
-        (
-          row
-        ): row is {
-          sequenceOrder: number;
-          subMoment: { id: number; name: string; momentId: number };
-          actions: LookupAction[];
-        } => Boolean(row)
-      );
-  }, [isOffensiveOrganizationMoment, filteredSubMoments, lookupsQuery.data]);
+      });
+  }, [isPhaseSequenceMoment, requiredPhaseRows, organizationPhases, lookupsQuery.data]);
 
   const offensiveOrganizationSequenceSelection = useMemo(
     () =>
       offensiveOrganizationSubMomentRows
-        .map((row) => {
-          const actionId = offensiveSequenceActionBySubMoment[row.subMoment.id];
-          if (!actionId) return null;
-          return {
+        .flatMap((row) =>
+          (offensiveSequenceActionBySubMoment[row.subMoment.id] ?? []).map((actionId) => ({
             subMomentId: row.subMoment.id,
             actionId,
             sequenceOrder: row.sequenceOrder
-          };
-        })
-        .filter(
-          (
-            item
-          ): item is {
-            subMomentId: number;
-            actionId: number;
-            sequenceOrder: number;
-          } => Boolean(item)
+          }))
         ),
     [offensiveOrganizationSubMomentRows, offensiveSequenceActionBySubMoment]
   );
 
   useEffect(() => {
-    if (!isOffensiveOrganizationMoment) return;
+    if (!isPhaseSequenceMoment) return;
     const validSubMomentIds = new Set(offensiveOrganizationSubMomentRows.map((row) => row.subMoment.id));
     setOffensiveSequenceActionBySubMoment((prev) => {
       const nextEntries = Object.entries(prev).filter(([key]) => validSubMomentIds.has(Number(key)));
       if (nextEntries.length === Object.keys(prev).length) return prev;
       return Object.fromEntries(nextEntries.map(([key, value]) => [Number(key), value]));
     });
-  }, [isOffensiveOrganizationMoment, offensiveOrganizationSubMomentRows]);
+  }, [isPhaseSequenceMoment, offensiveOrganizationSubMomentRows]);
 
+  const expectedPhaseCount = isRecoveryOffensiveSubMoment ? 2 : 4;
   const hasCompleteOffensiveOrganizationCatalogue =
-    offensiveOrganizationSubMomentRows.length === offensiveOrganizationSequenceNames.length;
-  const hasAnyOffensiveOrganizationSelection = offensiveOrganizationSequenceSelection.length > 0;
+    requiredPhaseRows.length === expectedPhaseCount && offensiveOrganizationSubMomentRows.length === expectedPhaseCount;
 
-  const resolvedSubMomentId = isOffensiveOrganizationMoment
-    ? offensiveOrganizationSequenceSelection[offensiveOrganizationSequenceSelection.length - 1]?.subMomentId
-    : subMomentId;
-  const resolvedActionIds = isOffensiveOrganizationMoment
+  const resolvedSubMomentId = isOffensiveTransitionMoment
+    ? subMomentId
+    : isOffensiveOrganizationMoment
+      ? offensiveOrganizationSequenceSelection[offensiveOrganizationSequenceSelection.length - 1]?.subMomentId
+      : subMomentId;
+  const resolvedActionIds = isPhaseSequenceMoment
     ? offensiveOrganizationSequenceSelection.map((entry) => entry.actionId)
     : actionIds;
 
   const selectedSubMoment = resolvedSubMomentId ? lookupsQuery.data?.subMoments.find((s) => s.id === resolvedSubMomentId) : undefined;
   const normalizedSubMomentName = normalizeActionName(selectedSubMoment?.name ?? "");
-  const isOffensiveTransitionMoment = normalizedMomentName === "transicao ofensiva";
-  const isRecoveryDefensiveSubMoment =
-    normalizedSubMomentName.includes("recuperacao") && normalizedSubMomentName.includes("meio campo defensivo");
-  const isRecoveryOffensiveSubMoment =
-    normalizedSubMomentName.includes("recuperacao") && normalizedSubMomentName.includes("meio campo ofensivo");
-  const isTransitionRecoverySubMoment = isRecoveryDefensiveSubMoment || isRecoveryOffensiveSubMoment;
-  const isOffensiveTransitionRecovery = isOffensiveTransitionMoment && isTransitionRecoverySubMoment;
   const transitionRecoveryZoneLabel = isRecoveryDefensiveSubMoment
     ? "Recovery in the Defensive Half"
     : isRecoveryOffensiveSubMoment
@@ -1530,7 +1545,7 @@ const filteredChampionships = useMemo(() => {
   }, [shouldShowTransitionStep, step]);
 
   const filteredActions = useMemo(() => {
-    if (isOffensiveOrganizationMoment) return [];
+    if (isPhaseSequenceMoment) return [];
     if (!subMomentId || !lookupsQuery.data) return [];
     const bySubMoment = lookupsQuery.data.actions.filter((a) => {
       if (a.subMomentId !== subMomentId) return false;
@@ -1563,10 +1578,10 @@ const filteredChampionships = useMemo(() => {
     return recoveryActionOrder
       .map((canonical) => actionByCanonical.get(canonical))
       .filter((action): action is LookupAction => Boolean(action));
-  }, [lookupsQuery.data, subMomentId, isOffensiveTransitionRecovery, isOffensiveOrganizationMoment]);
+  }, [lookupsQuery.data, subMomentId, isOffensiveTransitionRecovery, isPhaseSequenceMoment]);
 
   useEffect(() => {
-    if (isOffensiveOrganizationMoment) {
+    if (isPhaseSequenceMoment) {
       setActionIds([]);
       return;
     }
@@ -1577,7 +1592,7 @@ const filteredChampionships = useMemo(() => {
       }
       return next;
     });
-  }, [filteredActions, isOffensiveOrganizationMoment]);
+  }, [filteredActions, isPhaseSequenceMoment]);
 
   useEffect(() => {
     if (!shouldShowTransitionStep || !attackingSpaceId) return;
@@ -1597,28 +1612,29 @@ const filteredChampionships = useMemo(() => {
 
   const selectedActions = useMemo(() => {
     if (!lookupsQuery.data) return [];
-    if (isOffensiveOrganizationMoment) {
+    if (isPhaseSequenceMoment) {
       const actionById = new Map(lookupsQuery.data.actions.map((action) => [action.id, action]));
       return offensiveOrganizationSequenceSelection
         .map((entry) => actionById.get(entry.actionId))
         .filter((action): action is LookupAction => Boolean(action));
     }
     return filteredActions.filter((a) => actionIds.includes(a.id));
-  }, [lookupsQuery.data, isOffensiveOrganizationMoment, offensiveOrganizationSequenceSelection, filteredActions, actionIds]);
+  }, [lookupsQuery.data, isPhaseSequenceMoment, offensiveOrganizationSequenceSelection, filteredActions, actionIds]);
 
   const offensiveSequenceSummary = useMemo(() => {
-    if (!lookupsQuery.data || !isOffensiveOrganizationMoment) return [];
+    if (!lookupsQuery.data || !isPhaseSequenceMoment) return [];
     const actionById = new Map(lookupsQuery.data.actions.map((action) => [action.id, action]));
     return offensiveOrganizationSubMomentRows.map((row) => {
-      const selectedActionId = offensiveSequenceActionBySubMoment[row.subMoment.id];
-      const selectedAction = selectedActionId ? actionById.get(selectedActionId) : undefined;
+      const selectedActionNames = (offensiveSequenceActionBySubMoment[row.subMoment.id] ?? [])
+        .map((actionId) => actionById.get(actionId)?.name)
+        .filter((name): name is string => Boolean(name));
       return {
         sequenceOrder: row.sequenceOrder,
         subMomentName: row.subMoment.name,
-        actionName: selectedAction?.name ?? null
+        actionName: selectedActionNames.join(", ") || null
       };
     });
-  }, [lookupsQuery.data, isOffensiveOrganizationMoment, offensiveOrganizationSubMomentRows, offensiveSequenceActionBySubMoment]);
+  }, [lookupsQuery.data, isPhaseSequenceMoment, offensiveOrganizationSubMomentRows, offensiveSequenceActionBySubMoment]);
 
   const normalizedSelectedActionNames = useMemo(
     () => selectedActions.map((action) => normalizeActionName(action.name)),
@@ -1777,7 +1793,10 @@ const filteredChampionships = useMemo(() => {
           ? [{ subMomentId: existingGoal.subMomentId, actionId: existingActions[0], sequenceOrder: 1 }]
           : [];
     setOffensiveSequenceActionBySubMoment(
-      Object.fromEntries(existingSequence.map((entry) => [entry.subMomentId, entry.actionId]))
+      existingSequence.reduce<Record<number, number[]>>((grouped, entry) => {
+        grouped[entry.subMomentId] = [...(grouped[entry.subMomentId] ?? []), entry.actionId];
+        return grouped;
+      }, {})
     );
     setGoalPoint(existingGoal.goalCoordinates ?? null);
     setFieldPoint(existingGoal.fieldDrawing ?? null);
@@ -1880,8 +1899,10 @@ const filteredChampionships = useMemo(() => {
           momentId &&
             minute >= 0 &&
             (isOffensiveOrganizationMoment
-              ? hasAnyOffensiveOrganizationSelection
-              : resolvedSubMomentId && resolvedActionIds.length > 0)
+              ? hasCompleteOffensiveOrganizationCatalogue
+              : isOffensiveTransitionMoment
+                ? subMomentId && hasCompleteOffensiveOrganizationCatalogue
+                : resolvedSubMomentId && resolvedActionIds.length > 0)
         );
 
       case "transition":
@@ -1961,8 +1982,10 @@ const filteredChampionships = useMemo(() => {
 
 
     (isOffensiveOrganizationMoment
-      ? hasAnyOffensiveOrganizationSelection
-      : resolvedSubMomentId && resolvedActionIds.length > 0) &&
+      ? hasCompleteOffensiveOrganizationCatalogue
+      : isOffensiveTransitionMoment
+        ? subMomentId && hasCompleteOffensiveOrganizationCatalogue
+        : resolvedSubMomentId && resolvedActionIds.length > 0) &&
 
 
     (!hasCornerMarkerAction || cornerTakerId) &&
@@ -2768,22 +2791,48 @@ const filteredChampionships = useMemo(() => {
               </div>
 
 
-              {isOffensiveOrganizationMoment ? (
+              {isPhaseSequenceMoment ? (
                 <div className="md:col-span-2 space-y-3">
+                  {isOffensiveTransitionMoment && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Recovery context</label>
+                      <Select
+                        value={subMomentId?.toString() ?? ""}
+                        onChange={(event) => {
+                          setSubMomentId(event.target.value ? Number(event.target.value) : undefined);
+                          setOffensiveSequenceActionBySubMoment({});
+                          setTransitionDrawingPoint(null);
+                          setAttackingSpaceId(undefined);
+                        }}
+                      >
+                        <option value="">Select recovery context</option>
+                        {filteredSubMoments.map((subMoment) => (
+                          <option key={subMoment.id} value={subMoment.id} className="text-black">
+                            {displayFootballTerm(subMoment.name)}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <div>
-                      <label className="text-sm font-medium">Organised Attack Sequence</label>
+                      <label className="text-sm font-medium">
+                        {isOffensiveTransitionMoment ? "Attacking Transition Sequence" : "Organised Attack Sequence"}
+                      </label>
                       <p className="text-xs text-muted-foreground">
-                        Select only the phases observed (each phase is optional).
+                        Select zero, one or several actions in each available phase.
                       </p>
                     </div>
                     <Badge className="bg-cyan-500/10 text-cyan-100">
-                      {offensiveOrganizationSequenceSelection.length}/{offensiveOrganizationSequenceNames.length} fases
+                      {Object.values(offensiveSequenceActionBySubMoment).filter((ids) => ids.length > 0).length}/
+                      {requiredPhaseRows.length} fases
                     </Badge>
                   </div>
                   {!hasCompleteOffensiveOrganizationCatalogue ? (
                     <div className="rounded-xl border border-dashed border-amber-400/40 bg-amber-500/10 p-3 text-xs text-amber-100">
-                      The Organised Attack sub-phase configuration is incomplete.
+                      {isOffensiveTransitionMoment && !subMomentId
+                        ? "Select where possession was recovered to load the available phases."
+                        : "The phase configuration is incomplete."}
                     </div>
                   ) : (
                     <div className="grid gap-3 md:grid-cols-4">
@@ -2797,7 +2846,9 @@ const filteredChampionships = useMemo(() => {
                               Fase {row.sequenceOrder}
                             </span>
                             <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-                              {offensiveSequenceActionBySubMoment[row.subMoment.id] ? "Definida" : "Por definir"}
+                              {(offensiveSequenceActionBySubMoment[row.subMoment.id] ?? []).length > 0
+                                ? "Definida"
+                                : "Sem ação"}
                             </span>
                           </div>
                           <div className="mb-3 text-sm font-semibold text-white">{displayFootballTerm(row.subMoment.name)}</div>
@@ -2808,21 +2859,20 @@ const filteredChampionships = useMemo(() => {
                               </div>
                             ) : (
                               row.actions.map((action) => {
-                                const isSelected = offensiveSequenceActionBySubMoment[row.subMoment.id] === action.id;
+                                const isSelected = (offensiveSequenceActionBySubMoment[row.subMoment.id] ?? []).includes(action.id);
                                 return (
                                   <button
                                     key={`oo-action-${row.subMoment.id}-${action.id}`}
                                     type="button"
                                     onClick={() =>
                                       setOffensiveSequenceActionBySubMoment((prev) => {
-                                        const currentActionId = prev[row.subMoment.id];
-                                        if (currentActionId === action.id) {
-                                          const { [row.subMoment.id]: _removed, ...rest } = prev;
-                                          return rest;
-                                        }
+                                        const currentActionIds = prev[row.subMoment.id] ?? [];
+                                        const nextActionIds = currentActionIds.includes(action.id)
+                                          ? currentActionIds.filter((id) => id !== action.id)
+                                          : [...currentActionIds, action.id];
                                         return {
                                           ...prev,
-                                          [row.subMoment.id]: action.id
+                                          [row.subMoment.id]: nextActionIds
                                         };
                                       })
                                     }
@@ -3557,9 +3607,9 @@ const filteredChampionships = useMemo(() => {
                     ? selectedActions.map((action) => displayFootballTerm(action.name)).join(", ")
                     : "-"}
                 </span>
-                {isOffensiveOrganizationMoment && (
+                {isPhaseSequenceMoment && (
                   <>
-                    <span className="text-muted-foreground">Organised Attack Sequence</span>
+                    <span className="text-muted-foreground">Sequencia de fases</span>
                     <span>
                       {offensiveSequenceSummary.length > 0
                         ? offensiveSequenceSummary

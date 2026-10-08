@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { BarChart3, Trophy, Home, Users } from "lucide-react";
+import { BarChart3, FileBarChart, Trophy, Home, Users } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
 
@@ -9,6 +9,7 @@ const items: NavItem[] = [
   { href: "/teams", label: "Statistics", icon: <BarChart3 className="h-4 w-4" /> },
   { href: "/goals", label: "Record Goal", icon: <Trophy className="h-4 w-4" /> },
   { href: "/rankings", label: "Rankings", icon: <Trophy className="h-4 w-4" /> },
+  { href: "/reports", label: "Reports", icon: <FileBarChart className="h-4 w-4" /> },
   { href: "/manage/teams", label: "Teams", icon: <Users className="h-4 w-4" /> }
 ];
 

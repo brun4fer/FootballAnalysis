@@ -79,6 +79,12 @@ function Pitch({ x, y, pinColor = "#22c55e" }: { x: number; y: number; pinColor?
 
       <rect x="90" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
 
+      <line x1="39" y1="6" x2="64" y2="6" stroke="#94a3b8" strokeWidth="0.8" />
+
+      <path d="M64 3.8L69 6L64 8.2Z" fill="#94a3b8" />
+
+      <text x="52.5" y="4" textAnchor="middle" fill="#94a3b8" fontSize="2.8">Sentido do ataque</text>
+
       <g transform={`translate(${x * 105}, ${y * 68})`}>
 
         <circle r="4" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
@@ -93,6 +99,88 @@ function Pitch({ x, y, pinColor = "#22c55e" }: { x: number; y: number; pinColor?
 
   );
 
+}
+
+type PitchPoint = { x: number; y: number };
+
+function AssistToShotPitch({ assist, shot }: { assist: PitchPoint | null; shot: PitchPoint | null }) {
+  const assistX = assist ? assist.x * 105 : 0;
+  const assistY = assist ? assist.y * 68 : 0;
+  const shotX = shot ? shot.x * 105 : 0;
+  const shotY = shot ? shot.y * 68 : 0;
+
+  return (
+    <div className="space-y-3">
+      <svg
+        viewBox="0 0 105 68"
+        className="w-full rounded-xl border border-border/60 bg-slate-900/60 p-2"
+        role="img"
+        aria-label="Trajetoria entre a zona da assistencia e a zona do remate"
+      >
+        <defs>
+          <marker id="assist-shot-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0 0L6 3L0 6Z" fill="#f8fafc" />
+          </marker>
+          <marker id="attack-direction-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0 0L6 3L0 6Z" fill="#94a3b8" />
+          </marker>
+        </defs>
+        <rect x="1" y="1" width="103" height="66" rx="8" fill="#0b172a" stroke="#1e293b" strokeWidth="1.2" />
+        <line x1="52.5" y1="1" x2="52.5" y2="67" stroke="rgba(148,163,184,0.35)" strokeDasharray="3 3" />
+        <circle cx="52.5" cy="34" r="9.15" stroke="rgba(148,163,184,0.35)" fill="none" />
+        <rect x="1" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
+        <rect x="90" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
+
+        <line
+          x1="39"
+          y1="6"
+          x2="66"
+          y2="6"
+          stroke="#94a3b8"
+          strokeWidth="0.8"
+          markerEnd="url(#attack-direction-arrow)"
+        />
+        <text x="52.5" y="4" textAnchor="middle" fill="#94a3b8" fontSize="2.8">
+          Sentido do ataque
+        </text>
+
+        {assist && shot && (
+          <line
+            x1={assistX}
+            y1={assistY}
+            x2={shotX}
+            y2={shotY}
+            stroke="#f8fafc"
+            strokeWidth="1.25"
+            strokeDasharray="3 2"
+            markerEnd="url(#assist-shot-arrow)"
+          />
+        )}
+        {assist && (
+          <g transform={`translate(${assistX}, ${assistY})`}>
+            <circle r="4" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
+            <circle r="2.15" fill="#38bdf8" />
+            <text x="5" y="-3" fill="#e0f2fe" fontSize="3.2" fontWeight="600">
+              Assistencia
+            </text>
+          </g>
+        )}
+        {shot && (
+          <g transform={`translate(${shotX}, ${shotY})`}>
+            <circle r="4" fill="#f5f5f5" stroke="#0f172a" strokeWidth="0.6" />
+            <circle r="2.15" fill="#22c55e" />
+            <text x="5" y="5" fill="#dcfce7" fontSize="3.2" fontWeight="600">
+              Remate
+            </text>
+          </g>
+        )}
+      </svg>
+      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-400" /> Assistencia</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-green-500" /> Remate</span>
+      </div>
+    </div>
+  );
 }
 
 const normalizeToken = (value?: string | null) =>
@@ -396,18 +484,18 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
 
 
-      <div className={`grid gap-4 ${isTransitionGoal ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+      <div className={`grid gap-4 ${isTransitionGoal ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
 
         <Card>
 
-          <CardHeader title="Assist Location on the Pitch" />
+          <CardHeader title="Trajetoria da Assistencia ao Remate" />
 
           <CardContent>
 
-            {hasAssistDrawing && assistDrawing ? (
-              <Pitch x={assistDrawing.x} y={assistDrawing.y} pinColor="#38bdf8" />
+            {hasAssistDrawing || hasFieldPoint ? (
+              <AssistToShotPitch assist={assistDrawing} shot={goal.fieldDrawing ?? null} />
             ) : (
-              <div className="text-sm text-muted-foreground">No assist coordinates.</div>
+              <div className="text-sm text-muted-foreground">Sem coordenadas de assistencia ou remate.</div>
             )}
 
           </CardContent>
@@ -426,26 +514,6 @@ export default async function GoalDetail({ params }: { params: { id: string } })
             </CardContent>
           </Card>
         )}
-
-        <Card>
-
-          <CardHeader title="Shot Area" />
-
-          <CardContent>
-
-            {hasFieldPoint && goal.fieldDrawing ? (
-
-              <Pitch x={goal.fieldDrawing.x} y={goal.fieldDrawing.y} />
-
-            ) : (
-
-              <div className="text-sm text-muted-foreground">No pitch coordinates.</div>
-
-            )}
-
-          </CardContent>
-
-        </Card>
 
         <Card>
 

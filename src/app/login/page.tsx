@@ -30,7 +30,12 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
             The database update is still pending. Please contact the administrator and try again shortly.
           </p>
         )}
-        {searchParams.error && searchParams.error !== "setup" && (
+        {searchParams.error === "database" && (
+          <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+            It was not possible to connect to the database. Check the local configuration and try again.
+          </p>
+        )}
+        {searchParams.error && !["setup", "database"].includes(searchParams.error) && (
           <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
             The username or password is incorrect.
           </p>

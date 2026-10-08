@@ -44,6 +44,9 @@ export function Header({ user }: HeaderProps) {
           <Link href="/rankings" className="rounded-lg px-3 py-2 text-muted-foreground hover:bg-white/5 hover:text-foreground">
             Rankings
           </Link>
+          <Link href="/reports" className="rounded-lg px-3 py-2 text-muted-foreground hover:bg-white/5 hover:text-foreground">
+            Reports
+          </Link>
           <Link
             href="/account"
             className="ml-2 rounded-lg border border-border/70 px-3 py-1.5 text-right leading-tight hover:bg-white/5"

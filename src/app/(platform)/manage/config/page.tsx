@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 
 type Season = { id: number; name: string; description?: string | null };
 type Championship = { id: number; name: string; country: string; seasonId: number; logo?: string | null };
+type Moment = { id: number; name: string };
+type SubMoment = { id: number; name: string; momentId: number; sortOrder: number; isActive: boolean };
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
@@ -24,15 +26,93 @@ export default function ConfigPage() {
   const [champForm, setChampForm] = useState({ name: "", country: "", seasonId: "", logo: "" });
   const [editingSeason, setEditingSeason] = useState<number | null>(null);
   const [editingChamp, setEditingChamp] = useState<number | null>(null);
+  const [taxonomyMomentId, setTaxonomyMomentId] = useState("");
+  const [newSubMomentName, setNewSubMomentName] = useState("");
+  const [editingSubMomentId, setEditingSubMomentId] = useState<number | null>(null);
+  const [editingSubMomentName, setEditingSubMomentName] = useState("");
+  const [taxonomyMessage, setTaxonomyMessage] = useState<string | null>(null);
 
   const seasonsQuery = useQuery({ queryKey: ["seasons"], queryFn: () => fetchJson<Season[]>(`/api/manage/seasons`) });
   const champsQuery = useQuery({
     queryKey: ["championships"],
     queryFn: () => fetchJson<{ championships: Championship[]; seasons: Season[] }>(`/api/manage/championships`)
   });
+  const taxonomyQuery = useQuery({
+    queryKey: ["taxonomy-admin"],
+    queryFn: () => fetchJson<{ moments: Moment[]; subMoments: SubMoment[] }>("/api/lookups?includeInactive=1")
+  });
 
   const seasons = seasonsQuery.data ?? champsQuery.data?.seasons ?? [];
   const championships = champsQuery.data?.championships ?? [];
+  const taxonomyMoments = taxonomyQuery.data?.moments ?? [];
+  const visibleSubMoments = useMemo(
+    () =>
+      (taxonomyQuery.data?.subMoments ?? [])
+        .filter((subMoment) => subMoment.momentId === Number(taxonomyMomentId))
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
+    [taxonomyQuery.data?.subMoments, taxonomyMomentId]
+  );
+
+  const refreshTaxonomy = () => {
+    qc.invalidateQueries({ queryKey: ["taxonomy-admin"] });
+    qc.invalidateQueries({ queryKey: ["lookups"] });
+  };
+
+  const saveSubMoment = useMutation({
+    mutationFn: async () => {
+      setTaxonomyMessage(null);
+      if (editingSubMomentId) {
+        return fetchJson(`/api/lookups/sub-moments/${editingSubMomentId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: editingSubMomentName })
+        });
+      }
+      return fetchJson("/api/lookups/sub-moments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ momentId: Number(taxonomyMomentId), name: newSubMomentName })
+      });
+    },
+    onSuccess: () => {
+      refreshTaxonomy();
+      setNewSubMomentName("");
+      setEditingSubMomentId(null);
+      setEditingSubMomentName("");
+      setTaxonomyMessage("Sub-moment saved.");
+    },
+    onError: (error: Error) => setTaxonomyMessage(error.message)
+  });
+
+  const setSubMomentActive = useMutation({
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
+      fetchJson(`/api/lookups/sub-moments/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive })
+      }),
+    onSuccess: refreshTaxonomy,
+    onError: (error: Error) => setTaxonomyMessage(error.message)
+  });
+
+  const reorderSubMoments = useMutation({
+    mutationFn: (orderedIds: number[]) =>
+      fetchJson("/api/lookups/sub-moments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds })
+      }),
+    onSuccess: refreshTaxonomy,
+    onError: (error: Error) => setTaxonomyMessage(error.message)
+  });
+
+  const moveSubMoment = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= visibleSubMoments.length) return;
+    const reordered = [...visibleSubMoments];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    reorderSubMoments.mutate(reordered.map((entry) => entry.id));
+  };
 
   const saveSeason = useMutation({
     mutationFn: async () => {
@@ -94,6 +174,130 @@ export default function ConfigPage() {
           </Link>
         </div>
       </div>
+
+      <Card>
+        <CardHeader
+          title="Moments and sub-moments"
+          description="Add, rename, order or hide sub-moments. Hidden entries remain visible in historical goals."
+        />
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-[1fr_2fr_auto]">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Moment</label>
+              <Select
+                value={taxonomyMomentId}
+                onChange={(event) => {
+                  setTaxonomyMomentId(event.target.value);
+                  setEditingSubMomentId(null);
+                  setTaxonomyMessage(null);
+                }}
+              >
+                <option value="">Select moment</option>
+                {taxonomyMoments.map((moment) => (
+                  <option key={moment.id} value={moment.id} className="text-black">
+                    {moment.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">New sub-moment</label>
+              <Input
+                value={newSubMomentName}
+                onChange={(event) => setNewSubMomentName(event.target.value)}
+                placeholder="Sub-moment name"
+                disabled={!taxonomyMomentId}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                onClick={() => saveSubMoment.mutate()}
+                disabled={!taxonomyMomentId || newSubMomentName.trim().length < 2 || saveSubMoment.isPending}
+              >
+                Add
+              </Button>
+            </div>
+          </div>
+
+          {taxonomyMessage && <p className="text-xs text-cyan-200">{taxonomyMessage}</p>}
+
+          <div className="space-y-2">
+            {taxonomyMomentId && visibleSubMoments.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border/60 p-3 text-sm text-muted-foreground">
+                No sub-moments configured.
+              </div>
+            )}
+            {visibleSubMoments.map((subMoment, index) => (
+              <div
+                key={subMoment.id}
+                className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+                  subMoment.isActive ? "border-border/60" : "border-amber-400/30 bg-amber-500/5 opacity-75"
+                }`}
+              >
+                <span className="w-7 text-center text-xs text-muted-foreground">{index + 1}</span>
+                {editingSubMomentId === subMoment.id ? (
+                  <Input
+                    className="min-w-[220px] flex-1"
+                    value={editingSubMomentName}
+                    onChange={(event) => setEditingSubMomentName(event.target.value)}
+                  />
+                ) : (
+                  <span className="min-w-[220px] flex-1 text-sm font-medium text-white">{subMoment.name}</span>
+                )}
+                {!subMoment.isActive && <Badge className="bg-amber-500/10 text-amber-100">Hidden</Badge>}
+                <Button type="button" variant="ghost" size="sm" onClick={() => moveSubMoment(index, -1)} disabled={index === 0}>
+                  ↑
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => moveSubMoment(index, 1)}
+                  disabled={index === visibleSubMoments.length - 1}
+                >
+                  ↓
+                </Button>
+                {editingSubMomentId === subMoment.id ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => saveSubMoment.mutate()}
+                      disabled={editingSubMomentName.trim().length < 2 || saveSubMoment.isPending}
+                    >
+                      Save
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setEditingSubMomentId(null)}>
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditingSubMomentId(subMoment.id);
+                      setEditingSubMomentName(subMoment.name);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSubMomentActive.mutate({ id: subMoment.id, isActive: !subMoment.isActive })}
+                >
+                  {subMoment.isActive ? "Hide" : "Restore"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader title={editingSeason ? "Update Season" : "Add Season"} description="Create or edit seasons available to competitions." />

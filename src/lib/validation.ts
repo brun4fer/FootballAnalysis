@@ -82,22 +82,15 @@ export const goalInputSchema = z
       .optional()
   })
   .superRefine((value, ctx) => {
-    const hasSingleFlow = Boolean(value.subMomentId && value.actionIds.length > 0);
-    const hasSequenceFlow = Boolean(value.subMomentSequence && value.subMomentSequence.length > 0);
-    if (!hasSingleFlow && !hasSequenceFlow) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["subMomentSequence"],
-        message: "Provide subMomentSequence or subMomentId + actionIds."
-      });
-    }
+    // Whether an empty sequence is valid depends on the moment stored in the
+    // database. The server validates that authoritatively after parsing.
     if (value.subMomentSequence && value.subMomentSequence.length > 0) {
-      const sequenceOrders = value.subMomentSequence.map((entry) => entry.sequenceOrder);
-      if (new Set(sequenceOrders).size !== sequenceOrders.length) {
+      const actionPairs = value.subMomentSequence.map((entry) => `${entry.subMomentId}:${entry.actionId}`);
+      if (new Set(actionPairs).size !== actionPairs.length) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["subMomentSequence"],
-          message: "sequenceOrder is duplicated in subMomentSequence."
+          message: "An action is duplicated in the same phase."
         });
       }
     }

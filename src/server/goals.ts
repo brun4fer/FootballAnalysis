@@ -1,4 +1,4 @@
-import { eq, desc, inArray, asc, sql } from "drizzle-orm";
+import { and, eq, desc, inArray, asc, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "../db/client";
 import { actions, goalActions, goals, goalInvolvements, goalSubMomentActions, moments, players, subMoments, teams } from "../schema/schema";
@@ -25,28 +25,13 @@ function isTransitionRecoverySubMomentName(value: string) {
   );
 }
 
-const recoveryActionWhitelist = new Set([
-  "cruzamento direita",
-  "cruzamento esquerda",
-  "remate fora de area",
-  "remate de fora da area",
-  "profundidade"
-]);
-
 const OFFENSIVE_ORGANIZATION_MOMENT = "organizacao ofensiva";
-const OFFENSIVE_ORGANIZATION_SEQUENCE = ["saida do gr", "construcao", "criacao", "finalizacao"] as const;
 
 type GoalSubMomentSequenceEntry = {
   subMomentId: number;
   actionId: number;
   sequenceOrder: number;
 };
-
-function normalizeRecoveryActionName(value: string) {
-  const normalized = normalizeToken(value);
-  if (normalized === "remate de fora da area") return "remate fora de area";
-  return normalized;
-}
 
 async function hasGoalsColumn(columnName: string) {
   try {
@@ -107,11 +92,13 @@ async function ensureGoalSubMomentActionsTable() {
         CONSTRAINT "goal_sub_moment_actions_sequence_order_check" CHECK ("sequence_order" > 0)
       )
     `);
+    await db.execute(sql`DROP INDEX IF EXISTS "goal_sub_moment_actions_goal_sequence_key"`);
+    await db.execute(sql`DROP INDEX IF EXISTS "goal_sub_moment_actions_goal_sub_moment_key"`);
     await db.execute(
-      sql`CREATE UNIQUE INDEX IF NOT EXISTS "goal_sub_moment_actions_goal_sequence_key" ON "goal_sub_moment_actions" ("goal_id","sequence_order")`
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS "goal_sub_moment_actions_goal_sub_moment_action_key" ON "goal_sub_moment_actions" ("goal_id","sub_moment_id","action_id")`
     );
     await db.execute(
-      sql`CREATE UNIQUE INDEX IF NOT EXISTS "goal_sub_moment_actions_goal_sub_moment_key" ON "goal_sub_moment_actions" ("goal_id","sub_moment_id")`
+      sql`CREATE INDEX IF NOT EXISTS "idx_goal_sub_moment_actions_goal_sequence" ON "goal_sub_moment_actions" ("goal_id","sequence_order")`
     );
     await db.execute(
       sql`CREATE INDEX IF NOT EXISTS "idx_goal_sub_moment_actions_goal" ON "goal_sub_moment_actions" ("goal_id")`
@@ -128,7 +115,7 @@ async function ensureGoalSubMomentActionsTable() {
       FROM "goals" g
       WHERE g."sub_moment_id" IS NOT NULL
         AND g."action_id" IS NOT NULL
-      ON CONFLICT ("goal_id", "sequence_order") DO NOTHING
+      ON CONFLICT ("goal_id", "sub_moment_id", "action_id") DO NOTHING
     `);
   } catch {
     // Se nao for possivel alterar schema em runtime, o fluxo segue e o erro original sera devolvido no insert/update.
@@ -593,10 +580,6 @@ async function upsertGoal(
   const parsed = goalInputSchema.parse(normalized);
 
   const sequenceEntries = buildSequenceEntries(parsed);
-  if (sequenceEntries.length === 0) {
-    throw new Error("Sub-moment sequence is required");
-  }
-
   const [
     supportsReferencePlayer,
     supportsThrowInTaker,
@@ -634,12 +617,14 @@ async function upsertGoal(
     selectedMediaWorkspaceId = mediaWorkspace.id;
   }
 
-  const [team, scorer, opponent, moment] = await Promise.all([
+  const [team, scorer, opponent, moment, allMoments] = await Promise.all([
     requireOwnedTeam(parsed.teamId),
     db.query.players.findFirst({ where: eq(players.id, parsed.scorerId) }),
     requireOwnedTeam(parsed.opponentTeamId),
-    db.query.moments.findFirst({ where: eq(moments.id, parsed.momentId) })
+    db.query.moments.findFirst({ where: eq(moments.id, parsed.momentId) }),
+    db.select({ id: moments.id, name: moments.name }).from(moments)
   ]);
+  const offensiveOrganizationMoment = allMoments.find((entry) => isOffensiveOrganizationMomentName(entry.name));
 
   if (!team) throw new Error("Team not found");
   if (!opponent) throw new Error("Opponent team not found");
@@ -651,37 +636,50 @@ async function upsertGoal(
   if (scorer.teamId !== parsed.teamId) throw new Error("Scorer does not belong to team");
   if (!moment) throw new Error("Moment not found");
 
-  const orderedSequenceEntries = [...sequenceEntries].sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+  const orderedSequenceEntries = [...sequenceEntries].sort(
+    (a, b) => a.sequenceOrder - b.sequenceOrder || a.actionId - b.actionId
+  );
+
+  const isOffensiveOrganizationMoment = isOffensiveOrganizationMomentName(moment.name);
+  const isOffensiveTransitionMoment = normalizeToken(moment.name) === "transicao ofensiva";
+  if (orderedSequenceEntries.length === 0 && !isOffensiveOrganizationMoment && !isOffensiveTransitionMoment) {
+    throw new Error("Sub-moment sequence is required");
+  }
 
   const sequenceSubMomentIds = [...new Set(orderedSequenceEntries.map((entry) => entry.subMomentId))];
-  const subMomentRows = await db
-    .select({
-      id: subMoments.id,
-      name: subMoments.name,
-      momentId: subMoments.momentId
-    })
-    .from(subMoments)
-    .where(inArray(subMoments.id, sequenceSubMomentIds));
+  const subMomentRows = sequenceSubMomentIds.length
+    ? await db
+        .select({
+          id: subMoments.id,
+          name: subMoments.name,
+          momentId: subMoments.momentId
+        })
+        .from(subMoments)
+        .where(inArray(subMoments.id, sequenceSubMomentIds))
+    : [];
   if (subMomentRows.length !== sequenceSubMomentIds.length) throw new Error("Sub-moment not found");
   const subMomentById = new Map(subMomentRows.map((row) => [row.id, row]));
 
   orderedSequenceEntries.forEach((entry) => {
     const sequenceSubMoment = subMomentById.get(entry.subMomentId);
     if (!sequenceSubMoment) throw new Error("Sub-moment not found");
-    if (sequenceSubMoment.momentId !== parsed.momentId) {
+    const isReusableTransitionPhase =
+      isOffensiveTransitionMoment &&
+      offensiveOrganizationMoment?.id === sequenceSubMoment.momentId;
+    if (sequenceSubMoment.momentId !== parsed.momentId && !isReusableTransitionPhase) {
       throw new Error("Sub-moment does not match moment");
     }
   });
 
-  const isOffensiveOrganizationMoment = isOffensiveOrganizationMomentName(moment.name);
-  if (isOffensiveOrganizationMoment) {
-    if (orderedSequenceEntries.length > OFFENSIVE_ORGANIZATION_SEQUENCE.length) {
+  if (isOffensiveOrganizationMoment || isOffensiveTransitionMoment) {
+    const selectedPhaseCount = new Set(orderedSequenceEntries.map((entry) => entry.subMomentId)).size;
+    if (selectedPhaseCount > 4) {
       throw new Error("Organised Attack allows no more than four phases.");
     }
   }
 
   const sequenceActionIds = [...new Set(orderedSequenceEntries.map((entry) => entry.actionId))];
-  const requestedActionIds = isOffensiveOrganizationMoment
+  const requestedActionIds = isOffensiveOrganizationMoment || isOffensiveTransitionMoment
     ? sequenceActionIds
     : parsed.actionIds.length > 0
       ? [...new Set(parsed.actionIds)]
@@ -706,20 +704,48 @@ async function upsertGoal(
     .map((actionId) => actionById.get(actionId))
     .filter((row): row is NonNullable<typeof row> => Boolean(row));
 
-  const isOffensiveTransitionMoment = normalizeToken(moment.name) === "transicao ofensiva";
-  let isOffensiveTransitionRecovery = false;
+  const selectedRecoverySubMoment =
+    isOffensiveTransitionMoment && parsed.subMomentId
+      ? await db.query.subMoments.findFirst({ where: eq(subMoments.id, parsed.subMomentId) })
+      : null;
+  const isOffensiveTransitionRecovery = Boolean(
+    selectedRecoverySubMoment &&
+      selectedRecoverySubMoment.momentId === parsed.momentId &&
+      isTransitionRecoverySubMomentName(selectedRecoverySubMoment.name)
+  );
+  if (isOffensiveTransitionMoment && !isOffensiveTransitionRecovery) {
+    throw new Error("Select a valid Attacking Transition recovery context.");
+  }
+  if (isOffensiveTransitionMoment) {
+    if (!offensiveOrganizationMoment) {
+      throw new Error("The Organised Attack phase configuration was not found.");
+    }
+    const organizationPhases = await db
+      .select({ id: subMoments.id })
+      .from(subMoments)
+      .where(and(eq(subMoments.momentId, offensiveOrganizationMoment.id), eq(subMoments.isActive, true)))
+      .orderBy(asc(subMoments.sortOrder), asc(subMoments.id))
+      .limit(4);
+    if (organizationPhases.length !== 4) {
+      throw new Error("The Organised Attack phase configuration must contain four active phases.");
+    }
+    const isOffensiveHalfRecovery = normalizeToken(selectedRecoverySubMoment?.name ?? "").includes("meio campo ofensivo");
+    const allowedPhaseIds = new Set(
+      (isOffensiveHalfRecovery ? organizationPhases.slice(2, 4) : organizationPhases).map((phase) => phase.id)
+    );
+    if (orderedSequenceEntries.some((entry) => !allowedPhaseIds.has(entry.subMomentId))) {
+      throw new Error("The selected phase is not available for this recovery context.");
+    }
+  }
   for (const entry of orderedSequenceEntries) {
     const sequenceSubMoment = subMomentById.get(entry.subMomentId);
     const sequenceAction = actionById.get(entry.actionId);
     if (!sequenceSubMoment || !sequenceAction) throw new Error("Invalid sub-phase/action sequence");
 
-    const isRecovery = isOffensiveTransitionMoment && isTransitionRecoverySubMomentName(sequenceSubMoment.name);
     const wrongSubMoment = sequenceAction.subMomentId !== entry.subMomentId;
-    const canUseFallbackAction = isRecovery && recoveryActionWhitelist.has(normalizeRecoveryActionName(sequenceAction.name));
-    if (wrongSubMoment && !canUseFallbackAction) {
+    if (wrongSubMoment) {
       throw new Error("All actions must belong to the selected sub-moment");
     }
-    if (isRecovery) isOffensiveTransitionRecovery = true;
   }
   if (isOffensiveTransitionRecovery && !parsed.attackingSpaceId) {
     throw new Error("An Attacking Transition from a recovery requires attackingSpaceId.");
@@ -747,10 +773,13 @@ async function upsertGoal(
   }
 
   const primarySequenceEntry = orderedSequenceEntries[orderedSequenceEntries.length - 1];
-  const primarySubMoment = subMomentById.get(primarySequenceEntry.subMomentId);
-  if (!primarySubMoment) throw new Error("Primary sub-moment not found");
+  const primarySubMoment = isOffensiveTransitionMoment
+    ? selectedRecoverySubMoment
+    : primarySequenceEntry
+      ? subMomentById.get(primarySequenceEntry.subMomentId)
+      : null;
 
-  const subName = normalizeToken(primarySubMoment.name);
+  const subName = normalizeToken(primarySubMoment?.name ?? "");
   const actionNames = requestedActionRows.map((action) => normalizeToken(action.name));
   const isCorner = subName.includes("canto");
   const isFreeKick = subName.includes("livre");
@@ -823,8 +852,8 @@ async function upsertGoal(
       assistId,
       minute: parsed.minute,
       momentId: parsed.momentId,
-      subMomentId: primarySequenceEntry.subMomentId,
-      actionId: primarySequenceEntry.actionId,
+      subMomentId: primarySubMoment?.id ?? parsed.subMomentId ?? null,
+      actionId: primarySequenceEntry?.actionId ?? parsed.actionIds[0] ?? null,
       goalZoneId: null,
       goalCoordinates: parsed.goalCoordinates ?? null,
       videoPath: parsed.videoPath || null,
@@ -863,14 +892,16 @@ async function upsertGoal(
 
     if (supportsGoalSubMomentActions) {
       await tx.delete(goalSubMomentActions).where(eq(goalSubMomentActions.goalId, currentGoalId));
-      await tx.insert(goalSubMomentActions).values(
-        orderedSequenceEntries.map((entry) => ({
-          goalId: currentGoalId,
-          subMomentId: entry.subMomentId,
-          actionId: entry.actionId,
-          sequenceOrder: entry.sequenceOrder
-        }))
-      );
+      if (orderedSequenceEntries.length > 0) {
+        await tx.insert(goalSubMomentActions).values(
+          orderedSequenceEntries.map((entry) => ({
+            goalId: currentGoalId,
+            subMomentId: entry.subMomentId,
+            actionId: entry.actionId,
+            sequenceOrder: entry.sequenceOrder
+          }))
+        );
+      }
     }
 
     await tx.delete(goalInvolvements).where(eq(goalInvolvements.goalId, currentGoalId));
