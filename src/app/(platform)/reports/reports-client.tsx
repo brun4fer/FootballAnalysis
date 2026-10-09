@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Video } from "lucide-react";
+import { ExternalLink, Play, Video } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -33,9 +33,10 @@ type ReportGoal = {
   subMomentName?: string | null;
   actions: string[];
   hasVideo: boolean;
+  mediaAssetId?: string | null;
+  videoPath?: string | null;
+  attackDirection?: "left_to_right" | "right_to_left";
 };
-
-const PAGE_SIZE = 20;
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -46,8 +47,13 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 export function ReportsClient() {
   const [filters, setFilters] = useState<Record<string, string>>({});
-  const [page, setPage] = useState(0);
-  const lookupsQuery = useQuery({ queryKey: ["reports-lookups"], queryFn: () => fetchJson<Lookup>("/api/lookups") });
+  const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
+  const [playAll, setPlayAll] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const lookupsQuery = useQuery({
+    queryKey: ["reports-lookups"],
+    queryFn: () => fetchJson<Lookup>("/api/lookups?includeInactive=1")
+  });
   const playersQuery = useQuery({ queryKey: ["reports-players"], queryFn: () => fetchJson<Player[]>("/api/manage/players") });
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -75,12 +81,53 @@ export function ReportsClient() {
   const players = (playersQuery.data ?? []).filter(
     (entry) => !filters.teamId || entry.teamId === Number(filters.teamId)
   );
-  const goals = goalsQuery.data ?? [];
-  const pages = Math.max(1, Math.ceil(goals.length / PAGE_SIZE));
-  const visibleGoals = goals.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const goals = useMemo(() => goalsQuery.data ?? [], [goalsQuery.data]);
+  const videoGoals = useMemo(() => goals.filter((goal) => goal.hasVideo), [goals]);
+  const selectedGoal = goals.find((goal) => goal.id === selectedGoalId) ?? videoGoals[0] ?? goals[0] ?? null;
+  const selectedPlaybackUrl = selectedGoal?.mediaAssetId
+    ? `/api/media/assets/${encodeURIComponent(selectedGoal.mediaAssetId)}/playback`
+    : selectedGoal?.videoPath || null;
+
+  useEffect(() => {
+    if (goals.length === 0) {
+      setSelectedGoalId(null);
+      setPlayAll(false);
+      return;
+    }
+    if (!selectedGoalId || !goals.some((goal) => goal.id === selectedGoalId)) {
+      setSelectedGoalId((videoGoals[0] ?? goals[0]).id);
+      setPlayAll(false);
+    }
+  }, [goals, selectedGoalId, videoGoals]);
+
+  useEffect(() => {
+    if (!playAll || !selectedPlaybackUrl) return;
+    const frame = requestAnimationFrame(() => {
+      videoRef.current?.play().catch(() => setPlayAll(false));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [playAll, selectedGoalId, selectedPlaybackUrl]);
+
+  const playNextVideo = () => {
+    if (!selectedGoal || !playAll) return;
+    const index = videoGoals.findIndex((goal) => goal.id === selectedGoal.id);
+    const next = videoGoals[index + 1];
+    if (!next) {
+      setPlayAll(false);
+      return;
+    }
+    setSelectedGoalId(next.id);
+  };
+
+  const startPlayAll = () => {
+    if (videoGoals.length === 0) return;
+    const currentIndex = selectedGoal ? videoGoals.findIndex((goal) => goal.id === selectedGoal.id) : -1;
+    setSelectedGoalId((currentIndex >= 0 ? videoGoals[currentIndex] : videoGoals[0]).id);
+    setPlayAll(true);
+  };
 
   const setFilter = (name: string, value: string) => {
-    setPage(0);
+    setPlayAll(false);
     setFilters((current) => ({ ...current, [name]: value }));
   };
 
@@ -143,43 +190,103 @@ export function ReportsClient() {
             <option value="true">With video</option>
             <option value="false">Without video</option>
           </Select>
+          <Select value={filters.attackDirection ?? ""} onChange={(event) => setFilter("attackDirection", event.target.value)}>
+            <option value="">Todos os sentidos de ataque</option>
+            <option value="left_to_right">Esquerda para direita →</option>
+            <option value="right_to_left">← Direita para esquerda</option>
+          </Select>
           <div className="md:col-span-3 xl:col-span-4 flex justify-end">
-            <Button type="button" variant="secondary" onClick={() => { setFilters({}); setPage(0); }}>Clear filters</Button>
+            <Button type="button" variant="secondary" onClick={() => { setFilters({}); setPlayAll(false); }}>Clear filters</Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader title={`${goals.length} goals found`} description="Open a goal to watch the video and view its trajectory." />
-        <CardContent className="space-y-3">
+        <CardHeader title={`${goals.length} goals found`} description="Watch the filtered videos in sequence or select an individual goal." />
+        <CardContent className="space-y-4">
           {goalsQuery.isLoading && <p className="text-sm text-muted-foreground">Loading goals...</p>}
           {goalsQuery.error && <p className="text-sm text-destructive">{(goalsQuery.error as Error).message}</p>}
-          {!goalsQuery.isLoading && visibleGoals.length === 0 && <p className="text-sm text-muted-foreground">No goals match these filters.</p>}
-          {visibleGoals.map((goal) => (
-            <Link key={goal.id} href={`/stats/goal/${goal.id}`} className="block rounded-xl border border-border/60 bg-white/[.02] p-4 hover:border-cyan-300/40 hover:bg-cyan-300/[.04]">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-white">{goal.teamName} vs {goal.opponentName ?? "—"}</span>
-                    <Badge>{goal.minute}&apos;</Badge>
-                    {goal.hasVideo && <Badge className="bg-cyan-500/10 text-cyan-100"><Video className="mr-1 h-3 w-3" />Video</Badge>}
+          {!goalsQuery.isLoading && goals.length === 0 && <p className="text-sm text-muted-foreground">No goals match these filters.</p>}
+          {goals.length > 0 && (
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="space-y-3 rounded-2xl border border-border/60 bg-slate-950/50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="font-semibold text-white">
+                      {selectedGoal?.teamName} vs {selectedGoal?.opponentName ?? "—"} · {selectedGoal?.minute}&apos;
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {selectedGoal?.scorerName ?? "—"}{selectedGoal?.assistName ? ` · Assist: ${selectedGoal.assistName}` : ""}
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">{goal.scorerName ?? "—"}{goal.assistName ? ` · Assist: ${goal.assistName}` : ""}</p>
-                  <p className="text-xs text-muted-foreground">{goal.seasonName} · {goal.championshipName} · {displayFootballTerm(goal.momentName)}</p>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" onClick={startPlayAll} disabled={videoGoals.length === 0}>
+                      <Play className="mr-1 h-4 w-4" /> {playAll ? "Playing all" : `Play all (${videoGoals.length})`}
+                    </Button>
+                    {selectedGoal && (
+                      <Link href={`/stats/goal/${selectedGoal.id}`}>
+                        <Button type="button" variant="ghost" size="sm">
+                          <ExternalLink className="mr-1 h-4 w-4" />Details
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
                 </div>
-                <div className="flex max-w-xl flex-wrap justify-end gap-1">
-                  {goal.actions.map((action, index) => <Badge key={`${action}-${index}`} className="bg-white/5 text-white">{displayFootballTerm(action)}</Badge>)}
-                </div>
+                {selectedPlaybackUrl ? (
+                  <video
+                    key={selectedGoal?.id}
+                    ref={videoRef}
+                    controls
+                    className="aspect-video w-full rounded-xl border border-border/60 bg-black object-contain"
+                    src={selectedPlaybackUrl}
+                    onEnded={playNextVideo}
+                  />
+                ) : (
+                  <div className="flex aspect-video items-center justify-center rounded-xl border border-dashed border-border/60 bg-black/40 text-sm text-muted-foreground">
+                    This goal has no video.
+                  </div>
+                )}
               </div>
-            </Link>
-          ))}
-          {pages > 1 && (
-            <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground">
-              <span>Page {page + 1} of {pages}</span>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" disabled={page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>Previous</Button>
-                <Button variant="ghost" size="sm" disabled={page >= pages - 1} onClick={() => setPage((value) => Math.min(pages - 1, value + 1))}>Next</Button>
-              </div>
+
+              <aside className="max-h-[620px] space-y-2 overflow-y-auto pr-1">
+                {goals.map((goal) => {
+                  const selected = goal.id === selectedGoal?.id;
+                  return (
+                    <button
+                      key={goal.id}
+                      type="button"
+                      onClick={() => { setSelectedGoalId(goal.id); setPlayAll(false); }}
+                      className={`w-full rounded-xl border p-3 text-left transition ${
+                        selected ? "border-cyan-300/60 bg-cyan-400/10" : "border-border/60 bg-white/[.02] hover:border-cyan-300/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-semibold text-white">{goal.teamName} vs {goal.opponentName ?? "—"}</span>
+                        <Badge>{goal.minute}&apos;</Badge>
+                      </div>
+                      <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        {goal.hasVideo ? <Video className="h-3 w-3 text-cyan-300" /> : <span className="text-amber-200">Sem vídeo ·</span>}
+                        <span>{goal.scorerName ?? "—"}</span>
+                      </div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {displayFootballTerm(goal.momentName)}{goal.subMomentName ? ` · ${displayFootballTerm(goal.subMomentName)}` : ""}
+                      </div>
+                      <div className="mt-1 text-[10px] text-cyan-200/80">
+                        {goal.attackDirection === "right_to_left" ? "← Direita para esquerda" : "Esquerda para direita →"}
+                      </div>
+                      {goal.actions.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {goal.actions.map((action, index) => (
+                            <span key={`${action}-${index}`} className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-300">
+                              {displayFootballTerm(action)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </aside>
             </div>
           )}
         </CardContent>

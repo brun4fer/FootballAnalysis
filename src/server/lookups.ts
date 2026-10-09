@@ -40,7 +40,8 @@ async function ensureOffensiveOrganizationLaunchAction(params: {
       targetSubMomentIds.map((subMomentId) => ({
         subMomentId,
         name: OFFENSIVE_ORGANIZATION_LAUNCH_ACTION,
-        context: "field" as const
+        context: "field" as const,
+        sortOrder: 999
       }))
     )
     .onConflictDoNothing({ target: [actions.subMomentId, actions.name] });
@@ -61,7 +62,11 @@ export async function getLookups(options: { includeInactive?: boolean } = {}) {
   ]);
 
   await ensureOffensiveOrganizationLaunchAction({ momentsRows, subMomentRows });
-  const actionRows = await db.select().from(actions).orderBy(asc(actions.name));
+  const actionRows = await db
+    .select()
+    .from(actions)
+    .where(options.includeInactive ? undefined : eq(actions.isActive, true))
+    .orderBy(asc(actions.subMomentId), asc(actions.sortOrder), asc(actions.name));
 
   return {
     moments: momentsRows,

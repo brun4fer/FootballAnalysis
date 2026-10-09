@@ -29,6 +29,7 @@ export type GoalReportFilters = {
   involvedPlayerId?: number;
   minuteFrom?: number;
   minuteTo?: number;
+  attackDirection?: "left_to_right" | "right_to_left";
   hasVideo?: boolean;
 };
 
@@ -49,6 +50,7 @@ export async function getGoalReports(filters: GoalReportFilters) {
   if (filters.assistId) conditions.push(eq(goals.assistId, filters.assistId));
   if (filters.minuteFrom !== undefined) conditions.push(gte(goals.minute, filters.minuteFrom));
   if (filters.minuteTo !== undefined) conditions.push(lte(goals.minute, filters.minuteTo));
+  if (filters.attackDirection) conditions.push(eq(goals.attackDirection, filters.attackDirection));
   if (filters.subMomentId) {
     conditions.push(
       or(
@@ -119,6 +121,7 @@ export async function getGoalReports(filters: GoalReportFilters) {
       actionName: primaryAction.name,
       mediaAssetId: goals.mediaAssetId,
       videoPath: goals.videoPath,
+      attackDirection: goals.attackDirection,
       notes: goals.notes
     })
     .from(goals)

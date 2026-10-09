@@ -31,6 +31,7 @@ import { useAppContext } from "@/components/ui/app-context";
 
 import { GoalVideoPicker } from "@/components/goal-video-picker";
 import { cn } from "@/lib/utils";
+import { Check, GripVertical, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 
 
@@ -45,7 +46,14 @@ type LookupResponse = {
   subMoments: Array<{ id: number; name: string; momentId: number; sortOrder: number; isActive: boolean }>;
 
 
-  actions: Array<{ id: number; name: string; subMomentId: number; context: "field" | "field_goal" }>;
+  actions: Array<{
+    id: number;
+    name: string;
+    subMomentId: number;
+    context: "field" | "field_goal";
+    sortOrder: number;
+    isActive: boolean;
+  }>;
 
 
   seasons: Array<{ id: number; name: string }>;
@@ -77,6 +85,7 @@ type Player = { id: number; name: string };
 
 type Involvement = { playerId: number; role: "assist" | "involvement" };
 type Point = { x: number; y: number };
+type AttackDirection = "left_to_right" | "right_to_left";
 
 const toPoint = (value: unknown): Point | null => {
   if (!value || typeof value !== "object") return null;
@@ -386,12 +395,14 @@ function RecoverySpaceGrid({
   variant,
   value,
   onChange,
+  attackDirection = "left_to_right",
   readOnly = false,
   showHelperText = true
 }: {
   variant: RecoveryGridVariant;
   value?: number | null;
   onChange?: (zoneId: number) => void;
+  attackDirection?: AttackDirection;
   readOnly?: boolean;
   showHelperText?: boolean;
 }) {
@@ -410,6 +421,19 @@ function RecoverySpaceGrid({
           <rect x="8" y="29" width="7" height="22" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
           <rect x="96" y="22" width="16" height="36" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
           <rect x="105" y="29" width="7" height="22" fill="none" stroke="rgba(226,232,240,0.4)" strokeWidth="0.8" />
+          <line
+            x1={attackDirection === "left_to_right" ? 45 : 75}
+            y1="75"
+            x2={attackDirection === "left_to_right" ? 70 : 50}
+            y2="75"
+            stroke="#22d3ee"
+            strokeWidth="1.2"
+          />
+          <path
+            d={attackDirection === "left_to_right" ? "M70 72.8L76 75L70 77.2Z" : "M50 72.8L44 75L50 77.2Z"}
+            fill="#22d3ee"
+          />
+          <text x="60" y="73" textAnchor="middle" fill="#67e8f9" fontSize="3.2" fontWeight="700">ATTACK</text>
           {inertOverlay}
 
           {zones.map((zone) => {
@@ -633,11 +657,13 @@ function PitchPinpoint({
   value,
   onChange,
   storageField,
+  attackDirection = "left_to_right",
   pinColor = "#22c55e"
 }: {
   value: Point | null;
   onChange: (pt: Point) => void;
   storageField: "assist_drawing" | "field_drawing" | "transition_drawing";
+  attackDirection?: AttackDirection;
   pinColor?: string;
 }) {
 
@@ -744,7 +770,15 @@ function PitchPinpoint({
 
           <rect x="8" y="10" width="104" height="60" rx="4" fill="url(#pitchGradient)" stroke="rgba(148,163,184,0.35)" strokeWidth="0.8" />
 
-          <line x1="45" y1="75" x2="75" y2="75" stroke="#22d3ee" strokeWidth="1.2" markerEnd={`url(#${attackArrowId})`} />
+          <line
+            x1={attackDirection === "left_to_right" ? 45 : 75}
+            y1="75"
+            x2={attackDirection === "left_to_right" ? 75 : 45}
+            y2="75"
+            stroke="#22d3ee"
+            strokeWidth="1.2"
+            markerEnd={`url(#${attackArrowId})`}
+          />
           <text x="60" y="73" textAnchor="middle" fill="#67e8f9" fontSize="3.2" fontWeight="700">ATTACK</text>
 
 
@@ -1029,6 +1063,7 @@ type ExistingGoal = {
   notes: string | null;
   videoPath: string | null;
   mediaAssetId?: string | null;
+  attackDirection?: AttackDirection | null;
   involvements?: Involvement[];
 };
 
@@ -1055,6 +1090,7 @@ const [opponentTeamId, setOpponentTeamId] = useState<number | undefined>();
 const [scorerId, setScorerId] = useState<number | undefined>();
 const [assistId, setAssistId] = useState<number | undefined>();
 const [minute, setMinute] = useState(0);
+const [attackDirection, setAttackDirection] = useState<AttackDirection>("left_to_right");
 const [momentId, setMomentId] = useState<number | undefined>();
 const [subMomentId, setSubMomentId] = useState<number | undefined>();
 const [actionIds, setActionIds] = useState<number[]>([]);
@@ -1081,11 +1117,107 @@ const [mediaAssetId, setMediaAssetId] = useState<string | null>(null);
 const [involvements, setInvolvements] = useState<Involvement[]>([]);
 const [fieldPoint, setFieldPoint] = useState<Point | null>(null);
 const [message, setMessage] = useState<string | null>(null);
+const [newActionBySubMoment, setNewActionBySubMoment] = useState<Record<number, string>>({});
+const [newActionContextBySubMoment, setNewActionContextBySubMoment] = useState<Record<number, "field" | "field_goal">>({});
+const [editingCatalogActionId, setEditingCatalogActionId] = useState<number | null>(null);
+const [editingCatalogActionName, setEditingCatalogActionName] = useState("");
+const [editingCatalogActionContext, setEditingCatalogActionContext] = useState<"field" | "field_goal">("field");
+const [draggedCatalogAction, setDraggedCatalogAction] = useState<{ id: number; subMomentId: number } | null>(null);
+const [actionCatalogMessage, setActionCatalogMessage] = useState<string | null>(null);
 const [modal, setModal] = useState<{ kind: "moment" | "submoment" | "action"; open: boolean }>({
   kind: "moment",
   open: false
 });
 const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<LookupResponse>("/api/lookups") });
+const taxonomyAdminQuery = useQuery({
+  queryKey: ["taxonomy-admin-lookups"],
+  queryFn: () => fetchJson<LookupResponse>("/api/lookups?includeInactive=1")
+});
+
+const actionCatalogMutation = useMutation({
+  mutationFn: ({ url, method, body }: { url: string; method: "POST" | "PUT" | "PATCH"; body: unknown }) =>
+    fetchJson(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }),
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: ["lookups"] });
+    qc.invalidateQueries({ queryKey: ["taxonomy-admin-lookups"] });
+  },
+  onError: (error: Error) => setActionCatalogMessage(error.message)
+});
+
+const addCatalogAction = async (subMomentId: number) => {
+  const name = (newActionBySubMoment[subMomentId] ?? "").trim();
+  if (name.length < 2) return;
+  setActionCatalogMessage(null);
+  const result = await actionCatalogMutation.mutateAsync({
+    url: "/api/lookups/actions",
+    method: "POST",
+    body: {
+      subMomentId,
+      name,
+      context: newActionContextBySubMoment[subMomentId] ?? "field"
+    }
+  }).catch(() => null);
+  if (!result) return;
+  setNewActionBySubMoment((current) => ({ ...current, [subMomentId]: "" }));
+  setActionCatalogMessage("Ação adicionada.");
+};
+
+const saveCatalogActionName = async (actionId: number) => {
+  const name = editingCatalogActionName.trim();
+  if (name.length < 2) return;
+  const result = await actionCatalogMutation.mutateAsync({
+    url: `/api/lookups/actions/${actionId}`,
+    method: "PUT",
+    body: { name, context: editingCatalogActionContext }
+  }).catch(() => null);
+  if (!result) return;
+  setEditingCatalogActionId(null);
+  setEditingCatalogActionName("");
+  setActionCatalogMessage("Ação atualizada.");
+};
+
+const setCatalogActionActive = async (actionId: number, isActive: boolean) => {
+  const result = await actionCatalogMutation.mutateAsync({
+    url: `/api/lookups/actions/${actionId}`,
+    method: "PUT",
+    body: { isActive }
+  }).catch(() => null);
+  if (!result) return;
+  setOffensiveSequenceActionBySubMoment((current) =>
+    Object.fromEntries(
+      Object.entries(current).map(([subMomentKey, ids]) => [
+        Number(subMomentKey),
+        ids.filter((id) => id !== actionId)
+      ])
+    )
+  );
+  setActionCatalogMessage(isActive ? "Ação restaurada." : "Ação removida da seleção.");
+};
+
+const dropCatalogAction = async (subMomentId: number, targetActionId: number) => {
+  if (!draggedCatalogAction || draggedCatalogAction.subMomentId !== subMomentId) return;
+  const activeActions = (taxonomyAdminQuery.data?.actions ?? [])
+    .filter((action) => action.subMomentId === subMomentId && action.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+  const from = activeActions.findIndex((action) => action.id === draggedCatalogAction.id);
+  const to = activeActions.findIndex((action) => action.id === targetActionId);
+  setDraggedCatalogAction(null);
+  if (from < 0 || to < 0 || from === to) return;
+  const reordered = [...activeActions];
+  const [moved] = reordered.splice(from, 1);
+  reordered.splice(to, 0, moved);
+  const result = await actionCatalogMutation.mutateAsync({
+    url: "/api/lookups/actions",
+    method: "PATCH",
+    body: { subMomentId, orderedIds: reordered.map((action) => action.id) }
+  }).catch(() => null);
+  if (!result) return;
+  setActionCatalogMessage("Ordem das ações atualizada.");
+};
 
 
   const teamsQuery = useQuery({ queryKey: ["teams"], queryFn: () => fetchJson<Team[]>("/api/teams") });
@@ -1121,7 +1253,8 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     const effectiveSubMomentId = isOffensiveTransitionMoment
       ? subMomentId
       : isOffensiveOrganizationMoment
-        ? subMomentSequencePayload[subMomentSequencePayload.length - 1]?.subMomentId
+        ? subMomentSequencePayload[subMomentSequencePayload.length - 1]?.subMomentId ??
+          requiredPhaseRows[requiredPhaseRows.length - 1]?.id
         : resolvedSubMomentId;
 
     const hasTacticalContext = isOffensiveOrganizationMoment
@@ -1195,6 +1328,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
       goalCoordinates: goalPoint ?? undefined,
       videoPath: videoPath || undefined,
       mediaAssetId: mediaAssetId || undefined,
+      attackDirection,
       fieldDrawing: fieldPoint ?? undefined,
       assistDrawing: assistDrawingPoint ?? undefined,
       transitionDrawing: transitionDrawingPoint ?? undefined,
@@ -1222,6 +1356,7 @@ const lookupsQuery = useQuery({ queryKey: ["lookups"], queryFn: () => fetchJson<
     setScorerId(undefined);
     setAssistId(undefined);
     setMinute(0);
+    setAttackDirection("left_to_right");
     setMomentId(undefined);
     setSubMomentId(undefined);
     setActionIds([]);
@@ -1267,7 +1402,8 @@ const updateMutation = useMutation({
     const effectiveSubMomentId = isOffensiveTransitionMoment
       ? subMomentId
       : isOffensiveOrganizationMoment
-        ? subMomentSequencePayload[subMomentSequencePayload.length - 1]?.subMomentId
+        ? subMomentSequencePayload[subMomentSequencePayload.length - 1]?.subMomentId ??
+          requiredPhaseRows[requiredPhaseRows.length - 1]?.id
         : resolvedSubMomentId;
 
     const hasTacticalContext = isOffensiveOrganizationMoment
@@ -1340,6 +1476,7 @@ const updateMutation = useMutation({
       goalCoordinates: goalPoint ?? undefined,
       videoPath: videoPath || undefined,
       mediaAssetId: mediaAssetId || undefined,
+      attackDirection,
       fieldDrawing: fieldPoint ?? undefined,
       assistDrawing: assistDrawingPoint ?? undefined,
       transitionDrawing: transitionDrawingPoint ?? undefined,
@@ -1514,7 +1651,8 @@ const filteredChampionships = useMemo(() => {
   const resolvedSubMomentId = isOffensiveTransitionMoment
     ? subMomentId
     : isOffensiveOrganizationMoment
-      ? offensiveOrganizationSequenceSelection[offensiveOrganizationSequenceSelection.length - 1]?.subMomentId
+      ? offensiveOrganizationSequenceSelection[offensiveOrganizationSequenceSelection.length - 1]?.subMomentId ??
+        requiredPhaseRows[requiredPhaseRows.length - 1]?.id
       : subMomentId;
   const resolvedActionIds = isPhaseSequenceMoment
     ? offensiveOrganizationSequenceSelection.map((entry) => entry.actionId)
@@ -1780,6 +1918,7 @@ const filteredChampionships = useMemo(() => {
     setScorerId(existingGoal.scorerId);
     setAssistId(existingGoal.assistId ?? undefined);
     setMinute(existingGoal.minute);
+    setAttackDirection(existingGoal.attackDirection ?? "left_to_right");
     setMomentId(existingGoal.momentId);
     setSubMomentId(existingGoal.subMomentId);
     const existingActions = existingGoal.actionIds?.length
@@ -2460,7 +2599,7 @@ const filteredChampionships = useMemo(() => {
           {step === "scorer" && (
 
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
 
 
               <div className="space-y-2">
@@ -2505,6 +2644,14 @@ const filteredChampionships = useMemo(() => {
                 </Select>
 
 
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Sentido do ataque</label>
+                <Select value={attackDirection} onChange={(event) => setAttackDirection(event.target.value as AttackDirection)}>
+                  <option value="left_to_right" className="text-black">Esquerda para a direita →</option>
+                  <option value="right_to_left" className="text-black">← Direita para a esquerda</option>
+                </Select>
               </div>
 
 
@@ -2727,18 +2874,6 @@ const filteredChampionships = useMemo(() => {
                     const val = e.target.value;
 
 
-                    if (val === "__create__") {
-
-
-                      setModal({ kind: "moment", open: true });
-
-
-                      return;
-
-
-                    }
-
-
                     setMomentId(val ? Number(val) : undefined);
                     setSubMomentId(undefined);
                     setActionIds([]);
@@ -2765,9 +2900,6 @@ const filteredChampionships = useMemo(() => {
 
 
                   <option value="">Select phase</option>
-
-
-                  <option value="__create__">+ Create novo...</option>
 
 
                   {lookupsQuery.data?.moments.map((m) => (
@@ -2836,7 +2968,11 @@ const filteredChampionships = useMemo(() => {
                     </div>
                   ) : (
                     <div className="grid gap-3 md:grid-cols-4">
-                      {offensiveOrganizationSubMomentRows.map((row) => (
+                      {offensiveOrganizationSubMomentRows.map((row) => {
+                        const hiddenActions = (taxonomyAdminQuery.data?.actions ?? [])
+                          .filter((action) => action.subMomentId === row.subMoment.id && !action.isActive)
+                          .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+                        return (
                         <div
                           key={`oo-seq-${row.subMoment.id}`}
                           className="rounded-2xl border border-border/70 bg-gradient-to-b from-slate-900/70 to-slate-950/50 p-3 shadow-[0_16px_32px_rgba(2,6,23,0.4)]"
@@ -2861,41 +2997,151 @@ const filteredChampionships = useMemo(() => {
                               row.actions.map((action) => {
                                 const isSelected = (offensiveSequenceActionBySubMoment[row.subMoment.id] ?? []).includes(action.id);
                                 return (
-                                  <button
+                                  <div
                                     key={`oo-action-${row.subMoment.id}-${action.id}`}
-                                    type="button"
-                                    onClick={() =>
-                                      setOffensiveSequenceActionBySubMoment((prev) => {
-                                        const currentActionIds = prev[row.subMoment.id] ?? [];
-                                        const nextActionIds = currentActionIds.includes(action.id)
-                                          ? currentActionIds.filter((id) => id !== action.id)
-                                          : [...currentActionIds, action.id];
-                                        return {
-                                          ...prev,
-                                          [row.subMoment.id]: nextActionIds
-                                        };
-                                      })
-                                    }
+                                    draggable={editingCatalogActionId !== action.id}
+                                    onDragStart={() => setDraggedCatalogAction({ id: action.id, subMomentId: row.subMoment.id })}
+                                    onDragEnd={() => setDraggedCatalogAction(null)}
+                                    onDragOver={(event) => event.preventDefault()}
+                                    onDrop={() => void dropCatalogAction(row.subMoment.id, action.id)}
                                     className={cn(
-                                      "w-full rounded-lg border px-2 py-2 text-left text-xs transition",
+                                      "group rounded-lg border px-2 py-2 text-xs transition",
                                       isSelected
                                         ? "border-emerald-400 bg-emerald-500/12 text-emerald-100"
                                         : "border-border/50 bg-card/60 text-muted-foreground hover:border-cyan-400/40 hover:text-white"
                                     )}
                                   >
-                                    <div className="font-medium">{displayFootballTerm(action.name)}</div>
-                                    <div className="mt-1 text-[10px] opacity-80">
-                                      {action.context === "field_goal" ? "Pitch + Goal" : "Pitch"}
-                                    </div>
-                                  </button>
+                                    {editingCatalogActionId === action.id ? (
+                                      <div className="space-y-2">
+                                        <Input
+                                          value={editingCatalogActionName}
+                                          onChange={(event) => setEditingCatalogActionName(event.target.value)}
+                                          className="h-8 text-xs"
+                                        />
+                                        <Select
+                                          value={editingCatalogActionContext}
+                                          onChange={(event) => setEditingCatalogActionContext(event.target.value as "field" | "field_goal")}
+                                          className="h-8 text-xs"
+                                        >
+                                          <option value="field" className="text-black">Pitch</option>
+                                          <option value="field_goal" className="text-black">Pitch + Goal</option>
+                                        </Select>
+                                        <div className="flex justify-end gap-1">
+                                          <Button type="button" variant="ghost" size="sm" onClick={() => void saveCatalogActionName(action.id)}>
+                                            <Check className="h-3.5 w-3.5" />
+                                          </Button>
+                                          <Button type="button" variant="ghost" size="sm" onClick={() => setEditingCatalogActionId(null)}>
+                                            <X className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-start gap-1.5">
+                                        <GripVertical className="mt-0.5 h-4 w-4 shrink-0 cursor-grab opacity-50" aria-label="Arrastar para ordenar" />
+                                        <button
+                                          type="button"
+                                          className="min-w-0 flex-1 text-left"
+                                          onClick={() =>
+                                            setOffensiveSequenceActionBySubMoment((prev) => {
+                                              const currentActionIds = prev[row.subMoment.id] ?? [];
+                                              const nextActionIds = currentActionIds.includes(action.id)
+                                                ? currentActionIds.filter((id) => id !== action.id)
+                                                : [...currentActionIds, action.id];
+                                              return { ...prev, [row.subMoment.id]: nextActionIds };
+                                            })
+                                          }
+                                        >
+                                          <div className="font-medium">{displayFootballTerm(action.name)}</div>
+                                          <div className="mt-1 text-[10px] opacity-80">
+                                            {action.context === "field_goal" ? "Pitch + Goal" : "Pitch"}
+                                          </div>
+                                        </button>
+                                        <div className="flex shrink-0 opacity-70 transition group-hover:opacity-100">
+                                          <button
+                                            type="button"
+                                            className="rounded p-1 hover:bg-white/10"
+                                            title="Editar ação"
+                                            onClick={() => {
+                                              setEditingCatalogActionId(action.id);
+                                              setEditingCatalogActionName(action.name);
+                                              setEditingCatalogActionContext(action.context);
+                                            }}
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="rounded p-1 text-rose-200 hover:bg-rose-500/15"
+                                            title="Remover ação"
+                                            onClick={() => void setCatalogActionActive(action.id, false)}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 );
                               })
                             )}
                           </div>
+                          <div className="mt-3 space-y-2 border-t border-border/50 pt-3">
+                            <Input
+                              value={newActionBySubMoment[row.subMoment.id] ?? ""}
+                              onChange={(event) =>
+                                setNewActionBySubMoment((current) => ({ ...current, [row.subMoment.id]: event.target.value }))
+                              }
+                              placeholder="Nova ação"
+                              className="h-8 text-xs"
+                            />
+                            <div className="flex gap-2">
+                              <Select
+                                value={newActionContextBySubMoment[row.subMoment.id] ?? "field"}
+                                onChange={(event) =>
+                                  setNewActionContextBySubMoment((current) => ({
+                                    ...current,
+                                    [row.subMoment.id]: event.target.value as "field" | "field_goal"
+                                  }))
+                                }
+                                className="h-8 text-xs"
+                              >
+                                <option value="field" className="text-black">Pitch</option>
+                                <option value="field_goal" className="text-black">Pitch + Goal</option>
+                              </Select>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-8 shrink-0"
+                                disabled={(newActionBySubMoment[row.subMoment.id] ?? "").trim().length < 2 || actionCatalogMutation.isPending}
+                                onClick={() => void addCatalogAction(row.subMoment.id)}
+                              >
+                                <Plus className="mr-1 h-3.5 w-3.5" /> Add
+                              </Button>
+                            </div>
+                            {hiddenActions.length > 0 && (
+                              <div className="space-y-1 rounded-lg border border-dashed border-border/50 p-2">
+                                <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Removidas</div>
+                                {hiddenActions.map((action) => (
+                                  <div key={`hidden-action-${action.id}`} className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                                    <span className="truncate">{displayFootballTerm(action.name)}</span>
+                                    <button
+                                      type="button"
+                                      className="rounded p-1 text-cyan-200 hover:bg-cyan-500/10"
+                                      title="Restaurar ação"
+                                      onClick={() => void setCatalogActionActive(action.id, true)}
+                                    >
+                                      <RotateCcw className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      ))}
+                      );})}
                     </div>
                   )}
+                  {actionCatalogMessage && <p className="text-xs text-cyan-200">{actionCatalogMessage}</p>}
                 </div>
               ) : (
                 <>
@@ -2905,10 +3151,6 @@ const filteredChampionships = useMemo(() => {
                       value={subMomentId?.toString() ?? ""}
                       onChange={(e) => {
                         const val = e.target.value;
-                        if (val === "__create__") {
-                          setModal({ kind: "submoment", open: true });
-                          return;
-                        }
                         setSubMomentId(val ? Number(val) : undefined);
                         setActionIds([]);
                         setOffensiveSequenceActionBySubMoment({});
@@ -2922,9 +3164,6 @@ const filteredChampionships = useMemo(() => {
                       disabled={!momentId}
                     >
                       <option value="">Select sub-phase</option>
-                      <option value="__create__" disabled={!momentId}>
-                        + Create novo...
-                      </option>
                       {filteredSubMoments.map((s) => (
                         <option key={s.id} value={s.id} className="text-black">
                           {displayFootballTerm(s.name)}
@@ -2934,17 +3173,7 @@ const filteredChampionships = useMemo(() => {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">Actions</label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs"
-                        onClick={() => setModal({ kind: "action", open: true })}
-                      >
-                        + Create novo...
-                      </Button>
-                    </div>
+                    <label className="text-sm font-medium">Actions</label>
                     {filteredActions.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-border/60 bg-card/60 p-3 text-xs text-muted-foreground">
                         Select a sub-phase to view the available actions.
@@ -3412,6 +3641,7 @@ const filteredChampionships = useMemo(() => {
               <RecoverySpaceGrid
                 variant={recoveryGridVariant}
                 value={attackingSpaceId}
+                attackDirection={attackDirection}
                 onChange={(zoneId) => setAttackingSpaceId(zoneId)}
               />
 
@@ -3445,7 +3675,7 @@ const filteredChampionships = useMemo(() => {
               </div>
 
 
-              <PitchPinpoint value={assistDrawingPoint} onChange={setAssistDrawingPoint} storageField="assist_drawing" pinColor="#38bdf8" />
+              <PitchPinpoint value={assistDrawingPoint} onChange={setAssistDrawingPoint} storageField="assist_drawing" attackDirection={attackDirection} pinColor="#38bdf8" />
 
 
             </div>
@@ -3523,7 +3753,7 @@ const filteredChampionships = useMemo(() => {
               </div>
 
 
-              <PitchPinpoint value={fieldPoint} onChange={setFieldPoint} storageField="field_drawing" pinColor="#22c55e" />
+              <PitchPinpoint value={fieldPoint} onChange={setFieldPoint} storageField="field_drawing" attackDirection={attackDirection} pinColor="#22c55e" />
 
 
 
@@ -3585,6 +3815,10 @@ const filteredChampionships = useMemo(() => {
 
 
                 <span>{minute}&rsquo;</span>
+
+                <span className="text-muted-foreground">Sentido do ataque</span>
+
+                <span>{attackDirection === "left_to_right" ? "Esquerda → direita" : "Direita → esquerda"}</span>
 
 
                 <span className="text-muted-foreground">Phase</span>
@@ -3887,6 +4121,7 @@ const filteredChampionships = useMemo(() => {
                       <RecoverySpaceGrid
                         variant={recoveryGridVariant}
                         value={attackingSpaceId}
+                        attackDirection={attackDirection}
                         readOnly
                         showHelperText={false}
                       />

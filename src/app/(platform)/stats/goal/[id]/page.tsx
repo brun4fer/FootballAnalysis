@@ -63,7 +63,17 @@ function GoalNet({ x, y }: { x: number; y: number }) {
 
 
 
-function Pitch({ x, y, pinColor = "#22c55e" }: { x: number; y: number; pinColor?: string }) {
+function Pitch({
+  x,
+  y,
+  attackDirection = "left_to_right",
+  pinColor = "#22c55e"
+}: {
+  x: number;
+  y: number;
+  attackDirection?: "left_to_right" | "right_to_left";
+  pinColor?: string;
+}) {
 
   return (
 
@@ -79,9 +89,16 @@ function Pitch({ x, y, pinColor = "#22c55e" }: { x: number; y: number; pinColor?
 
       <rect x="90" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
 
-      <line x1="39" y1="6" x2="64" y2="6" stroke="#94a3b8" strokeWidth="0.8" />
+      <line
+        x1={attackDirection === "left_to_right" ? 39 : 66}
+        y1="6"
+        x2={attackDirection === "left_to_right" ? 64 : 41}
+        y2="6"
+        stroke="#94a3b8"
+        strokeWidth="0.8"
+      />
 
-      <path d="M64 3.8L69 6L64 8.2Z" fill="#94a3b8" />
+      <path d={attackDirection === "left_to_right" ? "M64 3.8L69 6L64 8.2Z" : "M41 3.8L36 6L41 8.2Z"} fill="#94a3b8" />
 
       <text x="52.5" y="4" textAnchor="middle" fill="#94a3b8" fontSize="2.8">Sentido do ataque</text>
 
@@ -103,7 +120,15 @@ function Pitch({ x, y, pinColor = "#22c55e" }: { x: number; y: number; pinColor?
 
 type PitchPoint = { x: number; y: number };
 
-function AssistToShotPitch({ assist, shot }: { assist: PitchPoint | null; shot: PitchPoint | null }) {
+function AssistToShotPitch({
+  assist,
+  shot,
+  attackDirection = "left_to_right"
+}: {
+  assist: PitchPoint | null;
+  shot: PitchPoint | null;
+  attackDirection?: "left_to_right" | "right_to_left";
+}) {
   const assistX = assist ? assist.x * 105 : 0;
   const assistY = assist ? assist.y * 68 : 0;
   const shotX = shot ? shot.x * 105 : 0;
@@ -132,9 +157,9 @@ function AssistToShotPitch({ assist, shot }: { assist: PitchPoint | null; shot: 
         <rect x="90" y="20" width="14" height="28" stroke="rgba(148,163,184,0.35)" fill="none" />
 
         <line
-          x1="39"
+          x1={attackDirection === "left_to_right" ? 39 : 66}
           y1="6"
-          x2="66"
+          x2={attackDirection === "left_to_right" ? 66 : 39}
           y2="6"
           stroke="#94a3b8"
           strokeWidth="0.8"
@@ -405,6 +430,10 @@ export default async function GoalDetail({ params }: { params: { id: string } })
                 &apos;
               </span>
 
+              <span className="text-muted-foreground">Sentido do ataque</span>
+
+              <span>{goal.attackDirection === "right_to_left" ? "Direita → esquerda" : "Esquerda → direita"}</span>
+
               <span className="text-muted-foreground">Phase</span>
 
               <span>{displayFootballTerm(goal.momentName) || goal.momentId}</span>
@@ -493,7 +522,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
           <CardContent>
 
             {hasAssistDrawing || hasFieldPoint ? (
-              <AssistToShotPitch assist={assistDrawing} shot={goal.fieldDrawing ?? null} />
+              <AssistToShotPitch assist={assistDrawing} shot={goal.fieldDrawing ?? null} attackDirection={goal.attackDirection} />
             ) : (
               <div className="text-sm text-muted-foreground">Sem coordenadas de assistencia ou remate.</div>
             )}
@@ -507,7 +536,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
             <CardHeader title="Recovery Point" />
             <CardContent>
               {hasTransitionDrawing && transitionDrawing ? (
-                <Pitch x={transitionDrawing.x} y={transitionDrawing.y} pinColor="#eab308" />
+                <Pitch x={transitionDrawing.x} y={transitionDrawing.y} attackDirection={goal.attackDirection} pinColor="#eab308" />
               ) : (
                 <div className="text-sm text-muted-foreground">No recovery coordinates.</div>
               )}

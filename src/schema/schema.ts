@@ -201,7 +201,9 @@ export const actions = pgTable(
     context: text("context")
       .notNull()
       .default("field_goal")
-      .$type<"field" | "field_goal">()
+      .$type<"field" | "field_goal">(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true)
   },
   (table) => ({
     uniqueSubMomentName: uniqueIndex("actions_sub_moment_name_key").on(table.subMomentId, table.name),
@@ -244,6 +246,10 @@ export const goals = pgTable(
     assistDrawing: jsonb("assist_drawing").$type<CoordinatePoint | null>(),
     transitionDrawing: jsonb("transition_drawing").$type<CoordinatePoint | null>(),
     attackingSpaceId: integer("attacking_space_id"),
+    attackDirection: text("attack_direction")
+      .notNull()
+      .default("left_to_right")
+      .$type<"left_to_right" | "right_to_left">(),
     assistSector: text("assist_sector"),
     shotSector: text("shot_sector"),
     finishSector: text("finish_sector"),
@@ -269,7 +275,11 @@ export const goals = pgTable(
     idxCrossAuthor: index("idx_goals_cross_author").on(table.crossAuthorId),
     idxThrowInTaker: index("idx_goals_throw_in_taker").on(table.throwInTakerId),
     idxReferencePlayer: index("idx_goals_reference_player").on(table.referencePlayerId),
-    idxFoulSufferedBy: index("idx_goals_foul_suffered_by").on(table.foulSufferedById)
+    idxFoulSufferedBy: index("idx_goals_foul_suffered_by").on(table.foulSufferedById),
+    attackDirectionCheck: check(
+      "goals_attack_direction_check",
+      sql`${table.attackDirection} IN ('left_to_right','right_to_left')`
+    )
   })
 );
 

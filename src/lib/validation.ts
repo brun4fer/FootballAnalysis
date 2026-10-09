@@ -67,6 +67,7 @@ export const goalInputSchema = z
     assistDrawing: pointSchema.optional().nullable(),
     transitionDrawing: pointSchema.optional().nullable(),
     attackingSpaceId: z.number().int().min(1).max(10).optional().nullable(),
+    attackDirection: z.enum(["left_to_right", "right_to_left"]).default("left_to_right"),
     cornerProfile: setPieceProfile.optional().nullable(),
     freekickProfile: setPieceProfile.optional().nullable(),
     throwInProfile: throwProfile.optional().nullable(),

@@ -361,6 +361,39 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     WHERE g.team_id = ${teamId}
   `);
 
+  const filteredGoals = db.execute<{
+    id: number;
+    minute: number;
+    scorerName: string;
+    assistName: string | null;
+    opponentName: string | null;
+    momentName: string;
+    subMomentName: string | null;
+    mediaAssetId: string | null;
+    videoPath: string | null;
+    attackDirection: "left_to_right" | "right_to_left";
+  }>(sql`
+    SELECT
+      g.id,
+      g.minute,
+      scorer.name AS "scorerName",
+      assistant.name AS "assistName",
+      opponent.name AS "opponentName",
+      m.name AS "momentName",
+      sm.name AS "subMomentName",
+      g.media_asset_id AS "mediaAssetId",
+      g.video_path AS "videoPath",
+      g.attack_direction AS "attackDirection"
+    FROM ${goals} g
+    JOIN ${players} scorer ON scorer.id = g.scorer_id
+    LEFT JOIN ${players} assistant ON assistant.id = g.assist_id
+    LEFT JOIN ${teams} opponent ON opponent.id = g.opponent_team_id
+    JOIN ${moments} m ON m.id = g.moment_id
+    LEFT JOIN ${subMoments} sm ON sm.id = g.sub_moment_id
+    WHERE ${goalFilter}
+    ORDER BY g.id DESC
+  `);
+
   const subMomentTotalsPromise: Promise<{ rows: Array<{ subMomentId: number; subMoment: string; totalGoals: number }> }> =
     !shouldComputeSubMomentBreakdown
       ? Promise.resolve({ rows: [] })
@@ -518,7 +551,8 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     teamGoalsRows,
     subMomentTotalsRows,
     subMomentActionRows,
-    recoverySpaceRows
+    recoverySpaceRows,
+    filteredGoalRows
   ] = await Promise.all([
     distribution,
     assistZones,
@@ -536,7 +570,8 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     teamGoalsCount,
     subMomentTotalsPromise,
     subMomentActionsPromise,
-    recoverySpaceRowsPromise
+    recoverySpaceRowsPromise,
+    filteredGoals
   ]);
 
   const normalizeSectorValue = (value?: string | null) => {
@@ -718,6 +753,13 @@ export async function getRadiography(teamId: number, filters?: RadiographyFilter
     recoverySpaces,
     momentGoals: momentGoalsRows.rows[0]?.goals ?? 0,
     teamGoals: teamGoalsRows.rows[0]?.goals ?? 0,
+    goals: filteredGoalRows.rows.map((goal) => ({
+      ...goal,
+      hasVideo: Boolean(goal.mediaAssetId || goal.videoPath),
+      videoPlaybackUrl: goal.mediaAssetId
+        ? `/api/media/assets/${encodeURIComponent(goal.mediaAssetId)}/playback`
+        : goal.videoPath
+    })),
     team: teamMeta ? { ...teamMeta, emblemPath: onlyLocal(teamMeta.emblemPath) } : null
   };
 }

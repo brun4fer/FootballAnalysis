@@ -8,6 +8,7 @@ import { RankingModal, type RankingModalItem } from "@/components/ui/ranking-mod
 import { Select } from "@/components/ui/select";
 import { SimplePie } from "@/components/ui/charts";
 import { cn } from "@/lib/utils";
+import { PlayCircle, Video } from "lucide-react";
 
 type TeamOption = {
   id: number;
@@ -70,6 +71,19 @@ type RecoverySpaceBreakdown = {
   zones: Array<{ zoneId: number; goals: number; percent: number }>;
 };
 
+type RadiographyGoal = {
+  id: number;
+  minute: number;
+  scorerName: string;
+  assistName?: string | null;
+  opponentName?: string | null;
+  momentName: string;
+  subMomentName?: string | null;
+  hasVideo: boolean;
+  videoPlaybackUrl?: string | null;
+  attackDirection: "left_to_right" | "right_to_left";
+};
+
 type RadiographyResponse = {
   distribution: { category: string; goals: number }[];
   assistZones: MapPoint[];
@@ -87,6 +101,7 @@ type RadiographyResponse = {
   recoverySpaces: RecoverySpaceBreakdown[];
   momentGoals: number;
   teamGoals: number;
+  goals: RadiographyGoal[];
   team: TeamOption | null;
 };
 
@@ -443,10 +458,12 @@ function GoalEntryMap({ points }: { points: MapPoint[] }) {
 
 function FieldPinMap({
   points,
-  pinColor
+  pinColor,
+  attackDirection = "left_to_right"
 }: {
   points: MapPoint[];
   pinColor: "#22c55e" | "#38bdf8";
+  attackDirection?: "left_to_right" | "right_to_left" | "mixed";
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
@@ -469,6 +486,26 @@ function FieldPinMap({
         <circle cx="104" cy="40" r="0.8" fill="rgba(148,163,184,0.65)" />
         <path d="M20 33a9 9 0 0 0 0 14" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
         <path d="M100 33a9 9 0 0 1 0 14" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="0.8" />
+        {attackDirection === "mixed" ? (
+          <>
+            <line x1="46" y1="74" x2="74" y2="74" stroke="#22d3ee" strokeWidth="1" />
+            <path d="M46 71.8L40 74L46 76.2ZM74 71.8L80 74L74 76.2Z" fill="#22d3ee" />
+            <text x="60" y="72" textAnchor="middle" fill="#67e8f9" fontSize="3">MIXED</text>
+          </>
+        ) : (
+          <>
+            <line
+              x1={attackDirection === "left_to_right" ? 45 : 75}
+              y1="74"
+              x2={attackDirection === "left_to_right" ? 70 : 50}
+              y2="74"
+              stroke="#22d3ee"
+              strokeWidth="1"
+            />
+            <path d={attackDirection === "left_to_right" ? "M70 71.8L76 74L70 76.2Z" : "M50 71.8L44 74L50 76.2Z"} fill="#22d3ee" />
+            <text x="60" y="72" textAnchor="middle" fill="#67e8f9" fontSize="3">ATTACK</text>
+          </>
+        )}
         {pins.map((pin, idx) => (
           <g
             key={`${pin.x}-${pin.y}-${idx}`}
@@ -706,6 +743,7 @@ export default function RadiographyPanel({
   const [radiography, setRadiography] = useState<RadiographyResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedVideoGoalId, setSelectedVideoGoalId] = useState<number | null>(null);
   const [rankingModal, setRankingModal] = useState<{
     title: string;
     items: RankingModalItem[];
@@ -853,7 +891,10 @@ export default function RadiographyPanel({
         return res.json() as Promise<RadiographyResponse>;
       })
       .then((payload) => {
-        if (!isCancelled) setRadiography(payload);
+        if (!isCancelled) {
+          setRadiography(payload);
+          setSelectedVideoGoalId(payload.goals[0]?.id ?? null);
+        }
       })
       .catch((err) => {
         if (!isCancelled) setError(err.message ?? "Could not load data");
@@ -940,6 +981,11 @@ export default function RadiographyPanel({
       }),
     [radiography?.recoverySpaces]
   );
+  const filteredGoals = radiography?.goals ?? [];
+  const selectedVideoGoal = filteredGoals.find((goal) => goal.id === selectedVideoGoalId) ?? filteredGoals[0] ?? null;
+  const attackDirections = new Set(filteredGoals.map((goal) => goal.attackDirection));
+  const mapAttackDirection: "left_to_right" | "right_to_left" | "mixed" =
+    attackDirections.size > 1 ? "mixed" : filteredGoals[0]?.attackDirection ?? "left_to_right";
 
   if (!championshipsLoading && championshipOptions.length === 0) {
     return <div className="text-sm text-muted-foreground">No competitions have been added.</div>;
@@ -1115,13 +1161,13 @@ export default function RadiographyPanel({
                 <Card className="bg-[#0c1420]/70 border border-border/60">
                   <CardHeader title="Shot Map" />
                   <CardContent className={MAP_CARD_CONTENT_CLASS}>
-                    <FieldPinMap points={shotZonePoints} pinColor="#22c55e" />
+                    <FieldPinMap points={shotZonePoints} pinColor="#22c55e" attackDirection={mapAttackDirection} />
                   </CardContent>
                 </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">
                   <CardHeader title="Assist Locations" />
                   <CardContent className={MAP_CARD_CONTENT_CLASS}>
-                    <FieldPinMap points={assistZonePoints} pinColor="#38bdf8" />
+                    <FieldPinMap points={assistZonePoints} pinColor="#38bdf8" attackDirection={mapAttackDirection} />
                   </CardContent>
                 </Card>
               </div>
@@ -1190,13 +1236,13 @@ export default function RadiographyPanel({
                 <Card className="bg-[#0c1420]/70 border border-border/60">
                   <CardHeader title="Shot Map" />
                   <CardContent className={MAP_CARD_CONTENT_CLASS}>
-                    <FieldPinMap points={shotZonePoints} pinColor="#22c55e" />
+                    <FieldPinMap points={shotZonePoints} pinColor="#22c55e" attackDirection={mapAttackDirection} />
                   </CardContent>
                 </Card>
                 <Card className="bg-[#0c1420]/70 border border-border/60">
                   <CardHeader title="Assist Locations" />
                   <CardContent className={MAP_CARD_CONTENT_CLASS}>
-                    <FieldPinMap points={assistZonePoints} pinColor="#38bdf8" />
+                    <FieldPinMap points={assistZonePoints} pinColor="#38bdf8" attackDirection={mapAttackDirection} />
                   </CardContent>
                 </Card>
               </div>
@@ -1229,6 +1275,81 @@ export default function RadiographyPanel({
                 </div>
               )}
             </>
+          )}
+
+          {isSpecificFilterActive && (
+            <Card className="border-border/60 bg-[#0c1420]/70">
+              <CardHeader
+                title={`Golos do filtro (${filteredGoals.length})`}
+                description="Selecione um golo para ver o vídeo e os respetivos dados."
+              />
+              <CardContent>
+                {filteredGoals.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
+                    Não existem golos para este filtro.
+                  </div>
+                ) : (
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+                    <div className="space-y-3 rounded-xl border border-border/60 bg-black/20 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="font-semibold text-white">
+                            {selectedVideoGoal?.scorerName} · {selectedVideoGoal?.minute}&apos;
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            vs {selectedVideoGoal?.opponentName ?? "—"}
+                            {selectedVideoGoal?.assistName ? ` · Assist: ${selectedVideoGoal.assistName}` : ""}
+                          </div>
+                        </div>
+                        <div className="text-xs text-cyan-200">
+                          {selectedVideoGoal?.attackDirection === "right_to_left" ? "← Direita para esquerda" : "Esquerda para direita →"}
+                        </div>
+                      </div>
+                      {selectedVideoGoal?.videoPlaybackUrl ? (
+                        <video
+                          key={selectedVideoGoal.id}
+                          controls
+                          className="aspect-video w-full rounded-xl border border-border/60 bg-black object-contain"
+                          src={selectedVideoGoal.videoPlaybackUrl}
+                        />
+                      ) : (
+                        <div className="flex aspect-video items-center justify-center rounded-xl border border-dashed border-border/60 bg-black/40 text-sm text-muted-foreground">
+                          Este golo não tem vídeo.
+                        </div>
+                      )}
+                    </div>
+                    <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
+                      {filteredGoals.map((goal) => (
+                        <button
+                          key={goal.id}
+                          type="button"
+                          onClick={() => setSelectedVideoGoalId(goal.id)}
+                          className={cn(
+                            "w-full rounded-xl border p-3 text-left transition",
+                            goal.id === selectedVideoGoal?.id
+                              ? "border-cyan-300/60 bg-cyan-400/10"
+                              : "border-border/60 bg-slate-950/30 hover:border-cyan-300/30"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm font-semibold text-white">{goal.scorerName}</span>
+                            <span className="text-xs text-cyan-100">{goal.minute}&apos;</span>
+                          </div>
+                          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                            {goal.hasVideo ? <Video className="h-3.5 w-3.5 text-cyan-300" /> : <PlayCircle className="h-3.5 w-3.5 opacity-40" />}
+                            <span>vs {goal.opponentName ?? "—"}</span>
+                          </div>
+                          <div className="mt-1 text-[11px] text-muted-foreground">
+                            {displayFootballTerm(goal.momentName)}
+                            {goal.subMomentName ? ` · ${displayFootballTerm(goal.subMomentName)}` : ""}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
 
         </div>

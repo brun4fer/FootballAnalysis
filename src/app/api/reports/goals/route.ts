@@ -22,6 +22,7 @@ const filtersSchema = z.object({
   involvedPlayerId: optionalNumber,
   minuteFrom: optionalNumber,
   minuteTo: optionalNumber,
+  attackDirection: z.enum(["left_to_right", "right_to_left"]).optional(),
   hasVideo: z.preprocess(
     (value) => (value === "true" ? true : value === "false" ? false : undefined),
     z.boolean().optional()
