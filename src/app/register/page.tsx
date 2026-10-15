@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { registerAction } from "@/actions/auth";
 import { getCurrentUser } from "@/lib/auth";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 
 const errorMessages: Record<string, string> = {
   workspace: "Enter a workspace or club name containing 2 to 120 characters.",
@@ -19,6 +20,9 @@ export default async function RegisterPage({ searchParams }: { searchParams: { e
 
   return (
     <main className="grid min-h-screen place-items-center px-4 py-10">
+      <div className="fixed right-4 top-4 z-20">
+        <LanguageToggle />
+      </div>
       <form action={registerAction} className="glass w-full max-w-md space-y-5 rounded-2xl p-7">
         <div className="flex items-center gap-3">
           <Image src="/icon-192.png" alt="" width={48} height={48} className="rounded-xl" priority />

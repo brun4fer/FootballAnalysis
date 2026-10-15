@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { displayFootballTerm } from "@/lib/presentation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -8,7 +9,8 @@ import { RankingModal, type RankingModalItem } from "@/components/ui/ranking-mod
 import { Select } from "@/components/ui/select";
 import { SimplePie } from "@/components/ui/charts";
 import { cn } from "@/lib/utils";
-import { PlayCircle, Video } from "lucide-react";
+import { ExternalLink, PlayCircle, Video } from "lucide-react";
+import { useLanguage } from "@/components/ui/language-context";
 
 type TeamOption = {
   id: number;
@@ -701,6 +703,7 @@ export default function RadiographyPanel({
   initialChampionshipId?: number;
   initialTeamId?: number;
 } = {}) {
+  const { language, t } = useLanguage();
   const [championshipOptions, setChampionshipOptions] = useState<ChampionshipOption[]>([]);
   const [teamOptions, setTeamOptions] = useState<TeamOption[]>([]);
   const [championshipId, setChampionshipId] = useState<number | undefined>(initialChampionshipId);
@@ -920,7 +923,7 @@ export default function RadiographyPanel({
   const isTransitionMomentFilter = Boolean(selectedMoment && isTransitionOffensiveMoment(selectedMoment.name));
   const shouldShowTopPlayerRankings = isAllMomentsFilter;
   const shouldShowReferenceRanking = isTransitionMomentFilter;
-  const selectedFilterLabel = displayFootballTerm(selectedMoment?.name) || selectedBpoFilter?.label || "Filter";
+  const selectedFilterLabel = displayFootballTerm(selectedMoment?.name, language) || (selectedBpoFilter ? t(selectedBpoFilter.label) : "Filter");
   const momentGoalsValue = radiography?.momentGoals ?? 0;
   const teamGoalsValue = radiography?.teamGoals ?? 0;
   const goalShare = teamGoalsValue > 0 ? (momentGoalsValue / teamGoalsValue) * 100 : 0;
@@ -1016,14 +1019,14 @@ export default function RadiographyPanel({
         </div>
         <div className="w-full max-w-xs">
           <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Competition
+            {t("Competition")}
           </label>
           <Select
             value={championshipId?.toString() ?? ""}
             onChange={(e) => setChampionshipId(e.target.value ? Number(e.target.value) : undefined)}
           >
             <option value="" className="text-black">
-              Select competition
+              {t("Select competition")}
             </option>
             {championshipOptions.map((championship) => (
               <option key={championship.id} value={championship.id} className="text-black">
@@ -1034,7 +1037,7 @@ export default function RadiographyPanel({
         </div>
         <div className="w-full max-w-xs">
           <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Team
+            {t("Team")}
           </label>
           <Select
             value={teamId?.toString() ?? ""}
@@ -1042,7 +1045,7 @@ export default function RadiographyPanel({
             disabled={!championshipId || teamsLoading}
           >
             <option value="" className="text-black">
-              {!championshipId ? "Select a competition first" : "Select team"}
+              {!championshipId ? t("Select a competition first") : t("Select team")}
             </option>
             {teamOptions.map((team) => (
               <option key={team.id} value={team.id} className="text-black">
@@ -1053,7 +1056,7 @@ export default function RadiographyPanel({
         </div>
         <div className="w-full max-w-xs">
           <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Phase
+            {t("Phase")}
           </label>
           <Select
             value={momentId ? `moment:${momentId}` : bpoCategory ? `bpo:${bpoCategory}` : ""}
@@ -1061,19 +1064,19 @@ export default function RadiographyPanel({
             disabled={!teamId || !selectedTeam}
           >
             <option value="" className="text-black">
-              All phases
+              {t("All phases")}
             </option>
-            <optgroup label="Phases Gerais">
+            <optgroup label={t("General phases")}>
               {momentOptions.map((moment) => (
                 <option key={moment.id} value={`moment:${moment.id}`} className="text-black">
-                  {displayFootballTerm(moment.name)}
+                  {displayFootballTerm(moment.name, language)}
                 </option>
               ))}
             </optgroup>
-            <optgroup label="Bolas Paradas Ofensivas">
+            <optgroup label={t("Offensive set pieces")}>
               {BPO_FILTER_OPTIONS.map((option) => (
                 <option key={option.value} value={`bpo:${option.value}`} className="text-black">
-                  {option.label}
+                  {t(option.label)}
                 </option>
               ))}
             </optgroup>
@@ -1082,7 +1085,7 @@ export default function RadiographyPanel({
       </div>
 
       <div className="space-y-2">
-        {championshipsLoading && <div className="text-sm text-muted-foreground">Loading competitions...</div>}
+        {championshipsLoading && <div className="text-sm text-muted-foreground">{t("Loading competitions...")}</div>}
         {championshipsError && <div className="text-sm text-destructive">{championshipsError}</div>}
         {teamsLoading && championshipId && <div className="text-sm text-muted-foreground">Loading teams...</div>}
         {teamsError && <div className="text-sm text-destructive">{teamsError}</div>}
@@ -1277,16 +1280,16 @@ export default function RadiographyPanel({
             </>
           )}
 
-          {isSpecificFilterActive && (
+          {radiography && (
             <Card className="border-border/60 bg-[#0c1420]/70">
               <CardHeader
-                title={`Golos do filtro (${filteredGoals.length})`}
-                description="Selecione um golo para ver o vídeo e os respetivos dados."
+                title={`${t(isSpecificFilterActive ? "Goals in this filter" : "All goals")} (${filteredGoals.length})`}
+                description={t("Select a goal to watch its video and review its data.")}
               />
               <CardContent>
                 {filteredGoals.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
-                    Não existem golos para este filtro.
+                    {t("There are no goals for this selection.")}
                   </div>
                 ) : (
                   <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -1302,7 +1305,7 @@ export default function RadiographyPanel({
                           </div>
                         </div>
                         <div className="text-xs text-cyan-200">
-                          {selectedVideoGoal?.attackDirection === "right_to_left" ? "← Direita para esquerda" : "Esquerda para direita →"}
+                          {selectedVideoGoal?.attackDirection === "right_to_left" ? `← ${t("Right to left")}` : `${t("Left to right")} →`}
                         </div>
                       </div>
                       {selectedVideoGoal?.videoPlaybackUrl ? (
@@ -1314,16 +1317,14 @@ export default function RadiographyPanel({
                         />
                       ) : (
                         <div className="flex aspect-video items-center justify-center rounded-xl border border-dashed border-border/60 bg-black/40 text-sm text-muted-foreground">
-                          Este golo não tem vídeo.
+                          {t("This goal has no video.")}
                         </div>
                       )}
                     </div>
                     <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
                       {filteredGoals.map((goal) => (
-                        <button
+                        <div
                           key={goal.id}
-                          type="button"
-                          onClick={() => setSelectedVideoGoalId(goal.id)}
                           className={cn(
                             "w-full rounded-xl border p-3 text-left transition",
                             goal.id === selectedVideoGoal?.id
@@ -1331,19 +1332,27 @@ export default function RadiographyPanel({
                               : "border-border/60 bg-slate-950/30 hover:border-cyan-300/30"
                           )}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm font-semibold text-white">{goal.scorerName}</span>
-                            <span className="text-xs text-cyan-100">{goal.minute}&apos;</span>
-                          </div>
-                          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                            {goal.hasVideo ? <Video className="h-3.5 w-3.5 text-cyan-300" /> : <PlayCircle className="h-3.5 w-3.5 opacity-40" />}
-                            <span>vs {goal.opponentName ?? "—"}</span>
-                          </div>
-                          <div className="mt-1 text-[11px] text-muted-foreground">
-                            {displayFootballTerm(goal.momentName)}
-                            {goal.subMomentName ? ` · ${displayFootballTerm(goal.subMomentName)}` : ""}
-                          </div>
-                        </button>
+                          <button type="button" className="w-full text-left" onClick={() => setSelectedVideoGoalId(goal.id)}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate text-sm font-semibold text-white">{goal.scorerName}</span>
+                              <span className="text-xs text-cyan-100">{goal.minute}&apos;</span>
+                            </div>
+                            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                              {goal.hasVideo ? <Video className="h-3.5 w-3.5 text-cyan-300" /> : <PlayCircle className="h-3.5 w-3.5 opacity-40" />}
+                              <span>vs {goal.opponentName ?? "—"}</span>
+                            </div>
+                            <div className="mt-1 text-[11px] text-muted-foreground">
+                              {displayFootballTerm(goal.momentName, language)}
+                              {goal.subMomentName ? ` · ${displayFootballTerm(goal.subMomentName, language)}` : ""}
+                            </div>
+                          </button>
+                          <Link
+                            href={`/stats/goal/${goal.id}`}
+                            className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-cyan-200 hover:text-cyan-100"
+                          >
+                            <ExternalLink className="h-3 w-3" /> {t("View details")}
+                          </Link>
+                        </div>
                       ))}
                     </div>
                   </div>

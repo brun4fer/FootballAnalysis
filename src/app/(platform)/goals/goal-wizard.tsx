@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 
 
 import { useAppContext } from "@/components/ui/app-context";
+import { useLanguage } from "@/components/ui/language-context";
 
 
 import { GoalVideoPicker } from "@/components/goal-video-picker";
@@ -1078,6 +1079,7 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
 
 
   const { updatePartial } = useAppContext();
+  const { language, t } = useLanguage();
 
 
   const [step, setStep] = useState<StepId>("season");
@@ -1573,6 +1575,7 @@ const filteredChampionships = useMemo(() => {
   const normalizedMomentName = normalizeActionName(selectedMoment?.name ?? "");
   const isOffensiveOrganizationMoment = normalizedMomentName === "organizacao ofensiva";
   const isOffensiveTransitionMoment = normalizedMomentName === "transicao ofensiva";
+  const isSetPieceMoment = normalizedMomentName.includes("bola") && normalizedMomentName.includes("parada");
   const isPhaseSequenceMoment = isOffensiveOrganizationMoment || isOffensiveTransitionMoment;
 
   const selectedRecoverySubMoment = subMomentId
@@ -1660,6 +1663,13 @@ const filteredChampionships = useMemo(() => {
 
   const selectedSubMoment = resolvedSubMomentId ? lookupsQuery.data?.subMoments.find((s) => s.id === resolvedSubMomentId) : undefined;
   const normalizedSubMomentName = normalizeActionName(selectedSubMoment?.name ?? "");
+  const hiddenSelectedSubMomentActions = useMemo(
+    () =>
+      (taxonomyAdminQuery.data?.actions ?? [])
+        .filter((action) => action.subMomentId === resolvedSubMomentId && !action.isActive)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id),
+    [resolvedSubMomentId, taxonomyAdminQuery.data?.actions]
+  );
   const transitionRecoveryZoneLabel = isRecoveryDefensiveSubMoment
     ? "Recovery in the Defensive Half"
     : isRecoveryOffensiveSubMoment
@@ -2321,7 +2331,7 @@ const filteredChampionships = useMemo(() => {
                     <option key={s.id} value={s.id} className="text-black">
 
 
-                      {displayFootballTerm(s.name)}
+                      {displayFootballTerm(s.name, language)}
 
 
                     </option>
@@ -2908,7 +2918,7 @@ const filteredChampionships = useMemo(() => {
                     <option key={m.id} value={m.id} className="text-black">
 
 
-                      {displayFootballTerm(m.name)}
+                      {displayFootballTerm(m.name, language)}
 
 
                     </option>
@@ -2940,7 +2950,7 @@ const filteredChampionships = useMemo(() => {
                         <option value="">Select recovery context</option>
                         {filteredSubMoments.map((subMoment) => (
                           <option key={subMoment.id} value={subMoment.id} className="text-black">
-                            {displayFootballTerm(subMoment.name)}
+                            {displayFootballTerm(subMoment.name, language)}
                           </option>
                         ))}
                       </Select>
@@ -2987,7 +2997,7 @@ const filteredChampionships = useMemo(() => {
                                 : "Sem ação"}
                             </span>
                           </div>
-                          <div className="mb-3 text-sm font-semibold text-white">{displayFootballTerm(row.subMoment.name)}</div>
+                          <div className="mb-3 text-sm font-semibold text-white">{displayFootballTerm(row.subMoment.name, language)}</div>
                           <div className="space-y-2">
                             {row.actions.length === 0 ? (
                               <div className="rounded-lg border border-dashed border-border/60 bg-card/50 px-2 py-2 text-[11px] text-muted-foreground">
@@ -3051,7 +3061,7 @@ const filteredChampionships = useMemo(() => {
                                             })
                                           }
                                         >
-                                          <div className="font-medium">{displayFootballTerm(action.name)}</div>
+                                          <div className="font-medium">{displayFootballTerm(action.name, language)}</div>
                                           <div className="mt-1 text-[10px] opacity-80">
                                             {action.context === "field_goal" ? "Pitch + Goal" : "Pitch"}
                                           </div>
@@ -3123,7 +3133,7 @@ const filteredChampionships = useMemo(() => {
                                 <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Removidas</div>
                                 {hiddenActions.map((action) => (
                                   <div key={`hidden-action-${action.id}`} className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                                    <span className="truncate">{displayFootballTerm(action.name)}</span>
+                                    <span className="truncate">{displayFootballTerm(action.name, language)}</span>
                                     <button
                                       type="button"
                                       className="rounded p-1 text-cyan-200 hover:bg-cyan-500/10"
@@ -3166,14 +3176,14 @@ const filteredChampionships = useMemo(() => {
                       <option value="">Select sub-phase</option>
                       {filteredSubMoments.map((s) => (
                         <option key={s.id} value={s.id} className="text-black">
-                          {displayFootballTerm(s.name)}
+                          {displayFootballTerm(s.name, language)}
                         </option>
                       ))}
                     </Select>
                   </div>
 
                   <div className="space-y-3">
-                    <label className="text-sm font-medium">Actions</label>
+                    <label className="text-sm font-medium">{t("Actions")}</label>
                     {filteredActions.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-border/60 bg-card/60 p-3 text-xs text-muted-foreground">
                         Select a sub-phase to view the available actions.
@@ -3183,44 +3193,141 @@ const filteredChampionships = useMemo(() => {
                         {filteredActions.map((action) => {
                           const isSelected = actionIds.includes(action.id);
                           return (
-                            <label
+                            <div
                               key={action.id}
+                              draggable={isSetPieceMoment && editingCatalogActionId !== action.id}
+                              onDragStart={() => setDraggedCatalogAction({ id: action.id, subMomentId: action.subMomentId })}
+                              onDragEnd={() => setDraggedCatalogAction(null)}
+                              onDragOver={(event) => isSetPieceMoment && event.preventDefault()}
+                              onDrop={() => isSetPieceMoment && void dropCatalogAction(action.subMomentId, action.id)}
                               className={cn(
-                                "flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm",
+                                "group rounded-lg border px-3 py-2 text-sm",
                                 isSelected
                                   ? "border-emerald-400 bg-emerald-500/10 text-white"
                                   : "border-border/50 bg-card/70 text-muted-foreground"
                               )}
                             >
-                              <input
-                                type="checkbox"
-                                className="sr-only"
-                                checked={isSelected}
-                                onChange={() =>
-                                  setActionIds((prev) =>
-                                    prev.includes(action.id) ? prev.filter((id) => id !== action.id) : [...prev, action.id]
-                                  )
-                                }
-                              />
-                              <div>
-                                <span className="font-medium text-white">{displayFootballTerm(action.name)}</span>
-                                <p className="text-[11px] text-muted-foreground">
-                                  {action.context === "field_goal" ? "Pitch + Goal" : "Pitch"}
-                                </p>
-                              </div>
-                              <span className="rounded-full border border-current px-2 py-0.5 text-[11px] font-semibold">
-                                {isSelected ? "Selected" : "Select"}
-                              </span>
-                            </label>
+                              {editingCatalogActionId === action.id ? (
+                                <div className="space-y-2">
+                                  <Input value={editingCatalogActionName} onChange={(event) => setEditingCatalogActionName(event.target.value)} />
+                                  <Select
+                                    value={editingCatalogActionContext}
+                                    onChange={(event) => setEditingCatalogActionContext(event.target.value as "field" | "field_goal")}
+                                  >
+                                    <option value="field" className="text-black">Pitch</option>
+                                    <option value="field_goal" className="text-black">Pitch + Goal</option>
+                                  </Select>
+                                  <div className="flex justify-end gap-1">
+                                    <Button type="button" size="sm" onClick={() => void saveCatalogActionName(action.id)}>
+                                      <Check className="mr-1 h-3.5 w-3.5" /> {t("Save")}
+                                    </Button>
+                                    <Button type="button" variant="ghost" size="sm" onClick={() => setEditingCatalogActionId(null)}>
+                                      <X className="mr-1 h-3.5 w-3.5" /> {t("Cancel")}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  {isSetPieceMoment && <GripVertical className="h-4 w-4 shrink-0 cursor-grab opacity-50" />}
+                                  <button
+                                    type="button"
+                                    className="min-w-0 flex-1 text-left"
+                                    onClick={() =>
+                                      setActionIds((prev) =>
+                                        prev.includes(action.id) ? prev.filter((id) => id !== action.id) : [...prev, action.id]
+                                      )
+                                    }
+                                  >
+                                    <span className="font-medium text-white">{displayFootballTerm(action.name, language)}</span>
+                                    <p className="text-[11px] text-muted-foreground">
+                                      {action.context === "field_goal" ? "Pitch + Goal" : "Pitch"}
+                                    </p>
+                                  </button>
+                                  <span className="rounded-full border border-current px-2 py-0.5 text-[11px] font-semibold">
+                                    {isSelected ? t("Selected") : t("Select")}
+                                  </span>
+                                  {isSetPieceMoment && (
+                                    <div className="flex shrink-0 gap-1">
+                                      <button
+                                        type="button"
+                                        className="rounded p-1 hover:bg-white/10"
+                                        title={t("Edit")}
+                                        onClick={() => {
+                                          setEditingCatalogActionId(action.id);
+                                          setEditingCatalogActionName(action.name);
+                                          setEditingCatalogActionContext(action.context);
+                                        }}
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded p-1 text-rose-200 hover:bg-rose-500/15"
+                                        title={t("Remove")}
+                                        onClick={() => void setCatalogActionActive(action.id, false)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
+                      </div>
+                    )}
+                    {isSetPieceMoment && resolvedSubMomentId && (
+                      <div className="space-y-2 rounded-xl border border-border/60 bg-slate-950/30 p-3">
+                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_auto]">
+                          <Input
+                            value={newActionBySubMoment[resolvedSubMomentId] ?? ""}
+                            onChange={(event) =>
+                              setNewActionBySubMoment((current) => ({ ...current, [resolvedSubMomentId]: event.target.value }))
+                            }
+                            placeholder={t("New action")}
+                          />
+                          <Select
+                            value={newActionContextBySubMoment[resolvedSubMomentId] ?? "field"}
+                            onChange={(event) =>
+                              setNewActionContextBySubMoment((current) => ({
+                                ...current,
+                                [resolvedSubMomentId]: event.target.value as "field" | "field_goal"
+                              }))
+                            }
+                          >
+                            <option value="field" className="text-black">Pitch</option>
+                            <option value="field_goal" className="text-black">Pitch + Goal</option>
+                          </Select>
+                          <Button
+                            type="button"
+                            disabled={(newActionBySubMoment[resolvedSubMomentId] ?? "").trim().length < 2 || actionCatalogMutation.isPending}
+                            onClick={() => void addCatalogAction(resolvedSubMomentId)}
+                          >
+                            <Plus className="mr-1 h-4 w-4" /> {t("Add")}
+                          </Button>
+                        </div>
+                        {hiddenSelectedSubMomentActions.length > 0 && (
+                          <div className="space-y-1 border-t border-border/50 pt-2">
+                            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{t("Removed")}</div>
+                            {hiddenSelectedSubMomentActions.map((action) => (
+                              <div key={action.id} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                <span>{displayFootballTerm(action.name, language)}</span>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => void setCatalogActionActive(action.id, true)}>
+                                  <RotateCcw className="mr-1 h-3.5 w-3.5" /> {t("Restore")}
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {actionCatalogMessage && <p className="text-xs text-cyan-200">{actionCatalogMessage}</p>}
                       </div>
                     )}
                     {selectedActions.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {selectedActions.map((action) => (
                           <Badge key={action.id} className="bg-emerald-500/10 text-emerald-100">
-                            {displayFootballTerm(action.name)}
+                            {displayFootballTerm(action.name, language)}
                           </Badge>
                         ))}
                       </div>
@@ -3824,13 +3931,13 @@ const filteredChampionships = useMemo(() => {
                 <span className="text-muted-foreground">Phase</span>
 
 
-                <span>{displayFootballTerm(lookupsQuery.data?.moments.find((m) => m.id === momentId)?.name) || "-"}</span>
+                <span>{displayFootballTerm(lookupsQuery.data?.moments.find((m) => m.id === momentId)?.name, language) || "-"}</span>
 
 
                 <span className="text-muted-foreground">Sub-phase</span>
 
 
-                <span>{displayFootballTerm(lookupsQuery.data?.subMoments.find((s) => s.id === resolvedSubMomentId)?.name) || "-"}</span>
+                <span>{displayFootballTerm(lookupsQuery.data?.subMoments.find((s) => s.id === resolvedSubMomentId)?.name, language) || "-"}</span>
 
 
                 <span className="text-muted-foreground">Actions</span>
@@ -3838,7 +3945,7 @@ const filteredChampionships = useMemo(() => {
 
                 <span>
                   {selectedActions.length > 0
-                    ? selectedActions.map((action) => displayFootballTerm(action.name)).join(", ")
+                    ? selectedActions.map((action) => displayFootballTerm(action.name, language)).join(", ")
                     : "-"}
                 </span>
                 {isPhaseSequenceMoment && (
@@ -3847,7 +3954,7 @@ const filteredChampionships = useMemo(() => {
                     <span>
                       {offensiveSequenceSummary.length > 0
                         ? offensiveSequenceSummary
-                            .map((entry) => `${entry.sequenceOrder}. ${displayFootballTerm(entry.subMomentName)}: ${displayFootballTerm(entry.actionName) || "—"}`)
+                            .map((entry) => `${entry.sequenceOrder}. ${displayFootballTerm(entry.subMomentName, language)}: ${displayFootballTerm(entry.actionName, language) || "—"}`)
                             .join(" | ")
                         : "-"}
                     </span>

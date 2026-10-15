@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
+import { LanguageToggle } from "@/components/ui/language-toggle";
+import { HeaderNavigation } from "@/components/ui/header-navigation";
 
 type HeaderProps = {
   user: {
@@ -26,27 +28,8 @@ export function Header({ user }: HeaderProps) {
           <div className="text-sm font-semibold tracking-tight md:text-lg">AP - Goals Scored</div>
         </div>
         <nav className="flex items-center gap-2 text-sm font-medium">
-          <Link href="/manage/config" className="rounded-lg px-3 py-2 text-muted-foreground hover:bg-white/5 hover:text-foreground">
-            Settings
-          </Link>
-          <Link href="/manage/teams" className="rounded-lg px-3 py-2 text-muted-foreground hover:bg-white/5 hover:text-foreground">
-            Teams
-          </Link>
-          <Link href="/manage/players" className="rounded-lg px-3 py-2 text-muted-foreground hover:bg-white/5 hover:text-foreground">
-            Players
-          </Link>
-          <Link href="/goals" className="rounded-lg px-3 py-2 text-muted-foreground hover:bg-white/5 hover:text-foreground">
-            Record Goal
-          </Link>
-          <Link href="/teams" className="rounded-lg px-3 py-2 text-muted-foreground hover:bg-white/5 hover:text-foreground">
-            Statistics
-          </Link>
-          <Link href="/rankings" className="rounded-lg px-3 py-2 text-muted-foreground hover:bg-white/5 hover:text-foreground">
-            Rankings
-          </Link>
-          <Link href="/reports" className="rounded-lg px-3 py-2 text-muted-foreground hover:bg-white/5 hover:text-foreground">
-            Reports
-          </Link>
+          <HeaderNavigation />
+          <LanguageToggle />
           <Link
             href="/account"
             className="ml-2 rounded-lg border border-border/70 px-3 py-1.5 text-right leading-tight hover:bg-white/5"

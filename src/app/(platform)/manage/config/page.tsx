@@ -7,12 +7,27 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { useLanguage } from "@/components/ui/language-context";
+import { displayFootballTerm } from "@/lib/presentation";
 import { Badge } from "@/components/ui/badge";
 
 type Season = { id: number; name: string; description?: string | null };
 type Championship = { id: number; name: string; country: string; seasonId: number; logo?: string | null };
 type Moment = { id: number; name: string };
 type SubMoment = { id: number; name: string; momentId: number; sortOrder: number; isActive: boolean };
+
+const normalizeName = (value: string) =>
+  value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+
+const fixedSetPieceSubMoments = new Set([
+  "canto",
+  "livre",
+  "livre direto",
+  "livre directo",
+  "penalti",
+  "penalty",
+  "lancamento lateral"
+]);
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
@@ -21,6 +36,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export default function ConfigPage() {
+  const { language, t } = useLanguage();
   const qc = useQueryClient();
   const [seasonForm, setSeasonForm] = useState({ name: "", description: "" });
   const [champForm, setChampForm] = useState({ name: "", country: "", seasonId: "", logo: "" });
@@ -52,6 +68,9 @@ export default function ConfigPage() {
         .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
     [taxonomyQuery.data?.subMoments, taxonomyMomentId]
   );
+  const selectedTaxonomyMoment = taxonomyMoments.find((moment) => moment.id === Number(taxonomyMomentId));
+  const normalizedTaxonomyMoment = normalizeName(selectedTaxonomyMoment?.name ?? "");
+  const isSetPieceTaxonomy = normalizedTaxonomyMoment.includes("bola") && normalizedTaxonomyMoment.includes("parada");
 
   const refreshTaxonomy = () => {
     qc.invalidateQueries({ queryKey: ["taxonomy-admin"] });
@@ -195,7 +214,7 @@ export default function ConfigPage() {
                 <option value="">Select moment</option>
                 {taxonomyMoments.map((moment) => (
                   <option key={moment.id} value={moment.id} className="text-black">
-                    {moment.name}
+                    {displayFootballTerm(moment.name, language)}
                   </option>
                 ))}
               </Select>
@@ -221,6 +240,11 @@ export default function ConfigPage() {
           </div>
 
           {taxonomyMessage && <p className="text-xs text-cyan-200">{taxonomyMessage}</p>}
+          {isSetPieceTaxonomy && (
+            <p className="rounded-lg border border-cyan-400/20 bg-cyan-500/5 px-3 py-2 text-xs text-cyan-100">
+              {t("Main set-piece categories are fixed. Their internal actions can be managed while recording a goal.")}
+            </p>
+          )}
 
           <div className="space-y-2">
             {taxonomyMomentId && visibleSubMoments.length === 0 && (
@@ -228,7 +252,9 @@ export default function ConfigPage() {
                 No sub-moments configured.
               </div>
             )}
-            {visibleSubMoments.map((subMoment, index) => (
+            {visibleSubMoments.map((subMoment, index) => {
+              const isFixed = isSetPieceTaxonomy && fixedSetPieceSubMoments.has(normalizeName(subMoment.name));
+              return (
               <div
                 key={subMoment.id}
                 className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
@@ -243,9 +269,10 @@ export default function ConfigPage() {
                     onChange={(event) => setEditingSubMomentName(event.target.value)}
                   />
                 ) : (
-                  <span className="min-w-[220px] flex-1 text-sm font-medium text-white">{subMoment.name}</span>
+                  <span className="min-w-[220px] flex-1 text-sm font-medium text-white">{displayFootballTerm(subMoment.name, language)}</span>
                 )}
-                {!subMoment.isActive && <Badge className="bg-amber-500/10 text-amber-100">Hidden</Badge>}
+                {!subMoment.isActive && <Badge className="bg-amber-500/10 text-amber-100">{t("Hidden")}</Badge>}
+                {isFixed && <Badge className="bg-cyan-500/10 text-cyan-100">{t("Fixed")}</Badge>}
                 <Button type="button" variant="ghost" size="sm" onClick={() => moveSubMoment(index, -1)} disabled={index === 0}>
                   ↑
                 </Button>
@@ -272,7 +299,7 @@ export default function ConfigPage() {
                       Cancel
                     </Button>
                   </>
-                ) : (
+                ) : !isFixed ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -282,19 +309,21 @@ export default function ConfigPage() {
                       setEditingSubMomentName(subMoment.name);
                     }}
                   >
-                    Edit
+                    {t("Edit")}
+                  </Button>
+                ) : null}
+                {!isFixed && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSubMomentActive.mutate({ id: subMoment.id, isActive: !subMoment.isActive })}
+                  >
+                    {subMoment.isActive ? t("Hide") : t("Restore")}
                   </Button>
                 )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSubMomentActive.mutate({ id: subMoment.id, isActive: !subMoment.isActive })}
-                >
-                  {subMoment.isActive ? "Hide" : "Restore"}
-                </Button>
               </div>
-            ))}
+            );})}
           </div>
         </CardContent>
       </Card>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { BarChart3, FileBarChart, Trophy, Home, Users } from "lucide-react";
+import { useLanguage } from "@/components/ui/language-context";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
 
@@ -14,11 +15,12 @@ const items: NavItem[] = [
 ];
 
 export function Sidebar() {
+  const { t } = useLanguage();
   return (
     <aside className="hidden w-52 shrink-0 space-y-2 rounded-xl border border-border/60 bg-[#0c1527]/60 p-3 md:block">
       <div className="flex items-center gap-2 px-2 text-sm font-semibold text-muted-foreground">
         <Home className="h-4 w-4" />
-        Navigation
+        {t("Navigation")}
       </div>
       {items.map((item) => (
         <Link
@@ -27,7 +29,7 @@ export function Sidebar() {
           className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground hover:bg-white/5 hover:text-white"
         >
           {item.icon}
-          <span>{item.label}</span>
+          <span>{t(item.label)}</span>
         </Link>
       ))}
     </aside>

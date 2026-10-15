@@ -2,6 +2,7 @@ import Image from "next/image";
 import { logoutAction, updateCredentialsAction } from "@/actions/auth";
 import { requireUser } from "@/lib/auth";
 import { MediaLibraryLinkPanel } from "@/components/media-library-link-panel";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 
 const errorMessages: Record<string, string> = {
   username: "The username must contain 3 to 40 letters, numbers or the characters . _ -",
@@ -17,6 +18,9 @@ export default async function AccountPage({ searchParams }: { searchParams: { er
 
   return (
     <main className="grid min-h-screen place-items-center px-4 py-10">
+      <div className="fixed right-4 top-4 z-20">
+        <LanguageToggle />
+      </div>
       <div className="w-full max-w-xl space-y-5">
         <div className="flex items-center gap-3">
           <Image src="/icon-192.png" alt="" width={44} height={44} className="rounded-xl" priority />

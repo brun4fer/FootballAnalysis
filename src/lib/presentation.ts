@@ -1,7 +1,7 @@
 const terms: Record<string, string> = {
   "organização ofensiva": "Organised Attack", "organizacao ofensiva": "Organised Attack",
   "transição ofensiva": "Attacking Transition", "transicao ofensiva": "Attacking Transition",
-  "bola parada": "Set Pieces", "saída do gr": "Goalkeeper Distribution", "saida do gr": "Goalkeeper Distribution",
+  "bola parada": "Set Pieces", "bolas paradas": "Set Pieces", "saída do gr": "Goalkeeper Distribution", "saida do gr": "Goalkeeper Distribution",
   "construção": "Build-up", "construcao": "Build-up", "criação": "Chance Creation", "criacao": "Chance Creation",
   "finalização": "Finishing", "finalizacao": "Finishing",
   "recuperação meio campo defensivo": "Recovery in the Defensive Half", "recuperacao meio campo defensivo": "Recovery in the Defensive Half",
@@ -27,7 +27,8 @@ const terms: Record<string, string> = {
   "indefinido": "Not specified", "outros": "Other", "jogo corrido": "Open Play"
 };
 
-export function displayFootballTerm(value: string | null | undefined) {
+export function displayFootballTerm(value: string | null | undefined, language: "pt" | "en" = "en") {
   if (!value) return value ?? "";
+  if (language === "pt") return value;
   return terms[value.trim().toLocaleLowerCase("pt-PT")] ?? value;
 }

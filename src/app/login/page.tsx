@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/actions/auth";
 import { getCurrentUser } from "@/lib/auth";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,9 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
 
   return (
     <main className="grid min-h-screen place-items-center px-4 py-10">
+      <div className="fixed right-4 top-4 z-20">
+        <LanguageToggle />
+      </div>
       <form action={loginAction} className="glass w-full max-w-sm space-y-5 rounded-2xl p-7">
         <div className="flex items-center gap-3">
           <Image src="/icon-192.png" alt="" width={48} height={48} className="rounded-xl" priority />

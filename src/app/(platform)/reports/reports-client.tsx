@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { displayFootballTerm } from "@/lib/presentation";
+import { useLanguage } from "@/components/ui/language-context";
 
 type Lookup = {
   seasons: Array<{ id: number; name: string }>;
@@ -46,6 +47,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 export function ReportsClient() {
+  const { language, t } = useLanguage();
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
   const [playAll, setPlayAll] = useState(false);
@@ -134,51 +136,51 @@ export function ReportsClient() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Goal Reports</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Find and review goals using combined tactical and player filters.</p>
+        <h1 className="text-2xl font-semibold text-white">{t("Goal Reports")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t("Find and review goals using combined tactical and player filters.")}</p>
       </div>
 
       <Card>
-        <CardHeader title="Filters" description="All filters can be combined." />
+        <CardHeader title={t("Filters")} description={t("All filters can be combined.")} />
         <CardContent className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
           <Select value={filters.seasonId ?? ""} onChange={(event) => { setFilter("seasonId", event.target.value); setFilter("championshipId", ""); setFilter("teamId", ""); }}>
-            <option value="">All seasons</option>
+            <option value="">{t("All seasons")}</option>
             {lookups?.seasons.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{entry.name}</option>)}
           </Select>
           <Select value={filters.championshipId ?? ""} onChange={(event) => { setFilter("championshipId", event.target.value); setFilter("teamId", ""); }}>
-            <option value="">All competitions</option>
+            <option value="">{t("All competitions")}</option>
             {championships.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{entry.name}</option>)}
           </Select>
           <Select value={filters.teamId ?? ""} onChange={(event) => setFilter("teamId", event.target.value)}>
-            <option value="">All teams</option>
+            <option value="">{t("All teams")}</option>
             {teams.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{entry.name}</option>)}
           </Select>
           <Select value={filters.opponentTeamId ?? ""} onChange={(event) => setFilter("opponentTeamId", event.target.value)}>
-            <option value="">All opponents</option>
+            <option value="">{t("All opponents")}</option>
             {teams.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{entry.name}</option>)}
           </Select>
           <Select value={filters.momentId ?? ""} onChange={(event) => { setFilter("momentId", event.target.value); setFilter("subMomentId", ""); setFilter("actionId", ""); }}>
-            <option value="">All moments</option>
-            {lookups?.moments.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{displayFootballTerm(entry.name)}</option>)}
+            <option value="">{t("All moments")}</option>
+            {lookups?.moments.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{displayFootballTerm(entry.name, language)}</option>)}
           </Select>
           <Select value={filters.subMomentId ?? ""} onChange={(event) => { setFilter("subMomentId", event.target.value); setFilter("actionId", ""); }}>
-            <option value="">All sub-moments</option>
-            {subMoments.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{displayFootballTerm(entry.name)}</option>)}
+            <option value="">{t("All sub-moments")}</option>
+            {subMoments.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{displayFootballTerm(entry.name, language)}</option>)}
           </Select>
           <Select value={filters.actionId ?? ""} onChange={(event) => setFilter("actionId", event.target.value)}>
-            <option value="">All actions</option>
-            {actions.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{displayFootballTerm(entry.name)}</option>)}
+            <option value="">{t("All actions")}</option>
+            {actions.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{displayFootballTerm(entry.name, language)}</option>)}
           </Select>
           <Select value={filters.scorerId ?? ""} onChange={(event) => setFilter("scorerId", event.target.value)}>
-            <option value="">All scorers</option>
+            <option value="">{t("All scorers")}</option>
             {players.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{entry.name}</option>)}
           </Select>
           <Select value={filters.assistId ?? ""} onChange={(event) => setFilter("assistId", event.target.value)}>
-            <option value="">All assists</option>
+            <option value="">{t("All assists")}</option>
             {players.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{entry.name}</option>)}
           </Select>
           <Select value={filters.involvedPlayerId ?? ""} onChange={(event) => setFilter("involvedPlayerId", event.target.value)}>
-            <option value="">All involved players</option>
+            <option value="">{t("All involved players")}</option>
             {players.map((entry) => <option key={entry.id} value={entry.id} className="text-black">{entry.name}</option>)}
           </Select>
           <div className="grid grid-cols-2 gap-2">
@@ -186,27 +188,27 @@ export function ReportsClient() {
             <Input type="number" min={0} max={130} placeholder="Minute to" value={filters.minuteTo ?? ""} onChange={(event) => setFilter("minuteTo", event.target.value)} />
           </div>
           <Select value={filters.hasVideo ?? ""} onChange={(event) => setFilter("hasVideo", event.target.value)}>
-            <option value="">With or without video</option>
-            <option value="true">With video</option>
-            <option value="false">Without video</option>
+            <option value="">{t("With or without video")}</option>
+            <option value="true">{t("With video")}</option>
+            <option value="false">{t("Without video")}</option>
           </Select>
           <Select value={filters.attackDirection ?? ""} onChange={(event) => setFilter("attackDirection", event.target.value)}>
-            <option value="">Todos os sentidos de ataque</option>
-            <option value="left_to_right">Esquerda para direita →</option>
-            <option value="right_to_left">← Direita para esquerda</option>
+            <option value="">{t("All attack directions")}</option>
+            <option value="left_to_right">{t("Left to right")} →</option>
+            <option value="right_to_left">← {t("Right to left")}</option>
           </Select>
           <div className="md:col-span-3 xl:col-span-4 flex justify-end">
-            <Button type="button" variant="secondary" onClick={() => { setFilters({}); setPlayAll(false); }}>Clear filters</Button>
+            <Button type="button" variant="secondary" onClick={() => { setFilters({}); setPlayAll(false); }}>{t("Clear filters")}</Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader title={`${goals.length} goals found`} description="Watch the filtered videos in sequence or select an individual goal." />
+        <CardHeader title={`${goals.length} ${t("goals found")}`} description={t("Watch the filtered videos in sequence or select an individual goal.")} />
         <CardContent className="space-y-4">
-          {goalsQuery.isLoading && <p className="text-sm text-muted-foreground">Loading goals...</p>}
+          {goalsQuery.isLoading && <p className="text-sm text-muted-foreground">{t("Loading goals...")}</p>}
           {goalsQuery.error && <p className="text-sm text-destructive">{(goalsQuery.error as Error).message}</p>}
-          {!goalsQuery.isLoading && goals.length === 0 && <p className="text-sm text-muted-foreground">No goals match these filters.</p>}
+          {!goalsQuery.isLoading && goals.length === 0 && <p className="text-sm text-muted-foreground">{t("No goals match these filters.")}</p>}
           {goals.length > 0 && (
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-3 rounded-2xl border border-border/60 bg-slate-950/50 p-3">
@@ -221,12 +223,12 @@ export function ReportsClient() {
                   </div>
                   <div className="flex gap-2">
                     <Button type="button" size="sm" onClick={startPlayAll} disabled={videoGoals.length === 0}>
-                      <Play className="mr-1 h-4 w-4" /> {playAll ? "Playing all" : `Play all (${videoGoals.length})`}
+                      <Play className="mr-1 h-4 w-4" /> {playAll ? t("Playing all") : `${t("Play all")} (${videoGoals.length})`}
                     </Button>
                     {selectedGoal && (
                       <Link href={`/stats/goal/${selectedGoal.id}`}>
                         <Button type="button" variant="ghost" size="sm">
-                          <ExternalLink className="mr-1 h-4 w-4" />Details
+                          <ExternalLink className="mr-1 h-4 w-4" />{t("View details")}
                         </Button>
                       </Link>
                     )}
@@ -243,7 +245,7 @@ export function ReportsClient() {
                   />
                 ) : (
                   <div className="flex aspect-video items-center justify-center rounded-xl border border-dashed border-border/60 bg-black/40 text-sm text-muted-foreground">
-                    This goal has no video.
+                    {t("This goal has no video.")}
                   </div>
                 )}
               </div>
@@ -252,38 +254,44 @@ export function ReportsClient() {
                 {goals.map((goal) => {
                   const selected = goal.id === selectedGoal?.id;
                   return (
-                    <button
+                    <div
                       key={goal.id}
-                      type="button"
-                      onClick={() => { setSelectedGoalId(goal.id); setPlayAll(false); }}
                       className={`w-full rounded-xl border p-3 text-left transition ${
                         selected ? "border-cyan-300/60 bg-cyan-400/10" : "border-border/60 bg-white/[.02] hover:border-cyan-300/30"
                       }`}
                     >
+                      <button type="button" className="w-full text-left" onClick={() => { setSelectedGoalId(goal.id); setPlayAll(false); }}>
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-semibold text-white">{goal.teamName} vs {goal.opponentName ?? "—"}</span>
                         <Badge>{goal.minute}&apos;</Badge>
                       </div>
                       <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        {goal.hasVideo ? <Video className="h-3 w-3 text-cyan-300" /> : <span className="text-amber-200">Sem vídeo ·</span>}
+                        {goal.hasVideo ? <Video className="h-3 w-3 text-cyan-300" /> : <span className="text-amber-200">{t("No video")} ·</span>}
                         <span>{goal.scorerName ?? "—"}</span>
                       </div>
                       <div className="mt-1 text-[11px] text-muted-foreground">
-                        {displayFootballTerm(goal.momentName)}{goal.subMomentName ? ` · ${displayFootballTerm(goal.subMomentName)}` : ""}
+                        {displayFootballTerm(goal.momentName, language)}{goal.subMomentName ? ` · ${displayFootballTerm(goal.subMomentName, language)}` : ""}
                       </div>
                       <div className="mt-1 text-[10px] text-cyan-200/80">
-                        {goal.attackDirection === "right_to_left" ? "← Direita para esquerda" : "Esquerda para direita →"}
+                        {goal.attackDirection === "right_to_left" ? `← ${t("Right to left")}` : `${t("Left to right")} →`}
                       </div>
                       {goal.actions.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {goal.actions.map((action, index) => (
                             <span key={`${action}-${index}`} className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-300">
-                              {displayFootballTerm(action)}
+                              {displayFootballTerm(action, language)}
                             </span>
                           ))}
                         </div>
                       )}
-                    </button>
+                      </button>
+                      <Link
+                        href={`/stats/goal/${goal.id}`}
+                        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-cyan-200 hover:text-cyan-100"
+                      >
+                        <ExternalLink className="h-3 w-3" /> {t("View details")}
+                      </Link>
+                    </div>
                   );
                 })}
               </aside>

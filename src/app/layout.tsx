@@ -4,6 +4,8 @@ import type { Metadata, Viewport } from "next";
 import { QueryProvider } from "@/components/ui/query-provider";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { Space_Grotesk } from "next/font/google";
+import { LanguageProvider } from "@/components/ui/language-context";
+import { GlobalTranslator } from "@/components/ui/global-translator";
 
 const font = Space_Grotesk({
   subsets: ["latin"],
@@ -43,8 +45,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en-GB" className={font.variable}>
       <body className="bg-background text-foreground">
-        <ServiceWorkerRegister />
-        <QueryProvider>{children}</QueryProvider>
+        <LanguageProvider>
+          <GlobalTranslator />
+          <ServiceWorkerRegister />
+          <QueryProvider>{children}</QueryProvider>
+        </LanguageProvider>
       </body>
     </html>
   );
