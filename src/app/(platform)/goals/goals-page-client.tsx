@@ -10,12 +10,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { getGoalContextLine, getGoalHeading, getMatchContextKey, type TeamVenue } from "@/lib/match-context";
 
 type Team = { id: number; name: string; championshipId?: number | null };
 type Season = { id: number; name: string };
 type Championship = { id: number; name: string; seasonId: number };
 type GoalEvent = {
   id: number;
+  goalNumber?: number | null;
+  teamId: number;
+  opponentTeamId?: number | null;
+  teamName?: string | null;
+  matchday?: number | null;
+  matchDate?: string | null;
+  teamVenue?: TeamVenue | null;
   minute: number;
   scorerId: number;
   scorerName?: string | null;
@@ -36,6 +44,9 @@ export function GoalsPageClient() {
   const [seasonId, setSeasonId] = useState("");
   const [championshipId, setChampionshipId] = useState("");
   const [teamId, setTeamId] = useState<number | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [matchdayFilter, setMatchdayFilter] = useState("");
+  const [gameFilter, setGameFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [pendingDeleteGoalId, setPendingDeleteGoalId] = useState<number | null>(null);
   const [deleteFeedback, setDeleteFeedback] = useState<string | null>(null);
@@ -71,8 +82,36 @@ export function GoalsPageClient() {
   });
 
   const goals = goalsQuery.data ?? [];
-  const totalPages = Math.ceil(goals.length / PAGE_SIZE);
-  const paginatedGoals = goals.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const matchdayOptions = useMemo(
+    () => [...new Set(goals.map((goal) => goal.matchday).filter((value): value is number => Boolean(value)))].sort((a, b) => a - b),
+    [goals]
+  );
+  const gameOptions = useMemo(() => {
+    const unique = new Map<string, GoalEvent>();
+    goals
+      .filter((goal) => !matchdayFilter || goal.matchday === Number(matchdayFilter))
+      .forEach((goal) => {
+        const key = getMatchContextKey(goal);
+        if (key && !unique.has(key)) unique.set(key, goal);
+      });
+    return [...unique.entries()].sort(([, first], [, second]) =>
+      (second.matchDate ?? "").localeCompare(first.matchDate ?? "")
+    );
+  }, [goals, matchdayFilter]);
+  const filteredGoals = useMemo(() => {
+    return goals
+      .filter((goal) => !matchdayFilter || goal.matchday === Number(matchdayFilter))
+      .filter((goal) => !gameFilter || getMatchContextKey(goal) === gameFilter)
+      .sort((first, second) => {
+        const dateComparison = (first.matchDate ?? "").localeCompare(second.matchDate ?? "");
+        const fallbackComparison = first.id - second.id;
+        return sortOrder === "oldest"
+          ? dateComparison || fallbackComparison
+          : -(dateComparison || fallbackComparison);
+      });
+  }, [gameFilter, goals, matchdayFilter, sortOrder]);
+  const totalPages = Math.ceil(filteredGoals.length / PAGE_SIZE);
+  const paginatedGoals = filteredGoals.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   const deleteGoalMutation = useMutation({
     mutationFn: async (goalId: number) => {
@@ -93,7 +132,7 @@ export function GoalsPageClient() {
 
   useEffect(() => {
     setCurrentPage(0);
-  }, [seasonId, championshipId, teamId, goals.length]);
+  }, [seasonId, championshipId, teamId, goals.length, sortOrder, matchdayFilter, gameFilter]);
 
   return (
     <div className="space-y-6">
@@ -155,38 +194,72 @@ export function GoalsPageClient() {
             </Select>
           </div>
 
+          {teamId && (
+            <div className="grid gap-3 md:grid-cols-3">
+              <Select value={sortOrder} onChange={(event) => setSortOrder(event.target.value as "newest" | "oldest")}>
+                <option value="newest">Newest date first</option>
+                <option value="oldest">Oldest date first</option>
+              </Select>
+
+              <Select
+                value={matchdayFilter}
+                onChange={(event) => {
+                  setMatchdayFilter(event.target.value);
+                  setGameFilter("");
+                }}
+              >
+                <option value="">All matchdays</option>
+                {matchdayOptions.map((matchday) => (
+                  <option key={matchday} value={matchday} className="text-black">Matchday {matchday}</option>
+                ))}
+              </Select>
+
+              <Select value={gameFilter} onChange={(event) => setGameFilter(event.target.value)}>
+                <option value="">All games</option>
+                {gameOptions.map(([key, goal]) => (
+                  <option key={key} value={key} className="text-black">
+                    {getGoalContextLine({ ...goal, minute: null })}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+
           {!teamId && <div className="text-sm text-muted-foreground">Select a team to view its history.</div>}
 
-          {teamId && (goals.length > 0 ? (
+          {teamId && (filteredGoals.length > 0 ? (
             paginatedGoals.map((goal) => (
-              <div key={goal.id} className="flex items-center justify-between rounded-lg border border-border/60 bg-card px-3 py-2 text-sm">
-                <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground">
-                    {goal.minute}
-                    &apos;
-                  </span>
-                  <span className="font-medium text-white">{goal.scorerName ?? `#${goal.scorerId}`}</span>
-                  <Badge className="bg-slate-700/60 text-slate-50">vs {goal.opponentName ?? "Opponent indefinido"}</Badge>
+              <div key={goal.id} className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card px-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-white">{getGoalHeading(goal.goalNumber, goal.id)}</span>
+                    <Badge className="bg-slate-700/60 text-slate-50">{goal.scorerName ?? `#${goal.scorerId}`}</Badge>
                   {goal.goalCoordinates && (
                     <Badge className="bg-cyan-500/10 text-cyan-100">
                       ({goal.goalCoordinates.x.toFixed(2)}, {goal.goalCoordinates.y.toFixed(2)})
                     </Badge>
                   )}
+                  </div>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {getGoalContextLine(goal) || `${goal.minute}' - vs ${goal.opponentName ?? "Undefined opponent"}`}
+                  </p>
                 </div>
-                <Button variant="ghost" size="sm">
-                  <Link href={`/stats/goal/${goal.id}`}>Ver</Link>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="border border-rose-400/40 text-rose-200 hover:bg-rose-500/15"
-                  onClick={() => {
-                    setDeleteFeedback(null);
-                    setPendingDeleteGoalId(goal.id);
-                  }}
-                >
-                  <Trash2 className="mr-1 h-4 w-4" /> Delete
-                </Button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button variant="ghost" size="sm">
+                    <Link href={`/stats/goal/${goal.id}`}>View</Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="border border-rose-400/40 text-rose-200 hover:bg-rose-500/15"
+                    onClick={() => {
+                      setDeleteFeedback(null);
+                      setPendingDeleteGoalId(goal.id);
+                    }}
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" /> Delete
+                  </Button>
+                </div>
               </div>
             ))
           ) : (

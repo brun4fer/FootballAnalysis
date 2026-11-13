@@ -1028,6 +1028,9 @@ type ExistingGoal = {
   id: number;
   opponentTeamId: number | null;
   teamId: number;
+  matchday?: number | null;
+  matchDate?: string | null;
+  teamVenue?: "home" | "away" | null;
   scorerId: number;
   assistId: number | null;
   minute: number;
@@ -1089,6 +1092,9 @@ export function GoalWizard({ existingGoal, onSaved }: { existingGoal?: ExistingG
 const [championshipId, setChampionshipId] = useState<number | undefined>();
 const [teamId, setTeamId] = useState<number | undefined>();
 const [opponentTeamId, setOpponentTeamId] = useState<number | undefined>();
+const [matchday, setMatchday] = useState("");
+const [matchDate, setMatchDate] = useState("");
+const [teamVenue, setTeamVenue] = useState<"home" | "away" | undefined>();
 const [scorerId, setScorerId] = useState<number | undefined>();
 const [assistId, setAssistId] = useState<number | undefined>();
 const [minute, setMinute] = useState(0);
@@ -1264,7 +1270,7 @@ const dropCatalogAction = async (subMomentId: number, targetActionId: number) =>
       : isOffensiveTransitionMoment
         ? Boolean(subMomentId && hasCompleteOffensiveOrganizationCatalogue)
         : Boolean(effectiveSubMomentId && effectiveActionIds.length > 0);
-    if (!teamId || !opponentTeamId || !scorerId || !momentId || !hasTacticalContext) {
+    if (!teamId || !opponentTeamId || !matchday || !matchDate || !teamVenue || !scorerId || !momentId || !hasTacticalContext) {
       throw new Error("Required fields are missing");
     }
     if (isPhaseSequenceMoment && !hasCompleteOffensiveOrganizationCatalogue) {
@@ -1312,6 +1318,9 @@ const dropCatalogAction = async (subMomentId: number, targetActionId: number) =>
     const payload = {
       opponentTeamId,
       teamId,
+      matchday: Number(matchday),
+      matchDate,
+      teamVenue,
       scorerId,
       assistId: assistId ?? null,
       minute,
@@ -1354,6 +1363,7 @@ const dropCatalogAction = async (subMomentId: number, targetActionId: number) =>
   },
   onSuccess: () => {
     setMessage("Goal saved successfully.");
+    qc.invalidateQueries({ queryKey: ["goals-page-history", teamId] });
     setStep("team");
     setScorerId(undefined);
     setAssistId(undefined);
@@ -1413,7 +1423,7 @@ const updateMutation = useMutation({
       : isOffensiveTransitionMoment
         ? Boolean(subMomentId && hasCompleteOffensiveOrganizationCatalogue)
         : Boolean(effectiveSubMomentId && effectiveActionIds.length > 0);
-    if (!teamId || !opponentTeamId || !scorerId || !momentId || !hasTacticalContext) {
+    if (!teamId || !opponentTeamId || !matchday || !matchDate || !teamVenue || !scorerId || !momentId || !hasTacticalContext) {
       throw new Error("Required fields are missing");
     }
     if (isPhaseSequenceMoment && !hasCompleteOffensiveOrganizationCatalogue) {
@@ -1460,6 +1470,9 @@ const updateMutation = useMutation({
     const payload = {
       opponentTeamId,
       teamId,
+      matchday: Number(matchday),
+      matchDate,
+      teamVenue,
       scorerId,
       assistId: assistId ?? null,
       minute,
@@ -1503,6 +1516,7 @@ const updateMutation = useMutation({
   },
   onSuccess: () => {
     setMessage("Goal updated.");
+    qc.invalidateQueries({ queryKey: ["goals-page-history", teamId] });
     onSaved?.();
   },
   onError: (err: any) => setMessage(err.message ?? "Could not update the goal")
@@ -1925,6 +1939,9 @@ const filteredChampionships = useMemo(() => {
 
     setTeamId(existingGoal.teamId);
     setOpponentTeamId(existingGoal.opponentTeamId ?? undefined);
+    setMatchday(existingGoal.matchday?.toString() ?? "");
+    setMatchDate(existingGoal.matchDate?.slice(0, 10) ?? "");
+    setTeamVenue(existingGoal.teamVenue ?? undefined);
     setScorerId(existingGoal.scorerId);
     setAssistId(existingGoal.assistId ?? undefined);
     setMinute(existingGoal.minute);
@@ -2032,7 +2049,16 @@ const filteredChampionships = useMemo(() => {
       case "team":
 
 
-        return Boolean(teamId && opponentTeamId && opponentTeamId !== teamId);
+        return Boolean(
+          teamId &&
+            opponentTeamId &&
+            opponentTeamId !== teamId &&
+            matchday &&
+            Number(matchday) >= 1 &&
+            Number.isInteger(Number(matchday)) &&
+            matchDate &&
+            teamVenue
+        );
 
 
       case "scorer":
@@ -2309,6 +2335,10 @@ const filteredChampionships = useMemo(() => {
 
                     setOpponentTeamId(undefined);
 
+                    setMatchday("");
+                    setMatchDate("");
+                    setTeamVenue(undefined);
+
 
                     setScorerId(undefined);
 
@@ -2344,7 +2374,6 @@ const filteredChampionships = useMemo(() => {
 
 
               </div>
-
 
               <div className="text-xs text-muted-foreground">
 
@@ -2413,6 +2442,10 @@ const filteredChampionships = useMemo(() => {
 
 
                     setOpponentTeamId(undefined);
+
+                    setMatchday("");
+                    setMatchDate("");
+                    setTeamVenue(undefined);
 
 
                     setScorerId(undefined);
@@ -2594,6 +2627,52 @@ const filteredChampionships = useMemo(() => {
                 </p>
 
 
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="goal-matchday">Matchday</label>
+                <Input
+                  id="goal-matchday"
+                  type="number"
+                  min={1}
+                  max={99}
+                  step={1}
+                  value={matchday}
+                  onChange={(event) => setMatchday(event.target.value)}
+                  placeholder="e.g. 12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="goal-match-date">Match date</label>
+                <Input
+                  id="goal-match-date"
+                  type="date"
+                  value={matchDate}
+                  onChange={(event) => setMatchDate(event.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-sm font-medium">Where is the analysed team playing?</span>
+                <div className="grid grid-cols-2 gap-2" role="group" aria-label="Analysed team venue">
+                  {(["home", "away"] as const).map((venue) => (
+                    <button
+                      key={venue}
+                      type="button"
+                      aria-pressed={teamVenue === venue}
+                      onClick={() => setTeamVenue(venue)}
+                      className={cn(
+                        "rounded-lg border px-4 py-2.5 text-sm font-medium transition",
+                        teamVenue === venue
+                          ? "border-cyan-400 bg-cyan-400/15 text-cyan-100"
+                          : "border-border/70 bg-card/50 text-muted-foreground hover:border-cyan-400/50 hover:text-white"
+                      )}
+                    >
+                      {venue === "home" ? "Home" : "Away"}
+                    </button>
+                  ))}
+                </div>
               </div>
 
 
@@ -3904,6 +3983,15 @@ const filteredChampionships = useMemo(() => {
 
 
                 <span>{lookupsQuery.data?.teams.find((t) => t.id === opponentTeamId)?.name ?? "-"}</span>
+
+                <span className="text-muted-foreground">Matchday</span>
+                <span>{matchday || "-"}</span>
+
+                <span className="text-muted-foreground">Match date</span>
+                <span>{matchDate ? matchDate.split("-").reverse().join("/") : "-"}</span>
+
+                <span className="text-muted-foreground">Analysed team venue</span>
+                <span>{teamVenue === "home" ? "Home" : teamVenue === "away" ? "Away" : "-"}</span>
 
 
                 <span className="text-muted-foreground">Scorer</span>

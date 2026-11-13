@@ -219,6 +219,9 @@ export const goals = pgTable(
     teamId: bigint("team_id", { mode: "number" })
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
+    matchday: smallint("matchday"),
+    matchDate: date("match_date"),
+    teamVenue: text("team_venue").$type<"home" | "away" | null>(),
     scorerId: bigint("scorer_id", { mode: "number" })
       .notNull()
       .references(() => players.id),
@@ -261,7 +264,15 @@ export const goals = pgTable(
   },
   (table) => ({
     minuteCheck: check("goals_minute_check", sql`${table.minute} BETWEEN 0 AND 130`),
+    matchdayCheck: check("goals_matchday_check", sql`${table.matchday} IS NULL OR ${table.matchday} BETWEEN 1 AND 99`),
+    teamVenueCheck: check("goals_team_venue_check", sql`${table.teamVenue} IS NULL OR ${table.teamVenue} IN ('home','away')`),
     idxTeamMinute: index("idx_goals_team_minute").on(table.teamId),
+    idxMatchContext: index("idx_goals_match_context").on(
+      table.teamId,
+      table.matchDate,
+      table.matchday,
+      table.opponentTeamId
+    ),
     idxOpponent: index("idx_goals_opponent").on(table.opponentTeamId),
     idxScorer: index("idx_goals_scorer").on(table.scorerId),
     idxAssist: index("idx_goals_assist").on(table.assistId),

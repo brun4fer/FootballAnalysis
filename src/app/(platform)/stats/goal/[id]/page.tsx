@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button";
 
 import { ArrowLeft } from "lucide-react";
 
-import Image from "next/image";
 import { GoalDeleteButton } from "./goal-delete-button";
+import { PlayerPhoto } from "@/components/player-photo";
+import { formatMatchDate, getFixtureLabel, getGoalContextLine, getGoalHeading } from "@/lib/match-context";
 
 
 
@@ -272,9 +273,11 @@ export default async function GoalDetail({ params }: { params: { id: string } })
         </Link>
         <div>
 
-          <h1 className="text-2xl font-semibold">Goal #{id}</h1>
+          <h1 className="text-2xl font-semibold">{getGoalHeading(goal.goalNumber, id)}</h1>
 
-          <p className="text-sm text-muted-foreground">Detailed view with video and locations.</p>
+          <p className="text-sm text-muted-foreground">
+            {getGoalContextLine(goal) || "Detailed view with video and locations."}
+          </p>
 
         </div>
 
@@ -309,15 +312,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
                     <div key={`${inv.playerId}-${inv.role}`} className="flex items-center gap-3 rounded-lg border border-border/60 px-3 py-2">
 
-                      {inv.photoPath ? (
-
-                        <Image src={inv.photoPath} alt={inv.playerName ?? String(inv.playerId)} width={28} height={28} className="h-7 w-7 rounded-full object-cover" />
-
-                      ) : (
-
-                        <div className="h-7 w-7 rounded-full bg-slate-700" />
-
-                      )}
+                      <PlayerPhoto src={inv.photoPath} name={inv.playerName ?? String(inv.playerId)} className="h-7 w-7" />
 
                       <div className="flex-1">
 
@@ -378,6 +373,18 @@ export default async function GoalDetail({ params }: { params: { id: string } })
               <span className="text-muted-foreground">Opponent</span>
 
               <span>{goal.opponentName ?? goal.opponentTeamId ?? "-"}</span>
+
+              <span className="text-muted-foreground">Fixture</span>
+              <span>{getFixtureLabel(goal)}</span>
+
+              <span className="text-muted-foreground">Matchday</span>
+              <span>{goal.matchday ?? "-"}</span>
+
+              <span className="text-muted-foreground">Match date</span>
+              <span>{formatMatchDate(goal.matchDate) || "-"}</span>
+
+              <span className="text-muted-foreground">Analysed team venue</span>
+              <span>{goal.teamVenue === "home" ? "Home" : goal.teamVenue === "away" ? "Away" : "-"}</span>
 
               <span className="text-muted-foreground">Scorer</span>
 

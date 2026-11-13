@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatMatchDate, getFixtureLabel, getGoalContextLine, getGoalHeading, type TeamVenue } from "@/lib/match-context";
 
 type Coordinate = { x: number; y: number };
 type GoalActionDto = { actionId: number; actionName?: string | null };
@@ -21,8 +22,12 @@ type GoalSubMomentSequenceDto = {
 type GoalDetailProps = {
   goal: {
     id: number;
+    goalNumber?: number | null;
     opponentTeamId?: number | null;
     teamId: number;
+    matchday?: number | null;
+    matchDate?: string | null;
+    teamVenue?: TeamVenue | null;
     scorerId: number;
     assistId?: number | null;
     minute: number;
@@ -160,8 +165,10 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold">Goal #{goal.id}</h1>
-          <p className="text-sm text-muted-foreground">Detailed view with video and locations.</p>
+          <h1 className="text-2xl font-semibold">{getGoalHeading(goal.goalNumber, goal.id)}</h1>
+          <p className="text-sm text-muted-foreground">
+            {getGoalContextLine(goal) || "Detailed view with video and locations."}
+          </p>
         </div>
       </div>
 
@@ -182,6 +189,14 @@ export default function GoalDetailContent({ goal }: GoalDetailProps) {
             <div className="grid grid-cols-2 gap-2">
               <span className="text-muted-foreground">Team</span>
               <span>{goal.teamName ?? goal.teamId}</span>
+              <span className="text-muted-foreground">Fixture</span>
+              <span>{getFixtureLabel(goal)}</span>
+              <span className="text-muted-foreground">Matchday</span>
+              <span>{goal.matchday ?? "-"}</span>
+              <span className="text-muted-foreground">Match date</span>
+              <span>{formatMatchDate(goal.matchDate) || "-"}</span>
+              <span className="text-muted-foreground">Analysed team venue</span>
+              <span>{goal.teamVenue === "home" ? "Home" : goal.teamVenue === "away" ? "Away" : "-"}</span>
               <span className="text-muted-foreground">Opponent</span>
               <span>{goal.opponentName ?? goal.opponentTeamId ?? "—"}</span>
               <span className="text-muted-foreground">Scorer</span>

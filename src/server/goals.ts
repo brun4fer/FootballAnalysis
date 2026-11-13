@@ -10,6 +10,37 @@ import { ensureMediaWorkspace } from "@/lib/media-workspace";
 
 type RawGoalPayload = Record<string, unknown>;
 
+type GoalMatchContextRow = {
+  id: number;
+  teamId: number;
+  opponentTeamId: number | null;
+  matchday: number | null;
+  matchDate: string | null;
+  minute: number;
+};
+
+function getGoalMatchKey(goal: GoalMatchContextRow) {
+  if (!goal.opponentTeamId || !goal.matchday || !goal.matchDate) return null;
+  return `${goal.teamId}:${goal.opponentTeamId}:${goal.matchday}:${goal.matchDate.slice(0, 10)}`;
+}
+
+function buildGoalNumberMap(rows: GoalMatchContextRow[]) {
+  const grouped = new Map<string, GoalMatchContextRow[]>();
+  rows.forEach((goal) => {
+    const key = getGoalMatchKey(goal);
+    if (!key) return;
+    grouped.set(key, [...(grouped.get(key) ?? []), goal]);
+  });
+
+  const result = new Map<number, number>();
+  grouped.forEach((goalsInMatch) => {
+    goalsInMatch
+      .sort((a, b) => a.minute - b.minute || a.id - b.id)
+      .forEach((goal, index) => result.set(goal.id, index + 1));
+  });
+  return result;
+}
+
 function normalizeToken(value: string) {
   return value
     .normalize("NFD")
@@ -164,6 +195,11 @@ async function normalizeGoalPayload(payload: RawGoalPayload) {
     attackingSpaceIdRaw === undefined || attackingSpaceIdRaw === null || attackingSpaceIdRaw === ""
       ? null
       : Number(String(attackingSpaceIdRaw).replace(/[^\d.-]/g, ""));
+  const matchdayRaw = payload?.matchday;
+  const matchday =
+    matchdayRaw === undefined || matchdayRaw === null || matchdayRaw === ""
+      ? null
+      : Number(String(matchdayRaw).replace(/[^\d.-]/g, ""));
 
   const actionIdsRaw = Array.isArray(payload?.actionIds)
     ? payload.actionIds
@@ -210,6 +246,7 @@ async function normalizeGoalPayload(payload: RawGoalPayload) {
   return {
     ...payload,
     minute,
+    matchday: Number.isNaN(matchday) ? null : matchday,
     subMomentId: Number.isNaN(subMomentId) ? undefined : subMomentId,
     actionIds,
     subMomentSequence,
@@ -243,17 +280,32 @@ function isOffensiveOrganizationMomentName(value: string) {
 
 export async function getGoalsByTeam(teamId: number) {
   await requireOwnedTeam(teamId);
-  const [supportsAssistDrawing, supportsTransitionDrawing, supportsAttackingSpace, supportsGoalSubMomentActions] = await Promise.all([
+  const [
+    supportsAssistDrawing,
+    supportsTransitionDrawing,
+    supportsAttackingSpace,
+    supportsGoalSubMomentActions,
+    supportsMatchday,
+    supportsMatchDate,
+    supportsTeamVenue
+  ] = await Promise.all([
     hasGoalsColumn("assist_drawing"),
     hasGoalsColumn("transition_drawing"),
     hasGoalsColumn("attacking_space_id"),
-    hasGoalSubMomentActionsTable()
+    hasGoalSubMomentActionsTable(),
+    hasGoalsColumn("matchday"),
+    hasGoalsColumn("match_date"),
+    hasGoalsColumn("team_venue")
   ]);
+  const teamTable = alias(teams, "history_team");
   const rows = await db
     .select({
       id: goals.id,
       opponentTeamId: goals.opponentTeamId,
       teamId: goals.teamId,
+      matchday: supportsMatchday ? goals.matchday : sql<null>`null`,
+      matchDate: supportsMatchDate ? goals.matchDate : sql<null>`null`,
+      teamVenue: supportsTeamVenue ? goals.teamVenue : sql<null>`null`,
       scorerId: goals.scorerId,
       assistId: goals.assistId,
       minute: goals.minute,
@@ -270,6 +322,7 @@ export async function getGoalsByTeam(teamId: number) {
       goalZoneId: goals.goalZoneId,
       scorerName: players.name,
       opponentName: teams.name,
+      teamName: teamTable.name,
       cornerTakerId: goals.cornerTakerId,
       freekickTakerId: goals.freekickTakerId,
       penaltyTakerId: goals.penaltyTakerId,
@@ -281,6 +334,7 @@ export async function getGoalsByTeam(teamId: number) {
     .leftJoin(actions, eq(goals.actionId, actions.id))
     .leftJoin(players, eq(goals.scorerId, players.id))
     .leftJoin(teams, eq(goals.opponentTeamId, teams.id))
+    .leftJoin(teamTable, eq(goals.teamId, teamTable.id))
     .where(eq(goals.teamId, teamId))
     .orderBy(desc(goals.id));
 
@@ -386,11 +440,13 @@ export async function getGoalsByTeam(teamId: number) {
     sequenceGrouped.set(row.goalId, list);
   });
 
+  const goalNumberById = buildGoalNumberMap(rows as GoalMatchContextRow[]);
   return rows.map((g) => {
     const actionsForGoal = actionGrouped.get(g.id) ?? [];
     const primaryActionName = actionsForGoal[0]?.actionName ?? (g as any).action;
     return {
       ...g,
+      goalNumber: goalNumberById.get(g.id) ?? null,
       referencePlayerId: referenceByGoalId.get(g.id) ?? null,
       throwInTakerId: throwInTakerByGoalId.get(g.id) ?? null,
       action: primaryActionName,
@@ -404,11 +460,22 @@ export async function getGoalsByTeam(teamId: number) {
 
 export async function getGoalById(goalId: number) {
   await requireOwnedGoal(goalId);
-  const [supportsAssistDrawing, supportsTransitionDrawing, supportsAttackingSpace, supportsGoalSubMomentActions] = await Promise.all([
+  const [
+    supportsAssistDrawing,
+    supportsTransitionDrawing,
+    supportsAttackingSpace,
+    supportsGoalSubMomentActions,
+    supportsMatchday,
+    supportsMatchDate,
+    supportsTeamVenue
+  ] = await Promise.all([
     hasGoalsColumn("assist_drawing"),
     hasGoalsColumn("transition_drawing"),
     hasGoalsColumn("attacking_space_id"),
-    hasGoalSubMomentActionsTable()
+    hasGoalSubMomentActionsTable(),
+    hasGoalsColumn("matchday"),
+    hasGoalsColumn("match_date"),
+    hasGoalsColumn("team_venue")
   ]);
   const assistPlayer = alias(players, "assist_player");
   const cornerTaker = alias(players, "corner_taker");
@@ -424,6 +491,9 @@ export async function getGoalById(goalId: number) {
       id: goals.id,
       opponentTeamId: goals.opponentTeamId,
       teamId: goals.teamId,
+      matchday: supportsMatchday ? goals.matchday : sql<null>`null`,
+      matchDate: supportsMatchDate ? goals.matchDate : sql<null>`null`,
+      teamVenue: supportsTeamVenue ? goals.teamVenue : sql<null>`null`,
       scorerId: goals.scorerId,
       assistId: goals.assistId,
       minute: goals.minute,
@@ -554,8 +624,34 @@ export async function getGoalById(goalId: number) {
         .orderBy(asc(goalSubMomentActions.sequenceOrder))
     : [];
 
+  let goalNumber: number | null = null;
+  const currentGoal = row[0];
+  if (
+    supportsMatchday &&
+    supportsMatchDate &&
+    currentGoal.matchday &&
+    currentGoal.matchDate &&
+    currentGoal.opponentTeamId
+  ) {
+    const goalsInMatch = await db
+      .select({ id: goals.id })
+      .from(goals)
+      .where(
+        and(
+          eq(goals.teamId, currentGoal.teamId),
+          eq(goals.opponentTeamId, currentGoal.opponentTeamId),
+          eq(goals.matchday, currentGoal.matchday),
+          eq(goals.matchDate, currentGoal.matchDate)
+        )
+      )
+      .orderBy(asc(goals.minute), asc(goals.id));
+    const index = goalsInMatch.findIndex((goal) => goal.id === goalId);
+    goalNumber = index >= 0 ? index + 1 : null;
+  }
+
   return {
     ...row[0],
+    goalNumber,
     videoPlaybackUrl: row[0].mediaAssetId
       ? `/api/media/assets/${encodeURIComponent(row[0].mediaAssetId)}/playback`
       : row[0].videoPath,
@@ -588,14 +684,20 @@ async function upsertGoal(
     supportsAssistDrawing,
     supportsTransitionDrawing,
     supportsAttackingSpace,
-    supportsGoalSubMomentActions
+    supportsGoalSubMomentActions,
+    supportsMatchday,
+    supportsMatchDate,
+    supportsTeamVenue
   ] = await Promise.all([
     hasGoalsColumn("reference_player_id"),
     hasGoalsColumn("throw_in_taker_id"),
     hasGoalsColumn("assist_drawing"),
     hasGoalsColumn("transition_drawing"),
     hasGoalsColumn("attacking_space_id"),
-    hasGoalSubMomentActionsTable()
+    hasGoalSubMomentActionsTable(),
+    hasGoalsColumn("matchday"),
+    hasGoalsColumn("match_date"),
+    hasGoalsColumn("team_venue")
   ]);
 
   const existingGoal =
@@ -875,6 +977,9 @@ async function upsertGoal(
       foulSufferedById,
       previousMomentDescription
     };
+    if (supportsMatchday) goalValues.matchday = parsed.matchday ?? null;
+    if (supportsMatchDate) goalValues.matchDate = parsed.matchDate ?? null;
+    if (supportsTeamVenue) goalValues.teamVenue = parsed.teamVenue ?? null;
     if (supportsThrowInTaker) goalValues.throwInTakerId = throwInTakerId;
     if (supportsReferencePlayer) goalValues.referencePlayerId = referencePlayerId;
     if (supportsAssistDrawing) goalValues.assistDrawing = parsed.assistDrawing ?? null;

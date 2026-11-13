@@ -11,6 +11,7 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:goal-context": "tsx scripts/migrate-goal-match-context.ts",
     "db:studio": "drizzle-kit studio",
     "db:bootstrap:users": "tsx scripts/bootstrap-workspace-users.ts",
     "db:seed:taxonomy": "node scripts/seed-moments.js",
