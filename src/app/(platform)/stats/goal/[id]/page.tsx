@@ -216,7 +216,15 @@ const normalizeToken = (value?: string | null) =>
     .toLowerCase()
     .trim();
 
-export default async function GoalDetail({ params }: { params: { id: string } }) {
+const getSafeReturnTo = (value?: string) => (value?.startsWith("/teams") ? value : "/teams");
+
+export default async function GoalDetail({
+  params,
+  searchParams
+}: {
+  params: { id: string };
+  searchParams?: { returnTo?: string };
+}) {
 
   const id = Number(params.id);
 
@@ -225,6 +233,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
 
   const goal = await getGoalById(id);
+  const returnTo = getSafeReturnTo(searchParams?.returnTo);
 
   if (!goal) return notFound();
 
@@ -266,7 +275,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
     <div className="space-y-6">
 
       <div className="flex items-center gap-3">
-        <Link href="/teams">
+        <Link href={returnTo}>
           <Button variant="ghost" size="sm" className="gap-1">
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
@@ -573,7 +582,7 @@ export default async function GoalDetail({ params }: { params: { id: string } })
 
       </div>
       <div className="flex justify-end">
-        <GoalDeleteButton goalId={id} />
+        <GoalDeleteButton goalId={id} returnTo={returnTo} />
       </div>
 
     </div>

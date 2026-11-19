@@ -6,7 +6,7 @@ import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-export function GoalDeleteButton({ goalId }: { goalId: number }) {
+export function GoalDeleteButton({ goalId, returnTo = "/teams" }: { goalId: number; returnTo?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -21,7 +21,7 @@ export function GoalDeleteButton({ goalId }: { goalId: number }) {
       const res = await fetch(`/api/goals/${goalId}`, { method: "DELETE" });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error ?? "Could not delete the goal.");
-      router.push("/teams");
+      router.push(returnTo.startsWith("/teams") ? returnTo : "/teams");
       router.refresh();
     } catch (error: any) {
       setMessage(error?.message ?? "Could not delete the goal.");

@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SimpleBar } from "@/components/ui/charts";
-import { FileText, PlayCircle, X, Eye, Trash2 } from "lucide-react";
+import { FileText, PlayCircle, X, Eye, Trash2, ArrowDownUp } from "lucide-react";
 import { useAppContext } from "@/components/ui/app-context";
 import { GoalWizard } from "../goals/goal-wizard";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -29,6 +30,7 @@ type Season = { id: number; name: string };
 type Championship = { id: number; name: string; seasonId: number };
 type GoalEvent = {
   id: number;
+  matchDate?: string | null;
   minute: number;
   scorerId: number;
   scorerName?: string | null;
@@ -128,12 +130,22 @@ function GoalNetPinMap({ goals }: { goals: GoalEvent[] }) {
 
 export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
   const { selection } = useAppContext();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const PAGE_SIZE = 5;
-  const [seasonId, setSeasonId] = useState<string>(selection.seasonId ? String(selection.seasonId) : "");
-  const [championshipId, setChampionshipId] = useState<string>(selection.championshipId ? String(selection.championshipId) : "");
-  const [teamId, setTeamId] = useState<number | undefined>(selection.teamId);
+  const initialSeasonId = searchParams.get("season") ?? (selection.seasonId ? String(selection.seasonId) : "");
+  const initialChampionshipId = searchParams.get("competition") ?? (selection.championshipId ? String(selection.championshipId) : "");
+  const initialTeamId = Number(searchParams.get("team")) || selection.teamId;
+  const initialGoalPage = Math.max(0, Number(searchParams.get("goalPage")) || 0);
+  const [seasonId, setSeasonId] = useState<string>(initialSeasonId);
+  const [championshipId, setChampionshipId] = useState<string>(initialChampionshipId);
+  const [teamId, setTeamId] = useState<number | undefined>(initialTeamId);
   const [teamPage, setTeamPage] = useState(0);
-  const [goalPage, setGoalPage] = useState(0);
+  const [goalPage, setGoalPage] = useState(initialGoalPage);
+  const [goalSortOrder, setGoalSortOrder] = useState<"newest" | "oldest">(
+    searchParams.get("goalSort") === "oldest" ? "oldest" : "newest"
+  );
   const [editingGoalId, setEditingGoalId] = useState<number | null>(null);
   const [editingGoal, setEditingGoal] = useState<any | null>(null);
   const [pendingDeleteGoalId, setPendingDeleteGoalId] = useState<number | null>(null);
@@ -168,6 +180,25 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
   useEffect(() => {
     setTeamPage(0);
   }, [seasonId, championshipId, filteredTeams.length]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    const setValue = (key: string, value: string | number | undefined) => {
+      if (value === undefined || value === "") nextParams.delete(key);
+      else nextParams.set(key, String(value));
+    };
+
+    setValue("season", seasonId);
+    setValue("competition", championshipId);
+    setValue("team", teamId);
+    setValue("goalPage", goalPage || undefined);
+    setValue("goalSort", goalSortOrder === "oldest" ? goalSortOrder : undefined);
+
+    const nextQuery = nextParams.toString();
+    if (nextQuery !== searchParams.toString()) {
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+    }
+  }, [championshipId, goalPage, goalSortOrder, pathname, router, searchParams, seasonId, teamId]);
 
   const selectedTeam = useMemo(() => filteredTeams.find((t) => t.id === teamId), [filteredTeams, teamId]);
 
@@ -261,12 +292,26 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
   });
 
   const goalEvents = useMemo(() => goalsQuery.data ?? [], [goalsQuery.data]);
-  const goalPageCount = Math.ceil(goalEvents.length / PAGE_SIZE);
-  const paginatedGoalEvents = goalEvents.slice(goalPage * PAGE_SIZE, (goalPage + 1) * PAGE_SIZE);
+  const sortedGoalEvents = useMemo(
+    () =>
+      [...goalEvents].sort((first, second) => {
+        const byDate = (first.matchDate ?? "").localeCompare(second.matchDate ?? "");
+        const byId = first.id - second.id;
+        return goalSortOrder === "oldest" ? byDate || byId : -(byDate || byId);
+      }),
+    [goalEvents, goalSortOrder]
+  );
+  const goalPageCount = Math.ceil(sortedGoalEvents.length / PAGE_SIZE);
+  const paginatedGoalEvents = sortedGoalEvents.slice(goalPage * PAGE_SIZE, (goalPage + 1) * PAGE_SIZE);
 
   useEffect(() => {
-    setGoalPage(0);
-  }, [seasonId, championshipId, teamId, goalEvents.length]);
+    setGoalPage((currentPage) => Math.min(currentPage, Math.max(goalPageCount - 1, 0)));
+  }, [goalPageCount]);
+
+  const goalDetailsHref = (goalId: number) => {
+    const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+    return `/stats/goal/${goalId}?returnTo=${encodeURIComponent(returnTo)}`;
+  };
 
   const loadGoalForEdit = async (id: number) => {
     setEditingGoalId(id);
@@ -309,6 +354,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                 setSeasonId(e.target.value);
                 setChampionshipId("");
                 setTeamId(undefined);
+                setGoalPage(0);
               }}
             >
               <option value="">Select season</option>
@@ -326,6 +372,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
               onChange={(e) => {
                 setChampionshipId(e.target.value);
                 setTeamId(undefined);
+                setGoalPage(0);
               }}
               disabled={!seasonId}
             >
@@ -339,7 +386,14 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Team</label>
-            <Select value={teamId?.toString() ?? ""} onChange={(e) => setTeamId(Number(e.target.value) || undefined)} disabled={!championshipId}>
+            <Select
+              value={teamId?.toString() ?? ""}
+              onChange={(e) => {
+                setTeamId(Number(e.target.value) || undefined);
+                setGoalPage(0);
+              }}
+              disabled={!championshipId}
+            >
               <option value="">Select team</option>
               {filteredTeams.map((team) => (
                 <option key={team.id} value={team.id} className="text-black">
@@ -527,7 +581,25 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
             </Card>
           </div>
           <Card>
-            <CardHeader title="Goal History" description="Quickly edit any goal" />
+            <CardHeader
+              title="Goal History"
+              description="Quickly edit any goal"
+              action={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  title={goalSortOrder === "newest" ? "Currently newest first" : "Currently oldest first"}
+                  onClick={() => {
+                    setGoalSortOrder((current) => (current === "newest" ? "oldest" : "newest"));
+                    setGoalPage(0);
+                  }}
+                >
+                  <ArrowDownUp className="h-3.5 w-3.5" />
+                  {goalSortOrder === "newest" ? "Newest" : "Oldest"}
+                </Button>
+              }
+            />
             <CardContent className="space-y-2 text-sm">
               {deleteFeedback && (
                 <div className="rounded-md border border-border/60 bg-card/60 px-3 py-2 text-xs text-muted-foreground">
@@ -552,7 +624,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="ghost" size="sm">
-                        <Link href={`/stats/goal/${g.id}`} className="flex items-center gap-1">
+                        <Link href={goalDetailsHref(g.id)} className="flex items-center gap-1">
                           <Eye className="h-4 w-4" /> Ver
                         </Link>
                       </Button>

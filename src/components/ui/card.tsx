@@ -12,11 +12,22 @@ export function Card({ className, children, ...props }: CardProps) {
   );
 }
 
-export function CardHeader({ title, description }: { title: string; description?: string }) {
+export function CardHeader({
+  title,
+  description,
+  action
+}: {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="border-b border-border/60 px-4 py-3 flex flex-col gap-1">
-      <div className="text-sm font-semibold text-white">{title}</div>
-      {description && <p className="text-xs text-muted-foreground">{description}</p>}
+    <div className="flex items-start justify-between gap-3 border-b border-border/60 px-4 py-3">
+      <div className="flex flex-col gap-1">
+        <div className="text-sm font-semibold text-white">{title}</div>
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+      </div>
+      {action}
     </div>
   );
 }
