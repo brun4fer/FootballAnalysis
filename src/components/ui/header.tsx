@@ -1,9 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { ArrowLeft, LogOut } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { LanguageToggle } from "@/components/ui/language-toggle";
 import { HeaderNavigation } from "@/components/ui/header-navigation";
+
+const PORTAL_URL = "https://ap-football-portal.vercel.app";
 
 type HeaderProps = {
   user: {
@@ -28,6 +30,7 @@ export function Header({ user }: HeaderProps) {
           <div className="text-sm font-semibold tracking-tight md:text-lg">AP - Goals Scored</div>
         </div>
         <nav className="flex items-center gap-2 text-sm font-medium">
+          <a href={PORTAL_URL} className="inline-flex h-9 items-center gap-2 rounded-lg px-2 text-xs text-cyan-300 transition hover:bg-white/5 hover:text-cyan-100" title="Voltar ao All-in-One Football Ecosystem"><ArrowLeft className="h-4 w-4" /><span className="hidden xl:inline">All-in-One</span></a>
           <HeaderNavigation />
           <LanguageToggle />
           <Link
