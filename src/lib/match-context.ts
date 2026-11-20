@@ -29,7 +29,7 @@ export function getMatchContextKey(context: MatchContext) {
 }
 
 export function getGoalHeading(goalNumber?: number | null, _legacyId?: number | null) {
-  return goalNumber ? `Goal No. ${goalNumber}` : "Goal";
+  return goalNumber ? `Golo n.º ${goalNumber}` : "Golo";
 }
 
 export function getGoalContextLine(
@@ -37,8 +37,8 @@ export function getGoalContextLine(
   options: { includeGoal?: boolean } = {}
 ) {
   const parts: string[] = [];
-  if (options.includeGoal && context.goalNumber) parts.push(`Goal No. ${context.goalNumber}`);
-  if (context.matchday) parts.push(`Matchday ${context.matchday}`);
+  if (options.includeGoal && context.goalNumber) parts.push(`Golo n.º ${context.goalNumber}`);
+  if (context.matchday) parts.push(`Jornada ${context.matchday}`);
   if (context.matchDate) parts.push(formatMatchDate(context.matchDate));
   if (context.teamName || context.opponentName) parts.push(getFixtureLabel(context));
   if (context.minute !== null && context.minute !== undefined) parts.push(`${context.minute}'`);
