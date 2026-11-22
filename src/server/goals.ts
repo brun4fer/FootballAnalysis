@@ -5,7 +5,7 @@ import { actions, goalActions, goals, goalInvolvements, goalSubMomentActions, mo
 import { goalInputSchema } from "../lib/validation";
 import { requireOwnedGoal, requireOwnedTeam } from "./workspace";
 import { requireUser } from "@/lib/auth";
-import { getMediaAsset, removeGoalMediaReference, setGoalMediaReference } from "@/lib/media-library";
+import { getMediaAssetFromCurrentApp, removeGoalMediaReference, setGoalMediaReference } from "@/lib/media-library";
 import { ensureMediaWorkspace } from "@/lib/media-workspace";
 
 type RawGoalPayload = Record<string, unknown>;
@@ -714,7 +714,7 @@ async function upsertGoal(
   if (parsed.mediaAssetId) {
     const account = await requireUser();
     const { mediaWorkspace } = await ensureMediaWorkspace(account);
-    const mediaAsset = await getMediaAsset(mediaWorkspace.id, parsed.mediaAssetId);
+    const mediaAsset = await getMediaAssetFromCurrentApp(mediaWorkspace.id, parsed.mediaAssetId);
     if (!mediaAsset || mediaAsset.storageStatus !== "READY") {
       throw new Error("The selected cloud video is not available in this workspace");
     }

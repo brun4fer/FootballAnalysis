@@ -13,6 +13,6 @@ export async function GET() {
     return NextResponse.json({ assets: assets.map(serializeMediaAsset) });
   } catch (error) {
     console.error("[media-library]", error);
-    return NextResponse.json({ error: "Could not load the shared cloud library." }, { status: 500 });
+    return NextResponse.json({ error: "Could not load the cloud library for this software." }, { status: 500 });
   }
 }

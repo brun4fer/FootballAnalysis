@@ -46,7 +46,7 @@ export async function createMediaAsset(input: {
   lastModified?: number | null;
 }) {
   const id = `mas_${randomUUID()}`;
-  const storageKey = `workspaces/${input.mediaWorkspaceId}/goal-clips/${id}/${safeFileName(input.fileName)}`;
+  const storageKey = `libraries/${mediaAppId()}/workspaces/${input.mediaWorkspaceId}/goal-clips/${id}/${safeFileName(input.fileName)}`;
   const result = await mediaQuery<MediaAssetRow>(
     `INSERT INTO "MediaAsset"
       ("id", "mediaWorkspaceId", "createdByAppId", "fileName", "fileSize", "durationSeconds", "mimeType", "lastModified", "storageKey", "storageStatus", "createdAt", "updatedAt")
@@ -71,12 +71,23 @@ export async function listReadyMediaAssets(mediaWorkspaceId: string) {
   const result = await mediaQuery<MediaAssetRow>(
     `SELECT "id", "mediaWorkspaceId", "fileName", "fileSize", "durationSeconds", "mimeType", "storageKey", "storageStatus", "etag", "uploadedAt", "createdAt"
        FROM "MediaAsset"
-      WHERE "mediaWorkspaceId" = $1 AND "storageStatus" = 'READY'
+      WHERE "mediaWorkspaceId" = $1 AND "createdByAppId" = $2 AND "storageStatus" = 'READY'
       ORDER BY "uploadedAt" DESC NULLS LAST, "createdAt" DESC
       LIMIT 200`,
-    [mediaWorkspaceId]
+    [mediaWorkspaceId, mediaAppId()]
   );
   return result.rows;
+}
+
+export async function getMediaAssetFromCurrentApp(mediaWorkspaceId: string, assetId: string) {
+  const result = await mediaQuery<MediaAssetRow>(
+    `SELECT "id", "mediaWorkspaceId", "fileName", "fileSize", "durationSeconds", "mimeType", "storageKey", "storageStatus", "etag", "uploadedAt", "createdAt"
+       FROM "MediaAsset"
+      WHERE "id" = $1 AND "mediaWorkspaceId" = $2 AND "createdByAppId" = $3
+      LIMIT 1`,
+    [assetId, mediaWorkspaceId, mediaAppId()]
+  );
+  return result.rows[0] ?? null;
 }
 
 export async function getMediaAsset(mediaWorkspaceId: string, assetId: string) {
