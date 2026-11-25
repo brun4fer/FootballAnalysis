@@ -170,6 +170,14 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
   const filteredTeams = teams.filter((t) => (!championshipId ? true : t.championshipId === Number(championshipId)));
   const teamPageCount = Math.ceil(filteredTeams.length / PAGE_SIZE);
   const paginatedTeams = filteredTeams.slice(teamPage * PAGE_SIZE, (teamPage + 1) * PAGE_SIZE);
+  const teamPhasesHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (seasonId) params.set("season", seasonId);
+    if (championshipId) params.set("competition", championshipId);
+    if (teamId) params.set("team", String(teamId));
+    const query = params.toString();
+    return `/teams/radiografia${query ? `?${query}` : ""}`;
+  }, [championshipId, seasonId, teamId]);
 
   useEffect(() => {
     if (filteredTeams.length > 0 && (!teamId || !filteredTeams.some((t) => t.id === teamId))) {
@@ -339,7 +347,7 @@ export function TeamDashboard({ initialTeams }: { initialTeams: Team[] }) {
           </p>
         </div>
         <Button variant="secondary" size="sm">
-          <Link href="/teams/radiografia">Team Phases</Link>
+          <Link href={teamPhasesHref}>Team Phases</Link>
         </Button>
       </div>
 

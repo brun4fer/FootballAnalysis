@@ -31,8 +31,17 @@ export async function POST(req: Request) {
 
     // Keep `path` for compatibility with existing frontend code.
     return NextResponse.json({ path: blob.url, url: blob.url, pathname: blob.pathname });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[upload]", error);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    const detail = error instanceof Error ? error.message : "";
+    const blobIsNotConfigured = /BLOB_READ_WRITE_TOKEN|blob store|store.*configured/i.test(detail);
+    return NextResponse.json(
+      {
+        error: blobIsNotConfigured
+          ? "File storage is not configured for this environment."
+          : "The upload service is temporarily unavailable. Please try again."
+      },
+      { status: blobIsNotConfigured ? 503 : 500 }
+    );
   }
 }
